@@ -3,6 +3,7 @@ package openldap
 import (
 	"context"
 	"errors"
+
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"

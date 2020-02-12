@@ -2,6 +2,7 @@ package openldap
 
 import (
 	"fmt"
+
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 )
 

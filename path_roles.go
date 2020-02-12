@@ -11,10 +11,15 @@ import (
 	"github.com/hashicorp/vault/sdk/queue"
 )
 
+const (
+	staticRolePath     = "static-role/"
+	staticRoleListPath = "static-roles/?$"
+)
+
 func (b *backend) pathListRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: "static-roles/?$",
+			Pattern: staticRoleListPath,
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ListOperation: &framework.PathOperation{
 					Callback:                    b.pathRoleList,
@@ -31,7 +36,7 @@ func (b *backend) pathListRoles() []*framework.Path {
 func (b *backend) pathRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern:        "static-role/" + framework.GenericNameRegex("name"),
+			Pattern:        staticRolePath + framework.GenericNameRegex("name"),
 			Fields:         fieldsForType(staticRolePath),
 			ExistenceCheck: b.pathStaticRoleExistenceCheck,
 			Operations: map[logical.Operation]framework.OperationHandler{

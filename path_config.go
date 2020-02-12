@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	configPath            = "config"
 	defaultPasswordLength = 64
 	defaultTLSVersion     = "tls12"
 )

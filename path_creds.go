@@ -14,7 +14,7 @@ func (b *backend) pathCredsCreate() []*framework.Path {
 			Pattern: "static-cred/" + framework.GenericNameRegex("name"),
 			Fields: map[string]*framework.FieldSchema{
 				"name": {
-					Type:        framework.TypeString,
+					Type:        framework.TypeLowerCaseString,
 					Description: "Name of the static role.",
 				},
 			},

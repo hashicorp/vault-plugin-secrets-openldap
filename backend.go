@@ -11,11 +11,6 @@ import (
 	"github.com/hashicorp/vault/sdk/queue"
 )
 
-const (
-	configPath     = "config"
-	staticRolePath = "static-role/"
-)
-
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
 	ldapClient := NewClient()
 	b := Backend(ldapClient)

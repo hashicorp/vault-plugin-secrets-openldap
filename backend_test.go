@@ -19,7 +19,7 @@ var (
 	maxTTLInt          = int(maxLeaseTTLVal.Seconds())
 )
 
-func getBackend() (logical.Backend, logical.Storage) {
+func getBackend(throwsErr bool) (logical.Backend, logical.Storage) {
 	config := &logical.BackendConfig{
 		Logger: logging.NewVaultLogger(log.Trace),
 
@@ -29,7 +29,7 @@ func getBackend() (logical.Backend, logical.Storage) {
 		},
 		StorageView: &logical.InmemStorage{},
 	}
-	b := Backend(&fakeClient{})
+	b := Backend(&fakeClient{throwErrs: throwsErr})
 	b.Setup(context.Background(), config)
 
 	return b, config.StorageView

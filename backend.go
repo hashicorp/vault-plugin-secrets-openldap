@@ -55,7 +55,6 @@ func Backend(client ldapClient) *backend {
 
 		Secrets:     []*framework.Secret{},
 		Clean:       b.clean,
-		Invalidate:  b.invalidate,
 		BackendType: logical.TypeLogical,
 	}
 	b.client = client
@@ -67,8 +66,6 @@ func Backend(client ldapClient) *backend {
 func (b *backend) clean(ctx context.Context) {
 	b.invalidateQueue()
 }
-
-func (b *backend) invalidate(ctx context.Context, key string) {}
 
 // invalidateQueue cancels any background queue loading and destroys the queue.
 func (b *backend) invalidateQueue() {

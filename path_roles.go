@@ -15,8 +15,12 @@ func (b *backend) pathListRoles() []*framework.Path {
 	return []*framework.Path{
 		{
 			Pattern: "static-roles/?$",
-			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.ListOperation: b.pathRoleList,
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.ListOperation: &framework.PathOperation{
+					Callback:                    b.pathRoleList,
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
+				},
 			},
 			HelpSynopsis:    staticRolesListHelpSynopsis,
 			HelpDescription: staticRolesListHelpDescription,
@@ -30,11 +34,27 @@ func (b *backend) pathRoles() []*framework.Path {
 			Pattern:        "static-role/" + framework.GenericNameRegex("name"),
 			Fields:         fieldsForType(staticRolePath),
 			ExistenceCheck: b.pathStaticRoleExistenceCheck,
-			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.ReadOperation:   b.pathStaticRoleRead,
-				logical.CreateOperation: b.pathStaticRoleCreateUpdate,
-				logical.UpdateOperation: b.pathStaticRoleCreateUpdate,
-				logical.DeleteOperation: b.pathStaticRoleDelete,
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.UpdateOperation: &framework.PathOperation{
+					Callback:                    b.pathStaticRoleCreateUpdate,
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
+				},
+				logical.CreateOperation: &framework.PathOperation{
+					Callback:                    b.pathStaticRoleCreateUpdate,
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
+				},
+				logical.ReadOperation: &framework.PathOperation{
+					Callback:                    b.pathStaticRoleRead,
+					ForwardPerformanceSecondary: false,
+					ForwardPerformanceStandby:   false,
+				},
+				logical.DeleteOperation: &framework.PathOperation{
+					Callback:                    b.pathStaticRoleDelete,
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
+				},
 			},
 			HelpSynopsis:    staticRoleHelpSynopsis,
 			HelpDescription: staticRoleHelpDescription,

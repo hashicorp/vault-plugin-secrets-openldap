@@ -34,10 +34,22 @@ func (b *backend) pathConfig() []*framework.Path {
 		{
 			Pattern: configPath,
 			Fields:  b.configFields(),
-			Callbacks: map[logical.Operation]framework.OperationFunc{
-				logical.UpdateOperation: b.configUpdateOperation,
-				logical.ReadOperation:   b.configReadOperation,
-				logical.DeleteOperation: b.configDeleteOperation,
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.UpdateOperation: &framework.PathOperation{
+					Callback:                    b.configUpdateOperation,
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
+				},
+				logical.ReadOperation: &framework.PathOperation{
+					Callback:                    b.configReadOperation,
+					ForwardPerformanceSecondary: false,
+					ForwardPerformanceStandby:   false,
+				},
+				logical.DeleteOperation: &framework.PathOperation{
+					Callback:                    b.configDeleteOperation,
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
+				},
 			},
 			HelpSynopsis:    configHelpSynopsis,
 			HelpDescription: configHelpDescription,

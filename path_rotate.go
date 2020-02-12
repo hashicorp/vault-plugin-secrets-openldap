@@ -160,7 +160,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 }
 
 // rollBackPassword uses naive exponential backoff to retry updating to an old password,
-// because Active Directory may still be propagating the previous password change.
+// because LDAP may still be propagating the previous password change.
 func (b *backend) rollBackPassword(ctx context.Context, config *config, oldPassword string) error {
 	var err error
 	for i := 0; i < 10; i++ {

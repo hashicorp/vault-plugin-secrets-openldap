@@ -13,11 +13,11 @@ func TestConfig(t *testing.T) {
 		b, storage := getBackend()
 
 		data := map[string]interface{}{
-			"binddn":                  "tester",
-			"bindpass":                "pa$$w0rd",
-			"url":                     "ldap://138.91.247.105",
-			"certificate":             validCertificate,
-			"formatter":               "mycustom{{PASSWORD}}",
+			"binddn":      "tester",
+			"bindpass":    "pa$$w0rd",
+			"url":         "ldap://138.91.247.105",
+			"certificate": validCertificate,
+			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -85,9 +85,9 @@ func TestConfig(t *testing.T) {
 		b, storage := getBackend()
 
 		data := map[string]interface{}{
-			"binddn":                  "tester",
-			"bindpass":                "pa$$w0rd",
-			"url":                     "ldap://138.91.247.105",
+			"binddn":   "tester",
+			"bindpass": "pa$$w0rd",
+			"url":      "ldap://138.91.247.105",
 		}
 
 		req := &logical.Request{
@@ -107,8 +107,8 @@ func TestConfig(t *testing.T) {
 		b, storage := getBackend()
 
 		data := map[string]interface{}{
-			"bindpass":                "pa$$w0rd",
-			"url":                     "ldap://138.91.247.105",
+			"bindpass": "pa$$w0rd",
+			"url":      "ldap://138.91.247.105",
 		}
 
 		req := &logical.Request{
@@ -128,8 +128,8 @@ func TestConfig(t *testing.T) {
 		b, storage := getBackend()
 
 		data := map[string]interface{}{
-			"binddn":                  "tester",
-			"url":                     "ldap://138.91.247.105",
+			"binddn": "tester",
+			"url":    "ldap://138.91.247.105",
 		}
 
 		req := &logical.Request{
@@ -149,9 +149,9 @@ func TestConfig(t *testing.T) {
 		b, storage := getBackend()
 
 		data := map[string]interface{}{
-			"binddn":                  "tester",
-			"bindpass":                "pa$$w0rd",
-			"url":                     "ldap://138.91.247.105",
+			"binddn":   "tester",
+			"bindpass": "pa$$w0rd",
+			"url":      "ldap://138.91.247.105",
 		}
 
 		req := &logical.Request{

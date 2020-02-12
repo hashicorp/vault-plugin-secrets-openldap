@@ -6,7 +6,7 @@ import (
 	"github.com/go-ldap/ldap/v3"
 )
 
-// Entry is an Active Directory-specific construct
+// Entry is an LDAP-specific construct
 // to make knowing and grabbing fields more convenient,
 // while retaining all original information.
 func NewEntry(ldapEntry *ldap.Entry) *Entry {

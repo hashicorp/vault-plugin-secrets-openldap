@@ -44,8 +44,8 @@ func newFieldRegistry() *fieldRegistry {
 }
 
 // fieldRegistry isn't currently intended to be an exhaustive list -
-// there are more fields in ActiveDirectory. However, these are the ones
-// that may be useful to Vault. Feel free to add to this list!
+// there are more fields in LDAP because schema can be defined by the user.
+// Here are some of the more common fields.
 type fieldRegistry struct {
 	AccountExpires              *Field `ldap:"accountExpires"`
 	AdminCount                  *Field `ldap:"adminCount"`

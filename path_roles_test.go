@@ -196,8 +196,8 @@ func TestRoles(t *testing.T) {
 		}
 
 		data = map[string]interface{}{
-			"username":        "hashicorp",
-			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"username": "hashicorp",
+			"dn":       "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 		}
 
 		req = &logical.Request{
@@ -255,7 +255,7 @@ func TestRoles(t *testing.T) {
 		}
 	})
 
-		t.Run("user doesn't exist", func(t *testing.T) {
+	t.Run("user doesn't exist", func(t *testing.T) {
 		b, storage := getBackend(true)
 
 		data := map[string]interface{}{

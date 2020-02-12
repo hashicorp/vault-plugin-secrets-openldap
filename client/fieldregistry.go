@@ -47,47 +47,20 @@ func newFieldRegistry() *fieldRegistry {
 // there are more fields in LDAP because schema can be defined by the user.
 // Here are some of the more common fields.
 type fieldRegistry struct {
-	AccountExpires              *Field `ldap:"accountExpires"`
-	AdminCount                  *Field `ldap:"adminCount"`
-	BadPasswordCount            *Field `ldap:"badPwdCount"`
-	BadPasswordTime             *Field `ldap:"badPasswordTime"`
-	CodePage                    *Field `ldap:"codePage"`
-	CommonName                  *Field `ldap:"cn"`
-	CountryCode                 *Field `ldap:"countryCode"`
-	DisplayName                 *Field `ldap:"displayName"`
-	DistinguishedName           *Field `ldap:"distinguishedName"`
-	DomainComponent             *Field `ldap:"dc"`
-	DomainName                  *Field `ldap:"dn"`
-	DSCorePropogationData       *Field `ldap:"dSCorePropagationData"`
-	GivenName                   *Field `ldap:"givenName"`
-	GroupType                   *Field `ldap:"groupType"`
-	Initials                    *Field `ldap:"initials"`
-	InstanceType                *Field `ldap:"instanceType"`
-	LastLogoff                  *Field `ldap:"lastLogoff"`
-	LastLogon                   *Field `ldap:"lastLogon"`
-	LastLogonTimestamp          *Field `ldap:"lastLogonTimestamp"`
-	LockoutTime                 *Field `ldap:"lockoutTime"`
-	LogonCount                  *Field `ldap:"logonCount"`
-	MemberOf                    *Field `ldap:"memberOf"`
-	Name                        *Field `ldap:"name"`
-	ObjectCategory              *Field `ldap:"objectCategory"`
-	ObjectClass                 *Field `ldap:"objectClass"`
-	ObjectGUID                  *Field `ldap:"objectGUID"`
-	ObjectSID                   *Field `ldap:"objectSid"`
-	OrganizationalUnit          *Field `ldap:"ou"`
-	PasswordLastSet             *Field `ldap:"pwdLastSet"`
-	PrimaryGroupID              *Field `ldap:"primaryGroupID"`
-	SAMAccountName              *Field `ldap:"sAMAccountName"`
-	SAMAccountType              *Field `ldap:"sAMAccountType"`
-	Surname                     *Field `ldap:"sn"`
-	UnicodePassword             *Field `ldap:"unicodePwd"`
-	UpdateSequenceNumberChanged *Field `ldap:"uSNChanged"`
-	UpdateSequenceNumberCreated *Field `ldap:"uSNCreated"`
-	UserAccountControl          *Field `ldap:"userAccountControl"`
-	UserPassword                *Field `ldap:"userPassword"`
-	UserPrincipalName           *Field `ldap:"userPrincipalName"`
-	WhenCreated                 *Field `ldap:"whenCreated"`
-	WhenChanged                 *Field `ldap:"whenChanged"`
+	CommonName         *Field `ldap:"cn"`
+	DisplayName        *Field `ldap:"displayName"`
+	DistinguishedName  *Field `ldap:"distinguishedName"`
+	DomainComponent    *Field `ldap:"dc"`
+	DomainName         *Field `ldap:"dn"`
+	Name               *Field `ldap:"name"`
+	ObjectCategory     *Field `ldap:"objectCategory"`
+	ObjectClass        *Field `ldap:"objectClass"`
+	ObjectGUID         *Field `ldap:"objectGUID"`
+	ObjectSID          *Field `ldap:"objectSid"`
+	OrganizationalUnit *Field `ldap:"ou"`
+	UnicodePassword    *Field `ldap:"unicodePwd"`
+	UserPassword       *Field `ldap:"userPassword"`
+	UserPrincipalName  *Field `ldap:"userPrincipalName"`
 
 	fieldList []*Field
 }

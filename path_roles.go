@@ -163,10 +163,8 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 	}
 
 	data := map[string]interface{}{
-		"dn":          role.StaticAccount.DN,
-		"username":    role.StaticAccount.Username,
-		"default_ttl": role.DefaultTTL.Seconds(),
-		"max_ttl":     role.MaxTTL.Seconds(),
+		"dn":       role.StaticAccount.DN,
+		"username": role.StaticAccount.Username,
 	}
 
 	data["rotation_period"] = role.StaticAccount.RotationPeriod.Seconds()
@@ -270,8 +268,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 }
 
 type roleEntry struct {
-	DefaultTTL    time.Duration  `json:"default_ttl"`
-	MaxTTL        time.Duration  `json:"max_ttl"`
 	StaticAccount *staticAccount `json:"static_account" mapstructure:"static_account"`
 }
 

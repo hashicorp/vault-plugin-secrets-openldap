@@ -98,27 +98,10 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	}
 
 	// Build the password conf.
-	ttl := fieldData.Get("ttl").(int)
-	maxTTL := fieldData.Get("max_ttl").(int)
 	length := fieldData.Get("length").(int)
 	formatter := fieldData.Get("formatter").(string)
 	url := fieldData.Get("url").(string)
 
-	if ttl == 0 {
-		ttl = int(b.System().DefaultLeaseTTL().Seconds())
-	}
-	if maxTTL == 0 {
-		maxTTL = int(b.System().MaxLeaseTTL().Seconds())
-	}
-	if ttl > maxTTL {
-		return nil, errors.New("ttl must be smaller than or equal to max_ttl")
-	}
-	if ttl < 1 {
-		return nil, errors.New("ttl must be positive")
-	}
-	if maxTTL < 1 {
-		return nil, errors.New("max_ttl must be positive")
-	}
 	if url == "" {
 		return nil, errors.New("url is required")
 	}
@@ -131,8 +114,6 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 			ConfigEntry: ldapConf,
 		},
 		Password: &passwordConf{
-			TTL:       ttl,
-			MaxTTL:    maxTTL,
 			Length:    length,
 			Formatter: formatter,
 		},

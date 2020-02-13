@@ -73,16 +73,8 @@ func TestRoles(t *testing.T) {
 			t.Fatalf("expected rotation_period to be %d but got %s", 5, resp.Data["rotation_period"])
 		}
 
-		if resp.Data["default_ttl"] == nil {
-			t.Fatal("expected default_ttl to not be empty")
-		}
-
 		if resp.Data["last_vault_rotation"] == nil {
 			t.Fatal("expected last_vault_rotation to not be empty")
-		}
-
-		if resp.Data["max_ttl"] == nil {
-			t.Fatal("expected max_ttl to not be empty")
 		}
 	})
 	t.Run("happy path with roles", func(t *testing.T) {
@@ -150,16 +142,8 @@ func TestRoles(t *testing.T) {
 			t.Fatalf("expected rotation_period to be %d but got %s", 5, resp.Data["rotation_period"])
 		}
 
-		if resp.Data["default_ttl"] == nil {
-			t.Fatal("expected default_ttl to not be empty")
-		}
-
 		if resp.Data["last_vault_rotation"] == nil {
 			t.Fatal("expected last_vault_rotation to not be empty")
-		}
-
-		if resp.Data["max_ttl"] == nil {
-			t.Fatal("expected max_ttl to not be empty")
 		}
 	})
 

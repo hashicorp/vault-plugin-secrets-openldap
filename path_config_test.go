@@ -64,14 +64,6 @@ func TestConfig(t *testing.T) {
 			t.Fatalf("expected username to be \"tester\" but received %q", resp.Data["binddn"])
 		}
 
-		if resp.Data["ttl"] != defaultTTLInt {
-			t.Fatalf("received unexpected ttl of \"%d\"", resp.Data["ttl"])
-		}
-
-		if resp.Data["max_ttl"] != maxTTLInt {
-			t.Fatalf("received unexpected max_ttl of \"%d\"", resp.Data["max_ttl"])
-		}
-
 		if resp.Data["length"] != defaultPasswordLength {
 			t.Fatalf("received unexpected length of \"%d\"", resp.Data["length"])
 		}

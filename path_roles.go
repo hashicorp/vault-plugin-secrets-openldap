@@ -13,7 +13,7 @@ import (
 
 const (
 	staticRolePath     = "static-role/"
-	staticRoleListPath = "static-roles"
+	staticRoleListPath = "static-roles/"
 )
 
 func (b *backend) pathListRoles() []*framework.Path {

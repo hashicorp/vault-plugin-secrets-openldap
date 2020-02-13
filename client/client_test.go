@@ -39,24 +39,9 @@ func TestSearch(t *testing.T) {
 	}
 	entry := entries[0]
 
-	result, _ := entry.GetJoined(FieldRegistry.Surname)
-	if result != "Jones" {
-		t.Fatalf("expected Surname of \"Jones\" but received %q", result)
-	}
-
-	result, _ = entry.GetJoined(FieldRegistry.BadPasswordTime)
-	if result != "131653637947737037" {
-		t.Fatalf("expected BadPasswordTime of \"131653637947737037\" but received %q", result)
-	}
-
-	result, _ = entry.GetJoined(FieldRegistry.PasswordLastSet)
+	result, _ := entry.GetJoined(FieldRegistry.PasswordLastSet)
 	if result != "0" {
 		t.Fatalf("expected PasswordLastSet of \"0\" but received %q", result)
-	}
-
-	result, _ = entry.GetJoined(FieldRegistry.PrimaryGroupID)
-	if result != "513" {
-		t.Fatalf("expected PrimaryGroupID of \"513\" but received %q", result)
 	}
 
 	result, _ = entry.GetJoined(FieldRegistry.UserPrincipalName)
@@ -200,20 +185,8 @@ func testSearchResult() *ldap.SearchResult {
 				DN: "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com",
 				Attributes: []*ldap.EntryAttribute{
 					{
-						Name:   FieldRegistry.Surname.String(),
-						Values: []string{"Jones"},
-					},
-					{
-						Name:   FieldRegistry.BadPasswordTime.String(),
-						Values: []string{"131653637947737037"},
-					},
-					{
 						Name:   FieldRegistry.PasswordLastSet.String(),
 						Values: []string{"0"},
-					},
-					{
-						Name:   FieldRegistry.PrimaryGroupID.String(),
-						Values: []string{"513"},
 					},
 					{
 						Name:   FieldRegistry.UserPrincipalName.String(),

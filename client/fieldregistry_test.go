@@ -7,28 +7,28 @@ import (
 func TestFieldRegistryEqualityComparisonsWork(t *testing.T) {
 	fields := FieldRegistry.List()
 
-	foundGivenName := false
-	foundSurname := false
+	foundDisplayName := false
+	foundCommonName := false
 	for _, field := range fields {
-		if field == FieldRegistry.GivenName {
-			foundGivenName = true
+		if field == FieldRegistry.DisplayName {
+			foundDisplayName = true
 		}
-		if field == FieldRegistry.Surname {
-			foundSurname = true
+		if field == FieldRegistry.CommonName {
+			foundCommonName = true
 		}
 	}
 
-	if !foundGivenName || !foundSurname {
+	if !foundDisplayName || !foundCommonName {
 		t.Fatal("the field registry's equality comparisons are not working")
 	}
 }
 
 func TestFieldRegistryParsesFieldsByString(t *testing.T) {
-	field := FieldRegistry.Parse("sn")
+	field := FieldRegistry.Parse("ou")
 	if field == nil {
 		t.Fatal("field not found")
 	}
-	if field != FieldRegistry.Surname {
+	if field != FieldRegistry.OrganizationalUnit {
 		t.Fatal("the field registry is unable to parse registry fields from their string representations")
 	}
 }

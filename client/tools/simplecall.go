@@ -24,7 +24,7 @@ func main() {
 	c := client.New()
 
 	filters := map[*client.Field][]string{
-		client.FieldRegistry.GivenName: {"Sara", "Sarah"},
+		client.FieldRegistry.DisplayName: {"Sara", "Sarah"},
 	}
 
 	entries, err := c.Search(config, config.UserDN, filters)

@@ -7,11 +7,13 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
+const staticCredPath = "static-cred/"
+
 func (b *backend) pathCredsCreate() []*framework.Path {
 	return []*framework.Path{
 		{
 
-			Pattern: "static-cred/" + framework.GenericNameRegex("name"),
+			Pattern: staticCredPath + framework.GenericNameRegex("name"),
 			Fields: map[string]*framework.FieldSchema{
 				"name": {
 					Type:        framework.TypeLowerCaseString,

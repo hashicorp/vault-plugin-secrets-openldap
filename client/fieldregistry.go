@@ -58,6 +58,7 @@ type fieldRegistry struct {
 	ObjectGUID         *Field `ldap:"objectGUID"`
 	ObjectSID          *Field `ldap:"objectSid"`
 	OrganizationalUnit *Field `ldap:"ou"`
+	PasswordLastSet    *Field `ldap:"passwordLastSet"`
 	UnicodePassword    *Field `ldap:"unicodePwd"`
 	UserPassword       *Field `ldap:"userPassword"`
 	UserPrincipalName  *Field `ldap:"userPrincipalName"`

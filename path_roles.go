@@ -165,7 +165,6 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 	data := map[string]interface{}{
 		"dn":          role.StaticAccount.DN,
 		"username":    role.StaticAccount.Username,
-		"password":    role.StaticAccount.Password,
 		"default_ttl": role.DefaultTTL.Seconds(),
 		"max_ttl":     role.MaxTTL.Seconds(),
 	}
@@ -175,9 +174,7 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 		data["last_vault_rotation"] = role.StaticAccount.LastVaultRotation
 	}
 
-	return &logical.Response{
-		Data: data,
-	}, nil
+	return &logical.Response{Data: data}, nil
 }
 
 func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {

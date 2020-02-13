@@ -15,16 +15,18 @@ import (
 	"github.com/hashicorp/vault/sdk/queue"
 )
 
-var (
+const (
 	minimumLengthOfComplexString = 8
 	PasswordComplexityPrefix     = "?@09AZ"
 	PwdFieldTmpl                 = "{{PASSWORD}}"
+	rotateRootPath               = "rotate-root"
+	rotateRolePath               = "rotate-role/"
 )
 
 func (b *backend) pathRotateCredentials() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: "rotate-root",
+			Pattern: rotateRootPath,
 			Fields:  map[string]*framework.FieldSchema{},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
@@ -42,7 +44,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			HelpDescription: pathRotateCredentialsUpdateHelpDesc,
 		},
 		{
-			Pattern: "rotate-role/" + framework.GenericNameRegex("name"),
+			Pattern: rotateRolePath + framework.GenericNameRegex("name"),
 			Fields: map[string]*framework.FieldSchema{
 				"name": {
 					Type:        framework.TypeString,
@@ -118,7 +120,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		return nil, err
 	}
 	if role == nil {
-		return logical.ErrorResponse("no static role found for role name"), nil
+		return logical.ErrorResponse(fmt.Sprintf("role doesn't exist: %s", name)), nil
 	}
 
 	// In create/update of static accounts, we only care if the operation

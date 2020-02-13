@@ -21,7 +21,7 @@ func TestConfig(t *testing.T) {
 		}
 
 		req := &logical.Request{
-			Operation: logical.UpdateOperation,
+			Operation: logical.CreateOperation,
 			Path:      configPath,
 			Storage:   storage,
 			Data:      data,
@@ -81,6 +81,102 @@ func TestConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("update config", func(t *testing.T) {
+		b, storage := getBackend(false)
+
+		data := map[string]interface{}{
+			"binddn":      "tester",
+			"bindpass":    "pa$$w0rd",
+			"url":         "ldap://138.91.247.105",
+			"certificate": validCertificate,
+			"formatter":   "mycustom{{PASSWORD}}",
+		}
+
+		req := &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      configPath,
+			Storage:   storage,
+			Data:      data,
+		}
+
+		resp, err := b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		data = map[string]interface{}{
+			"binddn":      "newtester",
+			"bindpass":    "pa$$w0rd",
+			"url":         "ldap://138.91.247.105",
+			"certificate": validCertificate,
+			"formatter":   "mycustom{{PASSWORD}}",
+		}
+
+		req = &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      configPath,
+			Storage:   storage,
+			Data:      data,
+		}
+
+		resp, err = b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		req = &logical.Request{
+			Operation: logical.ReadOperation,
+			Path:      configPath,
+			Storage:   storage,
+			Data:      nil,
+		}
+
+		resp, err = b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		if resp.Data["binddn"] != "newtester" {
+			t.Fatalf("expected binddn to be %s, got %s", "newtester", resp.Data["binddn"])
+		}
+	})
+
+	t.Run("delete config", func(t *testing.T) {
+		b, storage := getBackend(false)
+
+		data := map[string]interface{}{
+			"binddn":      "tester",
+			"bindpass":    "pa$$w0rd",
+			"url":         "ldap://138.91.247.105",
+			"certificate": validCertificate,
+			"formatter":   "mycustom{{PASSWORD}}",
+		}
+
+		req := &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      configPath,
+			Storage:   storage,
+			Data:      data,
+		}
+
+		resp, err := b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		req = &logical.Request{
+			Operation: logical.DeleteOperation,
+			Path:      configPath,
+			Storage:   storage,
+			Data:      nil,
+		}
+
+		resp, err = b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+	})
+
 	t.Run("minimum config", func(t *testing.T) {
 		b, storage := getBackend(false)
 
@@ -91,7 +187,7 @@ func TestConfig(t *testing.T) {
 		}
 
 		req := &logical.Request{
-			Operation: logical.UpdateOperation,
+			Operation: logical.CreateOperation,
 			Path:      configPath,
 			Storage:   storage,
 			Data:      data,
@@ -112,7 +208,7 @@ func TestConfig(t *testing.T) {
 		}
 
 		req := &logical.Request{
-			Operation: logical.UpdateOperation,
+			Operation: logical.CreateOperation,
 			Path:      configPath,
 			Storage:   storage,
 			Data:      data,
@@ -142,40 +238,6 @@ func TestConfig(t *testing.T) {
 		_, err := b.HandleRequest(context.Background(), req)
 		if err == nil {
 			t.Fatal("should have got error, didn't")
-		}
-	})
-
-	t.Run("delete config", func(t *testing.T) {
-		b, storage := getBackend(false)
-
-		data := map[string]interface{}{
-			"binddn":   "tester",
-			"bindpass": "pa$$w0rd",
-			"url":      "ldap://138.91.247.105",
-		}
-
-		req := &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		req = &logical.Request{
-			Operation: logical.DeleteOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      nil,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 	})
 }

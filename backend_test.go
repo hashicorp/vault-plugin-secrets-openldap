@@ -3,6 +3,7 @@ package openldap
 import (
 	"context"
 	"errors"
+	"github.com/hashicorp/vault/sdk/queue"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
@@ -21,7 +22,7 @@ var (
 
 func getBackend(throwsErr bool) (logical.Backend, logical.Storage) {
 	config := &logical.BackendConfig{
-		Logger: logging.NewVaultLogger(log.Trace),
+		Logger: logging.NewVaultLogger(log.Error),
 
 		System: &logical.StaticSystemView{
 			DefaultLeaseTTLVal: defaultLeaseTTLVal,
@@ -31,6 +32,16 @@ func getBackend(throwsErr bool) (logical.Backend, logical.Storage) {
 	}
 	b := Backend(&fakeClient{throwErrs: throwsErr})
 	b.Setup(context.Background(), config)
+
+	b.credRotationQueue = queue.New()
+	// Create a context with a cancel method for processing any WAL entries and
+	// populating the queue
+	initCtx := context.Background()
+	ictx, cancel := context.WithCancel(initCtx)
+	b.cancelQueue = cancel
+
+	// Load queue and kickoff new periodic ticker
+	go b.initQueue(ictx, config)
 
 	return b, config.StorageView
 }

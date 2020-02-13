@@ -3,7 +3,6 @@ package openldap
 import (
 	"context"
 	"errors"
-
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
@@ -37,8 +36,13 @@ func (b *backend) pathConfig() []*framework.Path {
 			Pattern: configPath,
 			Fields:  b.configFields(),
 			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.CreateOperation: &framework.PathOperation{
+					Callback:                    b.configCreateUpdateOperation,
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
+				},
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback:                    b.configUpdateOperation,
+					Callback:                    b.configCreateUpdateOperation,
 					ForwardPerformanceSecondary: true,
 					ForwardPerformanceStandby:   true,
 				},
@@ -81,7 +85,7 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 	return fields
 }
 
-func (b *backend) configUpdateOperation(ctx context.Context, req *logical.Request, fieldData *framework.FieldData) (*logical.Response, error) {
+func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.Request, fieldData *framework.FieldData) (*logical.Response, error) {
 	// Build and validate the ldap conf.
 	ldapConf, err := ldaputil.NewConfigEntry(nil, fieldData)
 	if err != nil {
@@ -97,6 +101,7 @@ func (b *backend) configUpdateOperation(ctx context.Context, req *logical.Reques
 	maxTTL := fieldData.Get("max_ttl").(int)
 	length := fieldData.Get("length").(int)
 	formatter := fieldData.Get("formatter").(string)
+	url := fieldData.Get("url").(string)
 
 	if ttl == 0 {
 		ttl = int(b.System().DefaultLeaseTTL().Seconds())
@@ -112,6 +117,9 @@ func (b *backend) configUpdateOperation(ctx context.Context, req *logical.Reques
 	}
 	if maxTTL < 1 {
 		return nil, errors.New("max_ttl must be positive")
+	}
+	if url == "" {
+		return nil, errors.New("url is required")
 	}
 	if err := validatePwdSettings(formatter, length); err != nil {
 		return nil, err

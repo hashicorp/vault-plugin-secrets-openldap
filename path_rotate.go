@@ -17,8 +17,8 @@ import (
 
 const (
 	minimumLengthOfComplexString = 8
-	PasswordComplexityPrefix     = "?@09AZ"
-	PwdFieldTmpl                 = "{{PASSWORD}}"
+	passwordComplexityPrefix     = "?@09AZ"
+	pwdFieldTmpl                 = "{{PASSWORD}}"
 	rotateRootPath               = "rotate-root"
 	rotateRolePath               = "rotate-role/"
 )
@@ -202,14 +202,14 @@ func GeneratePassword(formatter string, totalLength int) (string, error) {
 		return "", err
 	}
 	if formatter == "" {
-		pwd = PasswordComplexityPrefix + pwd
+		pwd = passwordComplexityPrefix + pwd
 		return pwd[:totalLength], nil
 	}
-	return strings.Replace(formatter, PwdFieldTmpl, pwd[:lengthOfPassword(formatter, totalLength)], 1), nil
+	return strings.Replace(formatter, pwdFieldTmpl, pwd[:lengthOfPassword(formatter, totalLength)], 1), nil
 }
 
 func lengthOfPassword(formatter string, totalLength int) int {
-	lengthOfText := len(formatter) - len(PwdFieldTmpl)
+	lengthOfText := len(formatter) - len(pwdFieldTmpl)
 	return totalLength - lengthOfText
 }
 

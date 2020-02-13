@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	// staticRolePath is the
 	staticRolePath     = "static-role/"
 	staticRoleListPath = "static-roles"
 )

@@ -3,8 +3,9 @@ package openldap
 import (
 	"context"
 	"errors"
-	"github.com/hashicorp/vault/sdk/queue"
 	"time"
+
+	"github.com/hashicorp/vault/sdk/queue"
 
 	"github.com/go-ldap/ldap/v3"
 	log "github.com/hashicorp/go-hclog"

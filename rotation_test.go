@@ -79,7 +79,8 @@ func TestAutoRotate(t *testing.T) {
 		}
 		oldPassword := resp.Data["password"]
 
-		time.Sleep(time.Second * 5)
+		// Wait for auto rotation (5s) + 1 second for breathing room
+		time.Sleep(time.Second * 6)
 
 		req = &logical.Request{
 			Operation: logical.ReadOperation,

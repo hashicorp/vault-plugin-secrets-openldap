@@ -3,6 +3,7 @@ package openldap
 import (
 	"context"
 	"errors"
+
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
@@ -10,14 +11,9 @@ import (
 )
 
 const (
-	// configPath is the path where configuration values are stored.
-	configPath = "config"
-
-	// defaultPasswordLength sets the length of generated passwords
+	configPath            = "config"
 	defaultPasswordLength = 64
-
-	// defaultTLSVersion sets the default version of TLS to use
-	defaultTLSVersion = "tls12"
+	defaultTLSVersion     = "tls12"
 )
 
 func readConfig(ctx context.Context, storage logical.Storage) (*config, error) {

@@ -2,8 +2,9 @@ package openldap
 
 import (
 	"context"
-	"github.com/hashicorp/vault/sdk/logical"
 	"testing"
+
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 func TestCreds(t *testing.T) {

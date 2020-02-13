@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-// staticCredPath is the path where static creds can be read for a role.
 const staticCredPath = "static-cred/"
 
 func (b *backend) pathCredsCreate() []*framework.Path {

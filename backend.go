@@ -119,9 +119,9 @@ func (b *backend) roleAtPath(ctx context.Context, s logical.Storage, roleName st
 	return &result, nil
 }
 
-// TODO: this could be better
 const backendHelp = `
 The OpenLDAP backend supports managing existing LDAP entry passwords by providing:
+
  * end points to add entries
  * manual rotation of entry passwords
  * auto rotation of entry passwords
@@ -129,5 +129,5 @@ The OpenLDAP backend supports managing existing LDAP entry passwords by providin
 The OpenLDAP secret engine is limited to OpenLDAP and does not support any other 
 implementations of LDAP.
 
-After mounting this backend, configure it using the "openldap/config" path.
+After mounting this secret backend, configure it using the "openldap/config" path.
 `

@@ -162,7 +162,8 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	// "password" is intentionally not returned by this endpoint,
 	// as we lean away from returning sensitive information unless it's absolutely necessary.
 	// Also, we don't return the full ADConf here because not all parameters are used by this engine.
-	configMap := map[string]interface{}{
+	configMap := config.LDAP.PasswordlessMap()
+	/*map[string]interface{}{
 		"url":             config.LDAP.Url,
 		"starttls":        config.LDAP.StartTLS,
 		"insecure_tls":    config.LDAP.InsecureTLS,
@@ -171,7 +172,7 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 		"userdn":          config.LDAP.UserDN,
 		"tls_min_version": config.LDAP.TLSMinVersion,
 		"tls_max_version": config.LDAP.TLSMaxVersion,
-	}
+	}*/
 
 	for k, v := range config.Password.Map() {
 		configMap[k] = v

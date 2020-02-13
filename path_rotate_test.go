@@ -174,7 +174,7 @@ func TestManaulRotate(t *testing.T) {
 		}
 
 		resp, _ := b.HandleRequest(context.Background(), req)
-		if resp == nil || !resp.IsError(){
+		if resp == nil || !resp.IsError() {
 			t.Fatal("expected error")
 		}
 	})

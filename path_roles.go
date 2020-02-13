@@ -12,14 +12,15 @@ import (
 )
 
 const (
+	// staticRolePath is the
 	staticRolePath     = "static-role/"
-	staticRoleListPath = "static-roles/?$"
+	staticRoleListPath = "static-roles"
 )
 
 func (b *backend) pathListRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: staticRoleListPath,
+			Pattern: staticRoleListPath + "?$",
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ListOperation: &framework.PathOperation{
 					Callback:                    b.pathRoleList,

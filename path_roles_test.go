@@ -389,3 +389,81 @@ func TestRoles(t *testing.T) {
 		}
 	})
 }
+
+func TestListRoles(t *testing.T) {
+	t.Run("list roles", func(t *testing.T) {
+		b, storage := getBackend(false)
+
+		data := map[string]interface{}{
+			"binddn":      "tester",
+			"bindpass":    "pa$$w0rd",
+			"url":         "ldap://138.91.247.105",
+			"certificate": validCertificate,
+			"formatter":   "mycustom{{PASSWORD}}",
+		}
+
+		req := &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      configPath,
+			Storage:   storage,
+			Data:      data,
+		}
+
+		resp, err := b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		data = map[string]interface{}{
+			"username":        "hashicorp",
+			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period": "5s",
+		}
+
+		req = &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      staticRolePath + "hashicorp",
+			Storage:   storage,
+			Data:      data,
+		}
+
+		resp, err = b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		data = map[string]interface{}{
+			"username":        "vault",
+			"dn":              "uid=vault,ou=users,dc=hashicorp,dc=com",
+			"rotation_period": "5s",
+		}
+
+		req = &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      staticRolePath + "vault",
+			Storage:   storage,
+			Data:      data,
+		}
+
+		resp, err = b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		req = &logical.Request{
+			Operation: logical.ListOperation,
+			Path:      staticRoleListPath,
+			Storage:   storage,
+			Data:      nil,
+		}
+
+		resp, err = b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		if len(resp.Data["keys"].([]string)) != 2 {
+			t.Fatalf("expected list with %d keys, got %d", 2, len(resp.Data["keys"].([]string)))
+		}
+	})
+}

@@ -10,9 +10,14 @@ import (
 )
 
 const (
-	configPath            = "config"
+	// configPath is the path where configuration values are stored.
+	configPath = "config"
+
+	// defaultPasswordLength sets the length of generated passwords
 	defaultPasswordLength = 64
-	defaultTLSVersion     = "tls12"
+
+	// defaultTLSVersion sets the default version of TLS to use
+	defaultTLSVersion = "tls12"
 )
 
 func readConfig(ctx context.Context, storage logical.Storage) (*config, error) {
@@ -158,21 +163,8 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 		return nil, nil
 	}
 
-	// NOTE:
-	// "password" is intentionally not returned by this endpoint,
-	// as we lean away from returning sensitive information unless it's absolutely necessary.
-	// Also, we don't return the full ADConf here because not all parameters are used by this engine.
+	// "password" is intentionally not returned by this endpoint
 	configMap := config.LDAP.PasswordlessMap()
-	/*map[string]interface{}{
-		"url":             config.LDAP.Url,
-		"starttls":        config.LDAP.StartTLS,
-		"insecure_tls":    config.LDAP.InsecureTLS,
-		"certificate":     config.LDAP.Certificate,
-		"binddn":          config.LDAP.BindDN,
-		"userdn":          config.LDAP.UserDN,
-		"tls_min_version": config.LDAP.TLSMinVersion,
-		"tls_max_version": config.LDAP.TLSMaxVersion,
-	}*/
 
 	for k, v := range config.Password.Map() {
 		configMap[k] = v

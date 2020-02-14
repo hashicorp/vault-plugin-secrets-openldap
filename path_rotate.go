@@ -124,7 +124,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		}
 	}
 
-	resp, err := b.setStaticAccount(ctx, req.Storage, &setStaticAccountInput{
+	resp, err := b.setStaticAccountPassword(ctx, req.Storage, &setStaticAccountInput{
 		RoleName: name,
 		Role:     role,
 	})
@@ -179,10 +179,7 @@ func storePassword(ctx context.Context, s logical.Storage, config *config) error
 	if err != nil {
 		return err
 	}
-	if err := s.Put(ctx, entry); err != nil {
-		return err
-	}
-	return nil
+	return s.Put(ctx, entry)
 }
 
 func GeneratePassword(formatter string, totalLength int) (string, error) {

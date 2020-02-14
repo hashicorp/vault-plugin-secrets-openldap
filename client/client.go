@@ -11,6 +11,12 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 )
 
+type Config struct {
+	*ldaputil.ConfigEntry
+	LastBindPassword         string    `json:"last_bind_password"`
+	LastBindPasswordRotation time.Time `json:"last_bind_password_rotation"`
+}
+
 func New() Client {
 	return Client{
 		ldap: &ldaputil.Client{

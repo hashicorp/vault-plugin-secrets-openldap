@@ -123,8 +123,13 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 	lock.Lock()
 	defer lock.Unlock()
 
+	//TODO: Add retry logic
+
 	// Remove the item from the queue
-	_, _ = b.popFromRotationQueueByKey(name)
+	_, err := b.popFromRotationQueueByKey(name)
+	if err != nil {
+		return nil, err
+	}
 
 	role, err := b.StaticRole(ctx, req.Storage, name)
 	if err != nil {
@@ -242,6 +247,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 
 		// In case this is an update, remove any previous version of the item from
 		// the queue
+
+		//TODO: Add retry logic
 		_, err = b.popFromRotationQueueByKey(name)
 		if err != nil {
 			return nil, err

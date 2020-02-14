@@ -87,7 +87,7 @@ func fieldsForType(roleType string) map[string]*framework.FieldSchema {
 		},
 		"ttl": {
 			Type:        framework.TypeDurationSecond,
-			Description: "In seconds, the time-to-live for the password.",
+			Description: "The time-to-live for the password.",
 		},
 	}
 

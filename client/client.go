@@ -132,7 +132,7 @@ func shouldTryLastPwd(lastPwd string, lastBindPasswordRotation time.Time) bool {
 	if lastPwd == "" {
 		return false
 	}
-	if lastBindPasswordRotation.Equal(time.Time{}) {
+	if lastBindPasswordRotation.IsZero() {
 		return false
 	}
 	return lastBindPasswordRotation.Add(10 * time.Minute).After(time.Now())

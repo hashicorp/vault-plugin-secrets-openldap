@@ -484,8 +484,7 @@ func (b *backend) loadStaticWALs(ctx context.Context, s logical.Storage) (map[st
 // operate in go-routines, and could be accessing the queue concurrently
 func (b *backend) pushItem(item *queue.Item) error {
 	b.RLock()
-	unlockFunc := b.RUnlock
-	defer func() { unlockFunc() }()
+	defer b.RUnlock()
 
 	if b.credRotationQueue != nil {
 		return b.credRotationQueue.Push(item)

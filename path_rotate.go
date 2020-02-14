@@ -120,7 +120,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		return nil, err
 	}
 	if role == nil {
-		return logical.ErrorResponse(fmt.Sprintf("role doesn't exist: %s", name)), nil
+		return logical.ErrorResponse("role doesn't exist: %s", name), nil
 	}
 
 	// In create/update of static accounts, we only care if the operation

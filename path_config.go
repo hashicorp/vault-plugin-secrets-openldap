@@ -72,7 +72,7 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 	}
 	fields["max_ttl"] = &framework.FieldSchema{
 		Type:        framework.TypeDurationSecond,
-		Description: "In seconds, the maximum password time-to-live.",
+		Description: "The maximum password time-to-live.",
 	}
 	fields["length"] = &framework.FieldSchema{
 		Type:        framework.TypeInt,

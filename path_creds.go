@@ -12,7 +12,6 @@ const staticCredPath = "static-cred/"
 func (b *backend) pathCredsCreate() []*framework.Path {
 	return []*framework.Path{
 		{
-
 			Pattern: staticCredPath + framework.GenericNameRegex("name"),
 			Fields: map[string]*framework.FieldSchema{
 				"name": {

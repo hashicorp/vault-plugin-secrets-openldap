@@ -22,16 +22,15 @@ func validatePwdSettings(formatter string, totalLength int) error {
 	if formatter == "" {
 		if totalLength < len(passwordComplexityPrefix)+minimumLengthOfComplexString {
 			suggestedLength := minimumLengthOfComplexString + len(passwordComplexityPrefix)
-			return fmt.Errorf(`it's not possible to generate a _secure_ password of length %d, 
-please boost length to %d, though Vault recommends higher`, totalLength, suggestedLength)
+			return fmt.Errorf("password length %d is less than the minimum required (%d)", totalLength, suggestedLength)
 		}
 		return nil
 	}
 
 	// Check for if there is a formatter.
 	if lengthOfPassword(formatter, totalLength) < minimumLengthOfComplexString {
-		return fmt.Errorf(`since the desired length is %d, it isn't possible to generate a sufficiently complex password
-- please increase desired length or remove characters from the formatter`, totalLength)
+		return fmt.Errorf("password length %d is smaller than desired length %d",
+			lengthOfPassword(formatter, totalLength),  minimumLengthOfComplexString)
 	}
 
 	numPwdFields := strings.Count(formatter, pwdFieldTmpl)

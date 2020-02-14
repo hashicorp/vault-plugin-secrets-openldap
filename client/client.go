@@ -1,12 +1,12 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
 	"time"
 
-	"github.com/go-errors/errors"
 	"github.com/go-ldap/ldap/v3"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 )

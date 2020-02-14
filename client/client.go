@@ -83,7 +83,9 @@ func (c *Client) UpdateEntry(cfg *Config, baseDN string, filters map[*Field][]st
 	return conn.Modify(modifyReq)
 }
 
-// UpdatePassword uses a Modify call under the hood because
+// UpdatePassword uses a Modify call under the hood instead of LDAP change password function.
+// This allows AD and OpenLDAP secret engines to use the same api without changes to
+// the interface.
 func (c *Client) UpdatePassword(cfg *Config, baseDN string, filters map[*Field][]string, newPassword string) error {
 	newValues := map[*Field][]string{
 		FieldRegistry.UserPassword: {newPassword},

@@ -68,7 +68,7 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 	fields := ldaputil.ConfigFields()
 	fields["ttl"] = &framework.FieldSchema{
 		Type:        framework.TypeDurationSecond,
-		Description: "In seconds, the default password time-to-live.",
+		Description: "The default password time-to-live.",
 	}
 	fields["max_ttl"] = &framework.FieldSchema{
 		Type:        framework.TypeDurationSecond,

@@ -437,7 +437,7 @@ func TestListRoles(t *testing.T) {
 
 		req = &logical.Request{
 			Operation: logical.ListOperation,
-			Path:      staticRoleListPath,
+			Path:      staticRolePath,
 			Storage:   storage,
 			Data:      nil,
 		}

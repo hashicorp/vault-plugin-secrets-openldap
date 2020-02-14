@@ -3,13 +3,11 @@ module github.com/hashicorp/vault-plugin-secrets-openldap
 go 1.13
 
 require (
-	github.com/go-errors/errors v1.0.1
 	github.com/go-ldap/ldap/v3 v3.1.6
-	github.com/go-test/deep v1.0.2-0.20181118220953-042da051cf31
 	github.com/hashicorp/errwrap v1.0.0
 	github.com/hashicorp/go-hclog v0.12.0
 	github.com/hashicorp/go-multierror v1.0.0
-	github.com/hashicorp/go-uuid v1.0.2
+	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/hashicorp/go-version v1.2.0 // indirect
 	github.com/hashicorp/vault/api v1.0.5-0.20200117231345-460d63e36490
 	github.com/hashicorp/vault/sdk v0.1.14-0.20200117231345-460d63e36490

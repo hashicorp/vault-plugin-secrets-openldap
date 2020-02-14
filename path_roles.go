@@ -201,14 +201,13 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	}
 	role.StaticAccount.Username = username
 
-	// If it's a Create operation, both username and rotation_period must be included
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
 	if !ok {
-		return logical.ErrorResponse("rotation_period is required to create static accounts"), nil
+		return logical.ErrorResponse("rotation_period is required for static accounts"), nil
 	}
 	rotationPeriodSeconds := rotationPeriodSecondsRaw.(int)
 	if rotationPeriodSeconds < queueTickSeconds {
-		// If rotation frequency is specified, and this is an update, the value
+		// If rotation frequency is specified the value
 		// must be at least that of the constant queueTickSeconds (5 seconds at
 		// time of writing), otherwise we wont be able to rotate in time
 		return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil

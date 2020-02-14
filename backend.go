@@ -98,27 +98,6 @@ type backend struct {
 	client    ldapClient
 }
 
-func (b *backend) StaticRole(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
-	return b.roleAtPath(ctx, s, roleName, staticRolePath)
-}
-
-func (b *backend) roleAtPath(ctx context.Context, s logical.Storage, roleName string, pathPrefix string) (*roleEntry, error) {
-	entry, err := s.Get(ctx, pathPrefix+roleName)
-	if err != nil {
-		return nil, err
-	}
-	if entry == nil {
-		return nil, nil
-	}
-
-	var result roleEntry
-	if err := entry.DecodeJSON(&result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
-
 const backendHelp = `
 The OpenLDAP backend supports managing existing LDAP entry passwords by providing:
 

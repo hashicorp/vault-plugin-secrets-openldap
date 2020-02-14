@@ -10,6 +10,7 @@ import (
 func TestManaulRotate(t *testing.T) {
 	t.Run("rotate root", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -45,6 +46,7 @@ func TestManaulRotate(t *testing.T) {
 
 	t.Run("rotate root that doesn't exist", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		req := &logical.Request{
 			Operation: logical.CreateOperation,
@@ -61,6 +63,7 @@ func TestManaulRotate(t *testing.T) {
 
 	t.Run("rotate role", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -163,6 +166,7 @@ func TestManaulRotate(t *testing.T) {
 
 	t.Run("rotate role that doesn't exist", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		req := &logical.Request{
 			Operation: logical.CreateOperation,

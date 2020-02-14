@@ -10,6 +10,7 @@ import (
 func TestCreds(t *testing.T) {
 	t.Run("happy path with creds", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -99,6 +100,7 @@ func TestCreds(t *testing.T) {
 
 	t.Run("cred doesn't exist", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		req := &logical.Request{
 			Operation: logical.ReadOperation,

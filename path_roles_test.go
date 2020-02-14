@@ -10,6 +10,7 @@ import (
 func TestRoles(t *testing.T) {
 	t.Run("happy path with roles", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -78,6 +79,7 @@ func TestRoles(t *testing.T) {
 	})
 	t.Run("happy path with roles", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -147,6 +149,7 @@ func TestRoles(t *testing.T) {
 
 	t.Run("missing dn", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -187,6 +190,7 @@ func TestRoles(t *testing.T) {
 
 	t.Run("missing username", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -227,6 +231,7 @@ func TestRoles(t *testing.T) {
 
 	t.Run("missing rotation_period", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -267,6 +272,7 @@ func TestRoles(t *testing.T) {
 
 	t.Run("rotation_period lower than 5s", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -308,6 +314,7 @@ func TestRoles(t *testing.T) {
 
 	t.Run("user doesn't exist (ldap error)", func(t *testing.T) {
 		b, storage := getBackend(true)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -349,6 +356,7 @@ func TestRoles(t *testing.T) {
 
 	t.Run("role doesn't exist", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		req := &logical.Request{
 			Operation: logical.ReadOperation,
@@ -370,6 +378,7 @@ func TestRoles(t *testing.T) {
 func TestListRoles(t *testing.T) {
 	t.Run("list roles", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",

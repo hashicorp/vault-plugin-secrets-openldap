@@ -11,6 +11,7 @@ import (
 func TestConfig(t *testing.T) {
 	t.Run("happy path with defaults", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -74,6 +75,7 @@ func TestConfig(t *testing.T) {
 
 	t.Run("update config", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -132,6 +134,7 @@ func TestConfig(t *testing.T) {
 
 	t.Run("delete config", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",
@@ -167,6 +170,7 @@ func TestConfig(t *testing.T) {
 
 	t.Run("minimum config", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":   "tester",
@@ -189,6 +193,7 @@ func TestConfig(t *testing.T) {
 
 	t.Run("missing binddn", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"bindpass": "pa$$w0rd",
@@ -210,6 +215,7 @@ func TestConfig(t *testing.T) {
 
 	t.Run("missing bindpass", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn": "tester",

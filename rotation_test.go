@@ -11,6 +11,7 @@ import (
 func TestAutoRotate(t *testing.T) {
 	t.Run("auto rotate role", func(t *testing.T) {
 		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
 
 		data := map[string]interface{}{
 			"binddn":      "tester",

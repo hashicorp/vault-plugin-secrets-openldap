@@ -126,7 +126,7 @@ func bind(cfg *Config, conn ldaputil.Connection) error {
 // shouldTryLastPwd determines if we should try a previous password.
 // LDAP can return a variety of errors when a password is invalid.
 // Rather than attempting to catalogue these errors across multiple versions of
-// AD, we simply try the last password if it's been less than a set amount of
+// OpenLDAP, we simply try the last password if it's been less than a set amount of
 // time since a rotation occurred.
 func shouldTryLastPwd(lastPwd string, lastBindPasswordRotation time.Time) bool {
 	if lastPwd == "" {

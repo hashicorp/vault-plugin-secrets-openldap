@@ -133,7 +133,8 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	}
 
 	// "password" is intentionally not returned by this endpoint
-	configMap := config.LDAP.PasswordlessMap()
+	configMap := config.LDAP.Map()
+	delete(configMap, "bindpass")
 
 	for k, v := range config.Password.Map() {
 		configMap[k] = v

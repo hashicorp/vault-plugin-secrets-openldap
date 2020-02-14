@@ -5,13 +5,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/hashicorp/vault/sdk/queue"
-
 	"github.com/go-ldap/ldap/v3"
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/helper/logging"
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/hashicorp/vault/sdk/queue"
 )
 
 var (

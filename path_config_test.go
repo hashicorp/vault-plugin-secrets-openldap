@@ -71,6 +71,10 @@ func TestConfig(t *testing.T) {
 		if resp.Data["formatter"] != "mycustom{{PASSWORD}}" {
 			t.Fatalf("received unexpected formatter of \"%d\"", resp.Data["formatter"])
 		}
+
+		if _, ok := resp.Data["bindpass"]; ok {
+			t.Fatal("bindpass found in config output, it shouldn't be")
+		}
 	})
 
 	t.Run("update config", func(t *testing.T) {

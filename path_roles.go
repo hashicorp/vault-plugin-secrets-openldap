@@ -171,9 +171,6 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 
 func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	name := data.Get("name").(string)
-	if name == "" {
-		return logical.ErrorResponse("empty role name attribute given"), nil
-	}
 
 	// Grab the exclusive lock as well potentially pop and re-push the queue item
 	// for this role

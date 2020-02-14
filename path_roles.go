@@ -224,7 +224,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	}
 	role.StaticAccount.RotationPeriod = time.Duration(rotationPeriodSeconds) * time.Second
 
-	// lvr represents the roles' LastVaultRotation
+	// lvr represents the role's LastVaultRotation
 	lvr := role.StaticAccount.LastVaultRotation
 
 	// Only call setStaticAccount if we're creating the role for the

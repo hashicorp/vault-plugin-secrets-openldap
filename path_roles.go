@@ -22,8 +22,6 @@ func (b *backend) pathListRoles() []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ListOperation: &framework.PathOperation{
 					Callback:                    b.pathRoleList,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 			},
 			HelpSynopsis:    staticRolesListHelpSynopsis,
@@ -41,23 +39,15 @@ func (b *backend) pathRoles() []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback:                    b.pathStaticRoleCreateUpdate,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 				logical.CreateOperation: &framework.PathOperation{
 					Callback:                    b.pathStaticRoleCreateUpdate,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 				logical.ReadOperation: &framework.PathOperation{
 					Callback:                    b.pathStaticRoleRead,
-					ForwardPerformanceSecondary: false,
-					ForwardPerformanceStandby:   false,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
 					Callback:                    b.pathStaticRoleDelete,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 			},
 			HelpSynopsis:    staticRoleHelpSynopsis,

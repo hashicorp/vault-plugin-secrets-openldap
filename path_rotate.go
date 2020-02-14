@@ -31,13 +31,9 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback:                    b.pathRotateCredentialsUpdate,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 				logical.CreateOperation: &framework.PathOperation{
 					Callback:                    b.pathRotateCredentialsUpdate,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 			},
 			HelpSynopsis:    pathRotateCredentialsUpdateHelpSyn,
@@ -54,13 +50,9 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback:                    b.pathRotateRoleCredentialsUpdate,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 				logical.CreateOperation: &framework.PathOperation{
 					Callback:                    b.pathRotateRoleCredentialsUpdate,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 			},
 			HelpSynopsis:    pathRotateRoleCredentialsUpdateHelpSyn,

@@ -39,23 +39,15 @@ func (b *backend) pathConfig() []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.CreateOperation: &framework.PathOperation{
 					Callback:                    b.configCreateUpdateOperation,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback:                    b.configCreateUpdateOperation,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 				logical.ReadOperation: &framework.PathOperation{
 					Callback:                    b.configReadOperation,
-					ForwardPerformanceSecondary: false,
-					ForwardPerformanceStandby:   false,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
 					Callback:                    b.configDeleteOperation,
-					ForwardPerformanceSecondary: true,
-					ForwardPerformanceStandby:   true,
 				},
 			},
 			HelpSynopsis:    configHelpSynopsis,

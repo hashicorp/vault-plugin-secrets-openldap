@@ -2,7 +2,6 @@ package openldap
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/vault/sdk/framework"

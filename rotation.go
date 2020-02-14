@@ -312,7 +312,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		return nil, errors.New("the config is currently unset")
 	}
 
-	newPassword, err := GeneratePassword(config.Password.Formatter, config.Password.Length)
+	newPassword, err := GeneratePassword(config.PasswordLength)
 	if err != nil {
 		return nil, err
 	}

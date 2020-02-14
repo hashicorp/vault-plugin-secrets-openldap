@@ -16,7 +16,6 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -85,7 +84,6 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -155,7 +153,6 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -196,7 +193,6 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -237,7 +233,6 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -278,7 +273,6 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -320,7 +314,6 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -383,7 +376,6 @@ func TestListRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{

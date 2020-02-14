@@ -21,7 +21,7 @@ func (b *backend) pathListRoles() []*framework.Path {
 			Pattern: staticRoleListPath + "?$",
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ListOperation: &framework.PathOperation{
-					Callback:                    b.pathRoleList,
+					Callback: b.pathRoleList,
 				},
 			},
 			HelpSynopsis:    staticRolesListHelpSynopsis,
@@ -38,16 +38,16 @@ func (b *backend) pathRoles() []*framework.Path {
 			ExistenceCheck: b.pathStaticRoleExistenceCheck,
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback:                    b.pathStaticRoleCreateUpdate,
+					Callback: b.pathStaticRoleCreateUpdate,
 				},
 				logical.CreateOperation: &framework.PathOperation{
-					Callback:                    b.pathStaticRoleCreateUpdate,
+					Callback: b.pathStaticRoleCreateUpdate,
 				},
 				logical.ReadOperation: &framework.PathOperation{
-					Callback:                    b.pathStaticRoleRead,
+					Callback: b.pathStaticRoleRead,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
-					Callback:                    b.pathStaticRoleDelete,
+					Callback: b.pathStaticRoleDelete,
 				},
 			},
 			HelpSynopsis:    staticRoleHelpSynopsis,

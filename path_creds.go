@@ -21,7 +21,7 @@ func (b *backend) pathCredsCreate() []*framework.Path {
 			},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ReadOperation: &framework.PathOperation{
-					Callback:                    b.pathStaticCredsRead,
+					Callback: b.pathStaticCredsRead,
 				},
 			},
 			HelpSynopsis:    pathStaticCredsReadHelpSyn,

@@ -17,7 +17,6 @@ func TestConfig(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -68,10 +67,6 @@ func TestConfig(t *testing.T) {
 			t.Fatalf("received unexpected length of \"%d\"", resp.Data["length"])
 		}
 
-		if resp.Data["formatter"] != "mycustom{{PASSWORD}}" {
-			t.Fatalf("received unexpected formatter of \"%d\"", resp.Data["formatter"])
-		}
-
 		if _, ok := resp.Data["bindpass"]; ok {
 			t.Fatal("bindpass found in config output, it shouldn't be")
 		}
@@ -85,7 +80,6 @@ func TestConfig(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{
@@ -105,7 +99,6 @@ func TestConfig(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req = &logical.Request{
@@ -145,7 +138,6 @@ func TestConfig(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"formatter":   "mycustom{{PASSWORD}}",
 		}
 
 		req := &logical.Request{

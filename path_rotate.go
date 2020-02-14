@@ -2,25 +2,20 @@ package openldap
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"time"
 
-	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/helper/base62"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/queue"
 )
 
 const (
-	minimumLengthOfComplexString = 8
-	passwordComplexityPrefix     = "?@09AZ"
-	pwdFieldTmpl                 = "{{PASSWORD}}"
-	rotateRootPath               = "rotate-root"
-	rotateRolePath               = "rotate-role/"
+	rotateRootPath = "rotate-root"
+	rotateRolePath = "rotate-role/"
 )
 
 func (b *backend) pathRotateCredentials() []*framework.Path {
@@ -30,10 +25,10 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			Fields:  map[string]*framework.FieldSchema{},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback:                    b.pathRotateCredentialsUpdate,
+					Callback: b.pathRotateCredentialsUpdate,
 				},
 				logical.CreateOperation: &framework.PathOperation{
-					Callback:                    b.pathRotateCredentialsUpdate,
+					Callback: b.pathRotateCredentialsUpdate,
 				},
 			},
 			HelpSynopsis:    pathRotateCredentialsUpdateHelpSyn,
@@ -49,10 +44,10 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback:                    b.pathRotateRoleCredentialsUpdate,
+					Callback: b.pathRotateRoleCredentialsUpdate,
 				},
 				logical.CreateOperation: &framework.PathOperation{
-					Callback:                    b.pathRotateRoleCredentialsUpdate,
+					Callback: b.pathRotateRoleCredentialsUpdate,
 				},
 			},
 			HelpSynopsis:    pathRotateRoleCredentialsUpdateHelpSyn,
@@ -70,7 +65,7 @@ func (b *backend) pathRotateCredentialsUpdate(ctx context.Context, req *logical.
 		return nil, errors.New("the config is currently unset")
 	}
 
-	newPassword, err := GeneratePassword(config.Password.Formatter, config.Password.Length)
+	newPassword, err := GeneratePassword(config.PasswordLength)
 	if err != nil {
 		return nil, err
 	}
@@ -182,41 +177,8 @@ func storePassword(ctx context.Context, s logical.Storage, config *config) error
 	return s.Put(ctx, entry)
 }
 
-func GeneratePassword(formatter string, totalLength int) (string, error) {
-	if err := validatePwdSettings(formatter, totalLength); err != nil {
-		return "", err
-	}
-	pwd, err := generatePassword(totalLength)
-	if err != nil {
-		return "", err
-	}
-	if formatter == "" {
-		pwd = passwordComplexityPrefix + pwd
-		return pwd[:totalLength], nil
-	}
-	return strings.Replace(formatter, pwdFieldTmpl, pwd[:lengthOfPassword(formatter, totalLength)], 1), nil
-}
-
-func lengthOfPassword(formatter string, totalLength int) int {
-	lengthOfText := len(formatter) - len(pwdFieldTmpl)
-	return totalLength - lengthOfText
-}
-
-// generatePassword returns a password of a length AT LEAST as long as the desired length,
-// it may be longer.
-func generatePassword(desiredLength int) (string, error) {
-	b, err := uuid.GenerateRandomBytes(desiredLength)
-	if err != nil {
-		return "", err
-	}
-	result := ""
-	// Though the result should immediately be longer than the desiredLength,
-	// do this in a loop to ensure there's absolutely no risk of a panic when slicing it down later.
-	for len(result) <= desiredLength {
-		// Encode to base64 because it's more complex.
-		result += base64.StdEncoding.EncodeToString(b)
-	}
-	return result, nil
+func GeneratePassword(length int) (string, error) {
+	return base62.Random(length)
 }
 
 const pathRotateCredentialsUpdateHelpSyn = `

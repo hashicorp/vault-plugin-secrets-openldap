@@ -38,16 +38,16 @@ func (b *backend) pathConfig() []*framework.Path {
 			Fields:  b.configFields(),
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.CreateOperation: &framework.PathOperation{
-					Callback:                    b.configCreateUpdateOperation,
+					Callback: b.configCreateUpdateOperation,
 				},
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback:                    b.configCreateUpdateOperation,
+					Callback: b.configCreateUpdateOperation,
 				},
 				logical.ReadOperation: &framework.PathOperation{
-					Callback:                    b.configReadOperation,
+					Callback: b.configReadOperation,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
-					Callback:                    b.configDeleteOperation,
+					Callback: b.configDeleteOperation,
 				},
 			},
 			HelpSynopsis:    configHelpSynopsis,
@@ -71,10 +71,6 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 		Default:     defaultPasswordLength,
 		Description: "The desired length of passwords that Vault generates.",
 	}
-	fields["formatter"] = &framework.FieldSchema{
-		Type:        framework.TypeString,
-		Description: `Text to insert the password into, ex. "customPrefix{{PASSWORD}}customSuffix".`,
-	}
 	return fields
 }
 
@@ -89,26 +85,18 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 		return nil, err
 	}
 
-	// Build the password conf.
 	length := fieldData.Get("length").(int)
-	formatter := fieldData.Get("formatter").(string)
 	url := fieldData.Get("url").(string)
 
 	if url == "" {
 		return nil, errors.New("url is required")
-	}
-	if err := validatePwdSettings(formatter, length); err != nil {
-		return nil, err
 	}
 
 	config := &config{
 		LDAP: &client.Config{
 			ConfigEntry: ldapConf,
 		},
-		Password: &passwordConf{
-			Length:    length,
-			Formatter: formatter,
-		},
+		PasswordLength: length,
 	}
 
 	entry, err := logical.StorageEntryJSON(configPath, config)
@@ -135,10 +123,7 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	// "password" is intentionally not returned by this endpoint
 	configMap := config.LDAP.Map()
 	delete(configMap, "bindpass")
-
-	for k, v := range config.Password.Map() {
-		configMap[k] = v
-	}
+	configMap["length"] = config.PasswordLength
 
 	resp := &logical.Response{
 		Data: configMap,
@@ -154,8 +139,8 @@ func (b *backend) configDeleteOperation(ctx context.Context, req *logical.Reques
 }
 
 type config struct {
-	LDAP     *client.Config
-	Password *passwordConf
+	LDAP           *client.Config
+	PasswordLength int `json:"length"`
 }
 
 const configHelpSynopsis = `

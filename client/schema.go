@@ -5,16 +5,16 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/strutil"
 )
 
-// SupportedSchema returns a slice of different OpenLDAP schemas supported
+// SupportedSchemas returns a slice of different OpenLDAP schemas supported
 // by the plugin.  This is used to change the FieldRegistry when modifying
 // user passwords.
-func SupportedSchema() []string {
+func SupportedSchemas() []string {
 	return []string{"openldap", "rcaf"}
 }
 
 // ValidSchema checks if the configured schema is supported by the plugin.
 func ValidSchema(schema string) bool {
-	return strutil.StrListContains(SupportedSchema(), schema)
+	return strutil.StrListContains(SupportedSchemas(), schema)
 }
 
 // GetSchemaFieldRegistry type switches field registries depending on the configured schema.
@@ -27,8 +27,8 @@ func GetSchemaFieldRegistry(schema string, newPassword string) (map[*Field][]str
 		return fields, nil
 	case "rcaf":
 		fields := map[*Field][]string{
-			FieldRegistry.RcafPassword:   {newPassword},
-			FieldRegistry.RcafAttributes: {"noexpired"},
+			FieldRegistry.RCAFPassword:   {newPassword},
+			FieldRegistry.RCAFAttributes: {"noexpired"},
 		}
 		return fields, nil
 	default:

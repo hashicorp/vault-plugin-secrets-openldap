@@ -106,7 +106,7 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 
 	if !client.ValidSchema(schema) {
 		return nil, fmt.Errorf("the configured schema %s is not valid.  Supported schemas: %s",
-			schema, client.SupportedSchema())
+			schema, client.SupportedSchemas())
 	}
 
 	config := &config{

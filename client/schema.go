@@ -28,7 +28,7 @@ func GetSchemaFieldRegistry(schema string, newPassword string) (map[*Field][]str
 	case "rcaf":
 		fields := map[*Field][]string{
 			FieldRegistry.RCAFPassword:   {newPassword},
-			FieldRegistry.RCAFAttributes: {"noexpired"},
+			FieldRegistry.RCAFAttributes: {"resume"},
 		}
 		return fields, nil
 	default:

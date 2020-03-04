@@ -126,7 +126,7 @@ func TestUpdatePasswordOpenLDAP(t *testing.T) {
 	}
 }
 
-func TestUpdatePasswordRCAF(t *testing.T) {
+func TestUpdatePasswordRACF(t *testing.T) {
 	testPass := "hell0$catz*"
 
 	config := emptyConfig()
@@ -142,8 +142,8 @@ func TestUpdatePasswordRCAF(t *testing.T) {
 	conn.ModifyRequestToExpect = &ldap.ModifyRequest{
 		DN: dn,
 	}
-	conn.ModifyRequestToExpect.Replace("rcafPassword", []string{testPass})
-	conn.ModifyRequestToExpect.Replace("rcafAttributes", []string{"noexpired"})
+	conn.ModifyRequestToExpect.Replace("racfPassword", []string{testPass})
+	conn.ModifyRequestToExpect.Replace("racfAttributes", []string{"resume"})
 
 	ldapClient := &ldaputil.Client{
 		Logger: hclog.NewNullLogger(),
@@ -156,7 +156,7 @@ func TestUpdatePasswordRCAF(t *testing.T) {
 		FieldRegistry.ObjectClass: {"*"},
 	}
 
-	newValues, err := GetSchemaFieldRegistry("rcaf", testPass)
+	newValues, err := GetSchemaFieldRegistry("racf", testPass)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,7 +9,7 @@ import (
 // by the plugin.  This is used to change the FieldRegistry when modifying
 // user passwords.
 func SupportedSchemas() []string {
-	return []string{"openldap", "rcaf"}
+	return []string{"openldap", "racf"}
 }
 
 // ValidSchema checks if the configured schema is supported by the plugin.
@@ -18,17 +18,17 @@ func ValidSchema(schema string) bool {
 }
 
 // GetSchemaFieldRegistry type switches field registries depending on the configured schema.
-// For example, IBM RCAF has a custom OpenLDAP schema so the password is stored in a different
+// For example, IBM RACF has a custom OpenLDAP schema so the password is stored in a different
 // attribute.
 func GetSchemaFieldRegistry(schema string, newPassword string) (map[*Field][]string, error) {
 	switch schema {
 	case "openldap":
 		fields := map[*Field][]string{FieldRegistry.UserPassword: {newPassword}}
 		return fields, nil
-	case "rcaf":
+	case "racf":
 		fields := map[*Field][]string{
-			FieldRegistry.RCAFPassword:   {newPassword},
-			FieldRegistry.RCAFAttributes: {"resume"},
+			FieldRegistry.RACFPassword:   {newPassword},
+			FieldRegistry.RACFAttributes: {"resume"},
 		}
 		return fields, nil
 	default:

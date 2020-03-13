@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/vault/sdk/framework"
-	"github.com/hashicorp/vault/sdk/helper/base62"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/queue"
 )
@@ -178,7 +177,9 @@ func storePassword(ctx context.Context, s logical.Storage, config *config) error
 }
 
 func GeneratePassword(length int) (string, error) {
-	return base62.Random(length)
+	// Replace original password generator with custom version.
+	// return base62.Random(length)
+	return racfCustomPassword(length)
 }
 
 const pathRotateCredentialsUpdateHelpSyn = `

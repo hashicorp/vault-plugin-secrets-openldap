@@ -44,10 +44,14 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback: b.pathRotateRoleCredentialsUpdate,
+					Callback:                    b.pathRotateRoleCredentialsUpdate,
+					ForwardPerformanceStandby:   true,
+					ForwardPerformanceSecondary: true,
 				},
 				logical.CreateOperation: &framework.PathOperation{
-					Callback: b.pathRotateRoleCredentialsUpdate,
+					Callback:                    b.pathRotateRoleCredentialsUpdate,
+					ForwardPerformanceStandby:   true,
+					ForwardPerformanceSecondary: true,
 				},
 			},
 			HelpSynopsis:    pathRotateRoleCredentialsUpdateHelpSyn,

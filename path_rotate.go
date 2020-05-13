@@ -25,10 +25,14 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			Fields:  map[string]*framework.FieldSchema{},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback: b.pathRotateCredentialsUpdate,
+					Callback:                    b.pathRotateCredentialsUpdate,
+					ForwardPerformanceStandby:   true,
+					ForwardPerformanceSecondary: true,
 				},
 				logical.CreateOperation: &framework.PathOperation{
-					Callback: b.pathRotateCredentialsUpdate,
+					Callback:                    b.pathRotateCredentialsUpdate,
+					ForwardPerformanceStandby:   true,
+					ForwardPerformanceSecondary: true,
 				},
 			},
 			HelpSynopsis:    pathRotateCredentialsUpdateHelpSyn,

@@ -38,7 +38,7 @@ func (f *FakeLDAPConnection) Close() {}
 
 func (f *FakeLDAPConnection) Modify(modifyRequest *ldap.ModifyRequest) error {
 	if !reflect.DeepEqual(f.ModifyRequestToExpect, modifyRequest) {
-		return fmt.Errorf("expected modifyRequest of %#v, but received %#v", f.ModifyRequestToExpect, modifyRequest)
+		return fmt.Errorf("Actual modify request: %#v\nExpected: %#v", modifyRequest, f.ModifyRequestToExpect)
 	}
 	return nil
 }

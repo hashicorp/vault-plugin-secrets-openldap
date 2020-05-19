@@ -39,10 +39,10 @@ func (f *FakeLDAPConnection) Close() {}
 
 func (f *FakeLDAPConnection) Modify(modifyRequest *ldap.ModifyRequest) error {
 	// Sort the change slices before comparison because they are added in a random order
-	sort.Slice(f.ModifyRequestToExpect, func(i, j int) bool {
+	sort.Slice(f.ModifyRequestToExpect.Changes, func(i, j int) bool {
 		return f.ModifyRequestToExpect.Changes[i].Modification.Type < f.ModifyRequestToExpect.Changes[j].Modification.Type
 	})
-	sort.Slice(modifyRequest, func(i, j int) bool {
+	sort.Slice(modifyRequest.Changes, func(i, j int) bool {
 		return modifyRequest.Changes[i].Modification.Type < modifyRequest.Changes[j].Modification.Type
 	})
 

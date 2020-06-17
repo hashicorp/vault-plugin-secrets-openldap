@@ -127,7 +127,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	// In create/update of static accounts, we only care if the operation
 	// err'd , and this call does not return credentials
 	item, err := b.popFromRotationQueueByKey(name)
-	if item == nil || err != nil {
+	if err != nil {
 		item = &queue.Item{
 			Key: name,
 		}
@@ -144,7 +144,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		item.Priority = time.Now().Add(10 * time.Second).Unix()
 
 		// Preserve the WALID if it was returned
-		if resp.WALID != "" {
+		if resp != nil && resp.WALID != "" {
 			item.Value = resp.WALID
 		}
 	} else {

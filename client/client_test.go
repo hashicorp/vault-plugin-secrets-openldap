@@ -203,6 +203,13 @@ func TestUpdatePasswordAD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if p, ok := newValues[FieldRegistry.UnicodePassword]; !ok {
+		t.Fatal("Expected unicodePwd field to be populated")
+	} else if len(p) != 1 {
+		t.Fatalf("Expected exactly one entry for unicodePwd but got %d", len(p))
+	} else if p[0] != encodedTestPass {
+		t.Fatalf("Expected unicodePwd field equal to %q but got %q", encodedTestPass, p[0])
+	}
 
 	if err := client.UpdatePassword(config, dn, newValues, filters); err != nil {
 		t.Fatal(err)

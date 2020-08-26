@@ -1,7 +1,6 @@
 package ldaputil
 
 import (
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -19,14 +18,6 @@ import (
 // Not all fields will be used by every integration.
 func ConfigFields() map[string]*framework.FieldSchema {
 	return map[string]*framework.FieldSchema{
-		"anonymous_group_search": {
-			Type:        framework.TypeBool,
-			Default:     false,
-			Description: "Use anonymous binds when performing LDAP group searches (if true the initial credentials will still be used for the initial connection test).",
-			DisplayAttrs: &framework.DisplayAttributes{
-				Name: "Anonymous group search",
-			},
-		},
 		"url": {
 			Type:        framework.TypeString,
 			Default:     "ldap://127.0.0.1",
@@ -114,28 +105,6 @@ Default: cn`,
 		"certificate": {
 			Type:        framework.TypeString,
 			Description: "CA certificate to use when verifying LDAP server certificate, must be x509 PEM encoded (optional)",
-			DisplayAttrs: &framework.DisplayAttributes{
-				Name:     "CA certificate",
-				EditType: "file",
-			},
-		},
-
-		"client_tls_cert": {
-			Type:        framework.TypeString,
-			Description: "Client certificate to provide to the LDAP server, must be x509 PEM encoded (optional)",
-			DisplayAttrs: &framework.DisplayAttributes{
-				Name:     "Client certificate",
-				EditType: "file",
-			},
-		},
-
-		"client_tls_key": {
-			Type:        framework.TypeString,
-			Description: "Client certificate key to provide to the LDAP server, must be x509 PEM encoded (optional)",
-			DisplayAttrs: &framework.DisplayAttributes{
-				Name:     "Client key",
-				EditType: "file",
-			},
 		},
 
 		"discoverdn": {
@@ -165,21 +134,21 @@ Default: cn`,
 		"tls_min_version": {
 			Type:        framework.TypeString,
 			Default:     "tls12",
-			Description: "Minimum TLS version to use. Accepted values are 'tls10', 'tls11', 'tls12' or 'tls13'. Defaults to 'tls12'",
+			Description: "Minimum TLS version to use. Accepted values are 'tls10', 'tls11' or 'tls12'. Defaults to 'tls12'",
 			DisplayAttrs: &framework.DisplayAttributes{
 				Name: "Minimum TLS Version",
 			},
-			AllowedValues: []interface{}{"tls10", "tls11", "tls12", "tls13"},
+			AllowedValues: []interface{}{"tls10", "tls11", "tls12"},
 		},
 
 		"tls_max_version": {
 			Type:        framework.TypeString,
 			Default:     "tls12",
-			Description: "Maximum TLS version to use. Accepted values are 'tls10', 'tls11', 'tls12' or 'tls13'. Defaults to 'tls12'",
+			Description: "Maximum TLS version to use. Accepted values are 'tls10', 'tls11' or 'tls12'. Defaults to 'tls12'",
 			DisplayAttrs: &framework.DisplayAttributes{
 				Name: "Maximum TLS Version",
 			},
-			AllowedValues: []interface{}{"tls10", "tls11", "tls12", "tls13"},
+			AllowedValues: []interface{}{"tls10", "tls11", "tls12"},
 		},
 
 		"deny_null_bind": {
@@ -198,17 +167,6 @@ Default: cn`,
 			Default:     false,
 			Description: "If true, use the Active Directory tokenGroups constructed attribute of the user to find the group memberships. This will find all security groups including nested ones.",
 		},
-
-		"use_pre111_group_cn_behavior": {
-			Type:        framework.TypeBool,
-			Description: "In Vault 1.1.1 a fix for handling group CN values of different cases unfortunately introduced a regression that could cause previously defined groups to not be found due to a change in the resulting name. If set true, the pre-1.1.1 behavior for matching group CNs will be used. This is only needed in some upgrade scenarios for backwards compatibility. It is enabled by default if the config is upgraded but disabled by default on new configurations.",
-		},
-
-		"request_timeout": {
-			Type:        framework.TypeDurationSecond,
-			Description: "Timeout, in seconds, for the connection when making requests against the server before returning back an error.",
-			Default:     "90s",
-		},
 	}
 }
 
@@ -225,10 +183,6 @@ func NewConfigEntry(existing *ConfigEntry, d *framework.FieldData) (*ConfigEntry
 		hadExisting = true
 	} else {
 		cfg = new(ConfigEntry)
-	}
-
-	if _, ok := d.Raw["anonymous_group_search"]; ok || !hadExisting {
-		cfg.AnonymousGroupSearch = d.Get("anonymous_group_search").(bool)
 	}
 
 	if _, ok := d.Raw["url"]; ok || !hadExisting {
@@ -271,29 +225,18 @@ func NewConfigEntry(existing *ConfigEntry, d *framework.FieldData) (*ConfigEntry
 	if _, ok := d.Raw["certificate"]; ok || !hadExisting {
 		certificate := d.Get("certificate").(string)
 		if certificate != "" {
-			if err := validateCertificate([]byte(certificate)); err != nil {
-				return nil, errwrap.Wrapf("failed to parse server tls cert: {{err}}", err)
+			block, _ := pem.Decode([]byte(certificate))
+
+			if block == nil || block.Type != "CERTIFICATE" {
+				return nil, errors.New("failed to decode PEM block in the certificate")
+			}
+			_, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, errwrap.Wrapf("failed to parse certificate: {{err}}", err)
 			}
 		}
+
 		cfg.Certificate = certificate
-	}
-
-	if _, ok := d.Raw["client_tls_cert"]; ok || !hadExisting {
-		clientTLSCert := d.Get("client_tls_cert").(string)
-		cfg.ClientTLSCert = clientTLSCert
-	}
-
-	if _, ok := d.Raw["client_tls_key"]; ok || !hadExisting {
-		clientTLSKey := d.Get("client_tls_key").(string)
-		cfg.ClientTLSKey = clientTLSKey
-	}
-
-	if cfg.ClientTLSCert != "" && cfg.ClientTLSKey != "" {
-		if _, err := tls.X509KeyPair([]byte(cfg.ClientTLSCert), []byte(cfg.ClientTLSKey)); err != nil {
-			return nil, errwrap.Wrapf("failed to parse client X509 key pair: {{err}}", err)
-		}
-	} else if cfg.ClientTLSCert != "" || cfg.ClientTLSKey != "" {
-		return nil, fmt.Errorf("both client_tls_cert and client_tls_key must be set")
 	}
 
 	if _, ok := d.Raw["insecure_tls"]; ok || !hadExisting {
@@ -344,46 +287,31 @@ func NewConfigEntry(existing *ConfigEntry, d *framework.FieldData) (*ConfigEntry
 		*cfg.CaseSensitiveNames = d.Get("case_sensitive_names").(bool)
 	}
 
-	usePre111GroupCNBehavior, ok := d.GetOk("use_pre111_group_cn_behavior")
-	if ok {
-		cfg.UsePre111GroupCNBehavior = new(bool)
-		*cfg.UsePre111GroupCNBehavior = usePre111GroupCNBehavior.(bool)
-	}
-
 	if _, ok := d.Raw["use_token_groups"]; ok || !hadExisting {
 		cfg.UseTokenGroups = d.Get("use_token_groups").(bool)
-	}
-
-	if _, ok := d.Raw["request_timeout"]; ok || !hadExisting {
-		cfg.RequestTimeout = d.Get("request_timeout").(int)
 	}
 
 	return cfg, nil
 }
 
 type ConfigEntry struct {
-	Url                      string `json:"url"`
-	UserDN                   string `json:"userdn"`
-	AnonymousGroupSearch     bool   `json:"anonymous_group_search"`
-	GroupDN                  string `json:"groupdn"`
-	GroupFilter              string `json:"groupfilter"`
-	GroupAttr                string `json:"groupattr"`
-	UPNDomain                string `json:"upndomain"`
-	UserAttr                 string `json:"userattr"`
-	Certificate              string `json:"certificate"`
-	ClientTLSCert            string `json:"client_tls_cert`
-	ClientTLSKey             string `json:"client_tls_key`
-	InsecureTLS              bool   `json:"insecure_tls"`
-	StartTLS                 bool   `json:"starttls"`
-	BindDN                   string `json:"binddn"`
-	BindPassword             string `json:"bindpass"`
-	DenyNullBind             bool   `json:"deny_null_bind"`
-	DiscoverDN               bool   `json:"discoverdn"`
-	TLSMinVersion            string `json:"tls_min_version"`
-	TLSMaxVersion            string `json:"tls_max_version"`
-	UseTokenGroups           bool   `json:"use_token_groups"`
-	UsePre111GroupCNBehavior *bool  `json:"use_pre111_group_cn_behavior"`
-	RequestTimeout           int    `json:"request_timeout"`
+	Url            string `json:"url"`
+	UserDN         string `json:"userdn"`
+	GroupDN        string `json:"groupdn"`
+	GroupFilter    string `json:"groupfilter"`
+	GroupAttr      string `json:"groupattr"`
+	UPNDomain      string `json:"upndomain"`
+	UserAttr       string `json:"userattr"`
+	Certificate    string `json:"certificate"`
+	InsecureTLS    bool   `json:"insecure_tls"`
+	StartTLS       bool   `json:"starttls"`
+	BindDN         string `json:"binddn"`
+	BindPassword   string `json:"bindpass"`
+	DenyNullBind   bool   `json:"deny_null_bind"`
+	DiscoverDN     bool   `json:"discoverdn"`
+	TLSMinVersion  string `json:"tls_min_version"`
+	TLSMaxVersion  string `json:"tls_max_version"`
+	UseTokenGroups bool   `json:"use_token_groups"`
 
 	// This json tag deviates from snake case because there was a past issue
 	// where the tag was being ignored, causing it to be jsonified as "CaseSensitiveNames".
@@ -400,43 +328,27 @@ func (c *ConfigEntry) Map() map[string]interface{} {
 
 func (c *ConfigEntry) PasswordlessMap() map[string]interface{} {
 	m := map[string]interface{}{
-		"url":                    c.Url,
-		"userdn":                 c.UserDN,
-		"groupdn":                c.GroupDN,
-		"groupfilter":            c.GroupFilter,
-		"groupattr":              c.GroupAttr,
-		"upndomain":              c.UPNDomain,
-		"userattr":               c.UserAttr,
-		"certificate":            c.Certificate,
-		"insecure_tls":           c.InsecureTLS,
-		"starttls":               c.StartTLS,
-		"binddn":                 c.BindDN,
-		"deny_null_bind":         c.DenyNullBind,
-		"discoverdn":             c.DiscoverDN,
-		"tls_min_version":        c.TLSMinVersion,
-		"tls_max_version":        c.TLSMaxVersion,
-		"use_token_groups":       c.UseTokenGroups,
-		"anonymous_group_search": c.AnonymousGroupSearch,
+		"url":              c.Url,
+		"userdn":           c.UserDN,
+		"groupdn":          c.GroupDN,
+		"groupfilter":      c.GroupFilter,
+		"groupattr":        c.GroupAttr,
+		"upndomain":        c.UPNDomain,
+		"userattr":         c.UserAttr,
+		"certificate":      c.Certificate,
+		"insecure_tls":     c.InsecureTLS,
+		"starttls":         c.StartTLS,
+		"binddn":           c.BindDN,
+		"deny_null_bind":   c.DenyNullBind,
+		"discoverdn":       c.DiscoverDN,
+		"tls_min_version":  c.TLSMinVersion,
+		"tls_max_version":  c.TLSMaxVersion,
+		"use_token_groups": c.UseTokenGroups,
 	}
 	if c.CaseSensitiveNames != nil {
 		m["case_sensitive_names"] = *c.CaseSensitiveNames
 	}
-	if c.UsePre111GroupCNBehavior != nil {
-		m["use_pre111_group_cn_behavior"] = *c.UsePre111GroupCNBehavior
-	}
 	return m
-}
-
-func validateCertificate(pemBlock []byte) error {
-	block, _ := pem.Decode([]byte(pemBlock))
-	if block == nil || block.Type != "CERTIFICATE" {
-		return errors.New("failed to decode PEM block in the certificate")
-	}
-	_, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return fmt.Errorf("failed to parse certificate %s", err.Error())
-	}
-	return nil
 }
 
 func (c *ConfigEntry) Validate() error {
@@ -460,13 +372,13 @@ func (c *ConfigEntry) Validate() error {
 		return errors.New("'tls_max_version' must be greater than or equal to 'tls_min_version'")
 	}
 	if c.Certificate != "" {
-		if err := validateCertificate([]byte(c.Certificate)); err != nil {
-			return errwrap.Wrapf("failed to parse server tls cert: {{err}}", err)
+		block, _ := pem.Decode([]byte(c.Certificate))
+		if block == nil || block.Type != "CERTIFICATE" {
+			return errors.New("failed to decode PEM block in the certificate")
 		}
-	}
-	if c.ClientTLSCert != "" && c.ClientTLSKey != "" {
-		if _, err := tls.X509KeyPair([]byte(c.ClientTLSCert), []byte(c.ClientTLSKey)); err != nil {
-			return errwrap.Wrapf("failed to parse client X509 key pair: {{err}}", err)
+		_, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return fmt.Errorf("failed to parse certificate %s", err.Error())
 		}
 	}
 	return nil

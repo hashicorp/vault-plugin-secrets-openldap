@@ -2,7 +2,7 @@ package logical
 
 import (
 	"fmt"
-	"net/http"
+	"io"
 	"strings"
 	"time"
 )
@@ -70,7 +70,10 @@ type Request struct {
 	// Operation is the requested operation type
 	Operation Operation `json:"operation" structs:"operation" mapstructure:"operation"`
 
-	// Path is the full path of the request
+	// Path is the part of the request path not consumed by the
+	// routing. As an example, if the original request path is "prod/aws/foo"
+	// and the AWS logical backend is mounted at "prod/aws/", then the
+	// final path is "foo" since the mount prefix is trimmed.
 	Path string `json:"path" structs:"path" mapstructure:"path" sentinel:""`
 
 	// Request data is an opaque map that must have string keys.
@@ -170,9 +173,9 @@ type Request struct {
 	// we can delete it before sending off to plugins
 	ClientTokenSource ClientTokenSource
 
-	// HTTPRequest, if set, can be used to access fields from the HTTP request
-	// that generated this logical.Request object, such as the request body.
-	HTTPRequest *http.Request `json:"-" sentinel:""`
+	// RequestReader if set can be used to read the full request body from the
+	// http request that generated this logical.Request object.
+	RequestReader io.ReadCloser `json:"-" sentinel:""`
 
 	// ResponseWriter if set can be used to stream a response value to the http
 	// request that generated this logical.Request object.

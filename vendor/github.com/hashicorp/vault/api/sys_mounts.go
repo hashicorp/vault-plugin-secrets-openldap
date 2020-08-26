@@ -129,13 +129,12 @@ func (c *Sys) MountConfig(path string) (*MountConfigOutput, error) {
 }
 
 type MountInput struct {
-	Type                  string            `json:"type"`
-	Description           string            `json:"description"`
-	Config                MountConfigInput  `json:"config"`
-	Local                 bool              `json:"local"`
-	SealWrap              bool              `json:"seal_wrap" mapstructure:"seal_wrap"`
-	ExternalEntropyAccess bool              `json:"external_entropy_access" mapstructure:"external_entropy_access"`
-	Options               map[string]string `json:"options"`
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Config      MountConfigInput  `json:"config"`
+	Local       bool              `json:"local"`
+	SealWrap    bool              `json:"seal_wrap" mapstructure:"seal_wrap"`
+	Options     map[string]string `json:"options"`
 
 	// Deprecated: Newer server responses should be returning this information in the
 	// Type field (json: "type") instead.
@@ -160,15 +159,14 @@ type MountConfigInput struct {
 }
 
 type MountOutput struct {
-	UUID                  string            `json:"uuid"`
-	Type                  string            `json:"type"`
-	Description           string            `json:"description"`
-	Accessor              string            `json:"accessor"`
-	Config                MountConfigOutput `json:"config"`
-	Options               map[string]string `json:"options"`
-	Local                 bool              `json:"local"`
-	SealWrap              bool              `json:"seal_wrap" mapstructure:"seal_wrap"`
-	ExternalEntropyAccess bool              `json:"external_entropy_access" mapstructure:"external_entropy_access"`
+	UUID        string            `json:"uuid"`
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Accessor    string            `json:"accessor"`
+	Config      MountConfigOutput `json:"config"`
+	Options     map[string]string `json:"options"`
+	Local       bool              `json:"local"`
+	SealWrap    bool              `json:"seal_wrap" mapstructure:"seal_wrap"`
 }
 
 type MountConfigOutput struct {

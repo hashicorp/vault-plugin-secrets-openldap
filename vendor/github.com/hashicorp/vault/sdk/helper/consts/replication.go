@@ -18,7 +18,6 @@ const (
 	// manager.  It should contain a character that is not allowed in secondary
 	// ids to ensure it doesn't collide.
 	CurrentReplicatedSecondaryIdentifier = ".current"
-	CoreFeatureFlagPath                  = "core/cluster/feature-flags"
 )
 
 type ReplicationState uint32
@@ -143,10 +142,6 @@ func (r ReplicationState) GetPerformanceString() string {
 	default:
 		return "unknown"
 	}
-}
-
-func (r ReplicationState) IsPrimaryState() bool {
-	return r.HasState(ReplicationPerformancePrimary | ReplicationDRPrimary)
 }
 
 func (r ReplicationState) HasState(flag ReplicationState) bool { return r&flag != 0 }

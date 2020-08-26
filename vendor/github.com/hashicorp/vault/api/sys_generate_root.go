@@ -10,10 +10,6 @@ func (c *Sys) GenerateDROperationTokenStatus() (*GenerateRootStatusResponse, err
 	return c.generateRootStatusCommon("/v1/sys/replication/dr/secondary/generate-operation-token/attempt")
 }
 
-func (c *Sys) GenerateRecoveryOperationTokenStatus() (*GenerateRootStatusResponse, error) {
-	return c.generateRootStatusCommon("/v1/sys/generate-recovery-token/attempt")
-}
-
 func (c *Sys) generateRootStatusCommon(path string) (*GenerateRootStatusResponse, error) {
 	r := c.c.NewRequest("GET", path)
 
@@ -36,10 +32,6 @@ func (c *Sys) GenerateRootInit(otp, pgpKey string) (*GenerateRootStatusResponse,
 
 func (c *Sys) GenerateDROperationTokenInit(otp, pgpKey string) (*GenerateRootStatusResponse, error) {
 	return c.generateRootInitCommon("/v1/sys/replication/dr/secondary/generate-operation-token/attempt", otp, pgpKey)
-}
-
-func (c *Sys) GenerateRecoveryOperationTokenInit(otp, pgpKey string) (*GenerateRootStatusResponse, error) {
-	return c.generateRootInitCommon("/v1/sys/generate-recovery-token/attempt", otp, pgpKey)
 }
 
 func (c *Sys) generateRootInitCommon(path, otp, pgpKey string) (*GenerateRootStatusResponse, error) {
@@ -74,10 +66,6 @@ func (c *Sys) GenerateDROperationTokenCancel() error {
 	return c.generateRootCancelCommon("/v1/sys/replication/dr/secondary/generate-operation-token/attempt")
 }
 
-func (c *Sys) GenerateRecoveryOperationTokenCancel() error {
-	return c.generateRootCancelCommon("/v1/sys/generate-recovery-token/attempt")
-}
-
 func (c *Sys) generateRootCancelCommon(path string) error {
 	r := c.c.NewRequest("DELETE", path)
 
@@ -96,10 +84,6 @@ func (c *Sys) GenerateRootUpdate(shard, nonce string) (*GenerateRootStatusRespon
 
 func (c *Sys) GenerateDROperationTokenUpdate(shard, nonce string) (*GenerateRootStatusResponse, error) {
 	return c.generateRootUpdateCommon("/v1/sys/replication/dr/secondary/generate-operation-token/update", shard, nonce)
-}
-
-func (c *Sys) GenerateRecoveryOperationTokenUpdate(shard, nonce string) (*GenerateRootStatusResponse, error) {
-	return c.generateRootUpdateCommon("/v1/sys/generate-recovery-token/update", shard, nonce)
 }
 
 func (c *Sys) generateRootUpdateCommon(path, shard, nonce string) (*GenerateRootStatusResponse, error) {

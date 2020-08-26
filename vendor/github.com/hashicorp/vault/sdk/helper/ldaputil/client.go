@@ -11,9 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
-	"time"
 
-	"github.com/go-ldap/ldap/v3"
+	"github.com/go-ldap/ldap"
 	"github.com/hashicorp/errwrap"
 	hclog "github.com/hashicorp/go-hclog"
 	multierror "github.com/hashicorp/go-multierror"
@@ -85,13 +84,8 @@ func (c *Client) DialLDAP(cfg *ConfigEntry) (Connection, error) {
 		}
 		retErr = multierror.Append(retErr, errwrap.Wrapf(fmt.Sprintf("error connecting to host %q: {{err}}", uut), err))
 	}
-	if retErr != nil {
-		return nil, retErr
-	}
-	if timeout := cfg.RequestTimeout; timeout > 0 {
-		conn.SetTimeout(time.Duration(timeout) * time.Second)
-	}
-	return conn, nil
+
+	return conn, retErr.ErrorOrNil()
 }
 
 /*
@@ -120,10 +114,6 @@ func (c *Client) GetUserBindDN(cfg *ConfigEntry, conn Connection, username strin
 		}
 
 		filter := fmt.Sprintf("(%s=%s)", cfg.UserAttr, ldap.EscapeFilter(username))
-		if cfg.UPNDomain != "" {
-			filter = fmt.Sprintf("(userPrincipalName=%s@%s)", EscapeLDAPValue(username), cfg.UPNDomain)
-		}
-
 		if c.Logger.IsDebug() {
 			c.Logger.Debug("discovering user", "userdn", cfg.UserDN, "filter", filter)
 		}
@@ -154,11 +144,11 @@ func (c *Client) GetUserBindDN(cfg *ConfigEntry, conn Connection, username strin
 /*
  * Returns the DN of the object representing the authenticated user.
  */
-func (c *Client) GetUserDN(cfg *ConfigEntry, conn Connection, bindDN, username string) (string, error) {
+func (c *Client) GetUserDN(cfg *ConfigEntry, conn Connection, bindDN string) (string, error) {
 	userDN := ""
 	if cfg.UPNDomain != "" {
 		// Find the distinguished name for the user if userPrincipalName used for login
-		filter := fmt.Sprintf("(userPrincipalName=%s@%s)", EscapeLDAPValue(username), cfg.UPNDomain)
+		filter := fmt.Sprintf("(userPrincipalName=%s)", ldap.EscapeFilter(bindDN))
 		if c.Logger.IsDebug() {
 			c.Logger.Debug("searching upn", "userdn", cfg.UserDN, "filter", filter)
 		}
@@ -171,10 +161,9 @@ func (c *Client) GetUserDN(cfg *ConfigEntry, conn Connection, bindDN, username s
 		if err != nil {
 			return userDN, errwrap.Wrapf("LDAP search failed for detecting user: {{err}}", err)
 		}
-		if len(result.Entries) != 1 {
-			return userDN, fmt.Errorf("LDAP search for userdn 0 or not unique")
+		for _, e := range result.Entries {
+			userDN = e.DN
 		}
-		userDN = result.Entries[0].DN
 	} else {
 		userDN = bindDN
 	}
@@ -216,9 +205,7 @@ func (c *Client) performLdapFilterGroupsSearch(cfg *ConfigEntry, conn Connection
 	}
 
 	var renderedQuery bytes.Buffer
-	if err := t.Execute(&renderedQuery, context); err != nil {
-		return nil, errwrap.Wrapf("LDAP search failed due to template parsing error: {{err}}", err)
-	}
+	t.Execute(&renderedQuery, context)
 
 	if c.Logger.IsDebug() {
 		c.Logger.Debug("searching", "groupdn", cfg.GroupDN, "rendered_query", renderedQuery.String())
@@ -370,12 +357,12 @@ func (c *Client) GetLdapGroups(cfg *ConfigEntry, conn Connection, userDN string,
 		values := e.GetAttributeValues(cfg.GroupAttr)
 		if len(values) > 0 {
 			for _, val := range values {
-				groupCN := getCN(cfg, val)
+				groupCN := getCN(val)
 				ldapMap[groupCN] = true
 			}
 		} else {
 			// If groupattr didn't resolve, use self (enumerating group objects)
-			groupCN := getCN(cfg, e.DN)
+			groupCN := getCN(e.DN)
 			ldapMap[groupCN] = true
 		}
 	}
@@ -432,7 +419,7 @@ func EscapeLDAPValue(input string) string {
  * Given a non-conforming string (such as an already-extracted CN),
  * it will be returned as-is.
  */
-func getCN(cfg *ConfigEntry, dn string) string {
+func getCN(dn string) string {
 	parsedDN, err := ldap.ParseDN(dn)
 	if err != nil || len(parsedDN.RDNs) == 0 {
 		// It was already a CN, return as-is
@@ -441,14 +428,8 @@ func getCN(cfg *ConfigEntry, dn string) string {
 
 	for _, rdn := range parsedDN.RDNs {
 		for _, rdnAttr := range rdn.Attributes {
-			if cfg.UsePre111GroupCNBehavior == nil || *cfg.UsePre111GroupCNBehavior {
-				if rdnAttr.Type == "CN" {
-					return rdnAttr.Value
-				}
-			} else {
-				if strings.EqualFold(rdnAttr.Type, "CN") {
-					return rdnAttr.Value
-				}
+			if strings.EqualFold(rdnAttr.Type, "CN") {
+				return rdnAttr.Value
 			}
 		}
 	}
@@ -488,15 +469,6 @@ func getTLSConfig(cfg *ConfigEntry, host string) (*tls.Config, error) {
 			return nil, fmt.Errorf("could not append CA certificate")
 		}
 		tlsConfig.RootCAs = caPool
-	}
-	if cfg.ClientTLSCert != "" && cfg.ClientTLSKey != "" {
-		certificate, err := tls.X509KeyPair([]byte(cfg.ClientTLSCert), []byte(cfg.ClientTLSKey))
-		if err != nil {
-			return nil, errwrap.Wrapf("failed to parse client X509 key pair: {{err}}", err)
-		}
-		tlsConfig.Certificates = append(tlsConfig.Certificates, certificate)
-	} else if cfg.ClientTLSCert != "" || cfg.ClientTLSKey != "" {
-		return nil, fmt.Errorf("both client_tls_cert and client_tls_key must be set")
 	}
 	return tlsConfig, nil
 }

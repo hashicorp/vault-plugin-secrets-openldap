@@ -134,20 +134,9 @@ func (c *Logical) Write(path string, data map[string]interface{}) (*Secret, erro
 		return nil, err
 	}
 
-	return c.write(path, r)
-}
-
-func (c *Logical) WriteBytes(path string, data []byte) (*Secret, error) {
-	r := c.c.NewRequest("PUT", "/v1/"+path)
-	r.BodyBytes = data
-
-	return c.write(path, r)
-}
-
-func (c *Logical) write(path string, request *Request) (*Secret, error) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	resp, err := c.c.RawRequestWithContext(ctx, request)
+	resp, err := c.c.RawRequestWithContext(ctx, r)
 	if resp != nil {
 		defer resp.Body.Close()
 	}

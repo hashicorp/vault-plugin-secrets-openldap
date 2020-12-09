@@ -1,0 +1,1 @@
+DO NOT MERGE THIS FOLDER - this package is here temporarily to match up with sdk/helper/template

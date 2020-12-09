@@ -1,0 +1,18 @@
+run:
+  modules-download-mode: vendor
+  tests: true
+  timeout: 1m
+
+linters:
+  enable-all: true
+  disable:
+    - gomnd
+    - testpackage
+    - nolintlint
+    - wsl
+
+linters-settings:
+  gocyclo:
+    min-complexity: 11
+  gofmt:
+    simplify: true

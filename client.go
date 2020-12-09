@@ -3,11 +3,15 @@ package openldap
 import (
 	"fmt"
 
+	"github.com/go-ldap/ldap/v3"
+
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 )
 
 type ldapClient interface {
+	Add(conf *client.Config, req *ldap.AddRequest) error
 	Get(conf *client.Config, dn string) (*client.Entry, error)
+	Del(conf *client.Config, req *ldap.DelRequest) error
 	UpdatePassword(conf *client.Config, dn string, newPassword string) error
 	UpdateRootPassword(conf *client.Config, newPassword string) error
 }
@@ -17,6 +21,8 @@ func NewClient() *Client {
 		ldap: client.New(),
 	}
 }
+
+var _ ldapClient = (*Client)(nil)
 
 type Client struct {
 	ldap client.Client
@@ -57,4 +63,12 @@ func (c *Client) UpdateRootPassword(conf *client.Config, newPassword string) err
 	newValues := map[*client.Field][]string{client.FieldRegistry.UserPassword: {newPassword}}
 
 	return c.ldap.UpdatePassword(conf, conf.BindDN, newValues, filters)
+}
+
+func (c *Client) Add(conf *client.Config, req *ldap.AddRequest) error {
+	return c.ldap.Add(conf, req)
+}
+
+func (c *Client) Del(conf *client.Config, req *ldap.DelRequest) error {
+	return c.ldap.Del(conf, req)
 }

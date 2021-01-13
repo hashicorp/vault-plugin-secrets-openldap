@@ -6,27 +6,34 @@
 #                   These plugins will need to be built for Linux.
 #
 # Optional:
-# VAULT_BIN      Location of the Vault binary. This is used to run queries against Vault.
-#                Default: "vault" (uses $PATH)
-# VAULT_VERSION  Version of Vault to run in Docker
-#                Default: "latest"
-# VAULT_TOKEN    The root token to use with Vault. These tests will not store the token
-#                in the local file system unlike the default behavior of a dev Vault server
-#                Default: "root-token"
-# VAULT_PORT     The port number for Vault to run at. This is used to construct the
-#                $VAULT_ADDR environment variable. The IP address nor protocol are specified
-#                because it is assumed that http://127.0.0.1 will be used.
-#                Default: 8200
+# ===== Vault ===========================================
+# VAULT_DOCKER_NAME  Name of the container to run Vault in
+#                    Default: "vault-tests"
+# VAULT_BIN          Location of the Vault binary. This is used to run queries against Vault.
+#                    Default: "vault" (uses $PATH)
+# VAULT_VERSION      Version of Vault to run in Docker
+#                    Default: "latest"
+# VAULT_TOKEN        The root token to use with Vault. These tests will not store the token
+#                    in the local file system unlike the default behavior of a dev Vault server
+#                    Default: "root-token"
+# VAULT_PORT         The port number for Vault to run at. This is used to construct the
+#                    $VAULT_ADDR environment variable. The IP address nor protocol are specified
+#                    because it is assumed that http://127.0.0.1 will be used.
+#                    Default: 8200
 #
-# OPENLDAP_DOCKER_NAME
-# OPENLDAP_VERSION
+# ===== OpenLDAP ===========================================
+# OPENLDAP_DOCKER_NAME    Name of the container to run OpenLDAP in
+#                         Default: "openldap-tests"
+# OPENLDAP_VERSION        Version of the OpenLDAP container to use
+#                         Default: "latest"
+# OPENLDAP_PORT_UNSECURE  The port number to expose OpenLDAP for unsecure communications
+#                         Default: 389
+# OPENLDAP_PORT_SECURE    The port number to expose OpenLDAP for secure communications
+#                         Default: 636
 #
+# ===== Docker ===========================================
 # DOCKER_NETWORK  Name of the docker network to create
 #                 Default: "openldap-acceptance-tests-network"
-
-# Is this needed?
-# TMP_DIR        Location of temporary directory to write files.
-#                Default: "/tmp"
 
 # Required
 vault_plugin_dir=${VAULT_PLUGIN_DIR}

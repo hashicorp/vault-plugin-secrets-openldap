@@ -55,7 +55,7 @@ func TestDynamicCredsRead_failures(t *testing.T) {
 			Key: path.Join(dynamicRolePath, roleName),
 			Value: jsonEncode(t, dynamicRole{
 				Name:         roleName,
-				CreationLDIF: simpleLDAPTemplate,
+				CreationLDIF: ldifCreationTemplate,
 			}),
 		}
 		storage.On("Get", mock.Anything, path.Join(dynamicRolePath, roleName)).
@@ -95,7 +95,7 @@ func TestDynamicCredsRead_failures(t *testing.T) {
 			Key: path.Join(dynamicRolePath, roleName),
 			Value: jsonEncode(t, dynamicRole{
 				Name:         roleName,
-				CreationLDIF: simpleLDAPTemplate,
+				CreationLDIF: ldifCreationTemplate,
 			}),
 		}
 		storage.On("Get", mock.Anything, path.Join(dynamicRolePath, roleName)).
@@ -135,7 +135,7 @@ func TestDynamicCredsRead_failures(t *testing.T) {
 			Key: path.Join(dynamicRolePath, roleName),
 			Value: jsonEncode(t, dynamicRole{
 				Name:         roleName,
-				CreationLDIF: simpleLDAPTemplate,
+				CreationLDIF: ldifCreationTemplate,
 			}),
 		}
 		configStorageResp := &logical.StorageEntry{
@@ -151,7 +151,7 @@ func TestDynamicCredsRead_failures(t *testing.T) {
 		defer storage.AssertExpectations(t)
 
 		client := new(mockLDAPClient)
-		client.On("Add", mock.Anything, mock.Anything).
+		client.On("Execute", mock.Anything, mock.Anything, mock.Anything).
 			Return(fmt.Errorf("test error")).
 			Once()
 
@@ -227,13 +227,13 @@ func TestDynamicCredsRead_success(t *testing.T) {
 
 			role: dynamicRole{
 				Name:         roleName,
-				CreationLDIF: simpleLDAPTemplate,
+				CreationLDIF: ldifCreationTemplate,
 			},
 
 			config: config{},
 
-			expectedDNRegex:       "^cn=v_token-dispname_testrole_[a-zA-Z0-9]{20}_[0-9]{10},ou=users,dc=hashicorp,dc=com$",
-			expectedUsernameRegex: "^v_token-dispname_testrole_[a-zA-Z0-9]{20}_[0-9]{10}$",
+			expectedDNRegex:       "^cn=v_token-dispname_testrole_[a-zA-Z0-9]{10}_[0-9]{10},ou=users,dc=hashicorp,dc=com$",
+			expectedUsernameRegex: "^v_token-dispname_testrole_[a-zA-Z0-9]{10}_[0-9]{10}$",
 			expectedPasswordRegex: "^[a-zA-Z0-9]{64}$",
 			expectedTTL:           0,
 			expectedMaxTTL:        0,
@@ -243,15 +243,15 @@ func TestDynamicCredsRead_success(t *testing.T) {
 
 			role: dynamicRole{
 				Name:         roleName,
-				CreationLDIF: simpleLDAPTemplate,
+				CreationLDIF: ldifCreationTemplate,
 			},
 
 			config: config{
 				PasswordPolicy: passwordPolicyName,
 			},
 
-			expectedDNRegex:       "^cn=v_token-dispname_testrole_[a-zA-Z0-9]{20}_[0-9]{10},ou=users,dc=hashicorp,dc=com$",
-			expectedUsernameRegex: "^v_token-dispname_testrole_[a-zA-Z0-9]{20}_[0-9]{10}$",
+			expectedDNRegex:       "^cn=v_token-dispname_testrole_[a-zA-Z0-9]{10}_[0-9]{10},ou=users,dc=hashicorp,dc=com$",
+			expectedUsernameRegex: "^v_token-dispname_testrole_[a-zA-Z0-9]{10}_[0-9]{10}$",
 			expectedPasswordRegex: "^" + fakePassword + "$",
 			expectedTTL:           0,
 			expectedMaxTTL:        0,
@@ -261,8 +261,8 @@ func TestDynamicCredsRead_success(t *testing.T) {
 
 			role: dynamicRole{
 				Name:             roleName,
-				CreationLDIF:     simpleLDAPTemplate,
-				UsernameTemplate: "v.{{rand 10}}.{{.RoleName}}.{{timestamp}}.{{.DisplayName}}",
+				CreationLDIF:     ldifCreationTemplate,
+				UsernameTemplate: "v.{{random 10}}.{{.RoleName}}.{{unix_time}}.{{.DisplayName}}",
 			},
 
 			config: config{},
@@ -278,8 +278,8 @@ func TestDynamicCredsRead_success(t *testing.T) {
 
 			role: dynamicRole{
 				Name:             roleName,
-				CreationLDIF:     simpleLDAPTemplate,
-				UsernameTemplate: "v.{{rand 10}}.{{.RoleName}}.{{timestamp}}.{{.DisplayName}}",
+				CreationLDIF:     ldifCreationTemplate,
+				UsernameTemplate: "v.{{random 10}}.{{.RoleName}}.{{unix_time}}.{{.DisplayName}}",
 				DefaultTTL:       1 * time.Hour,
 				MaxTTL:           24 * time.Hour,
 			},
@@ -297,7 +297,7 @@ func TestDynamicCredsRead_success(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			client := new(mockLDAPClient)
-			client.On("Add", mock.Anything, mock.Anything).
+			client.On("Execute", mock.Anything, mock.Anything, mock.Anything).
 				Return(error(nil)).
 				Once()
 			defer client.AssertExpectations(t)
@@ -358,14 +358,16 @@ func TestDynamicCredsRead_success(t *testing.T) {
 			password := getStringT(t, resp.Data, "password")
 			require.Regexp(t, test.expectedPasswordRegex, password)
 
-			actualDN := getStringT(t, resp.Data, "dn")
-			require.Regexp(t, test.expectedDNRegex, actualDN)
+			dns := getStringSlice(t, resp.Data, "DNs")
+			require.Len(t, dns, 1)
+			require.Regexp(t, test.expectedDNRegex, dns[0])
 		})
 	}
 }
 
 func TestSecretCredsRenew(t *testing.T) {
 	roleName := "testrole"
+	now := time.Now()
 
 	type testCase struct {
 		req *logical.Request
@@ -382,7 +384,8 @@ func TestSecretCredsRenew(t *testing.T) {
 			req: &logical.Request{
 				Secret: &logical.Secret{
 					InternalData: map[string]interface{}{
-						"name": roleName,
+						"name":          roleName,
+						"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
 					},
 					LeaseID: "foo bar",
 				},
@@ -396,7 +399,8 @@ func TestSecretCredsRenew(t *testing.T) {
 			req: &logical.Request{
 				Secret: &logical.Secret{
 					InternalData: map[string]interface{}{
-						"name": roleName,
+						"name":          roleName,
+						"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
 					},
 					LeaseID: "foo bar",
 				},
@@ -410,10 +414,18 @@ func TestSecretCredsRenew(t *testing.T) {
 			req: &logical.Request{
 				Secret: &logical.Secret{
 					InternalData: map[string]interface{}{
-						"name":     roleName,
-						"username": "alice",
-						"password": "r3allys3cu4ePassw0rd!",
-						"dn":       "cn=alice,ou=users,dc=learn,dc=example",
+						"name":          roleName,
+						"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+						"template_data": dynamicTemplateData{
+							Username:              "alice",
+							Password:              "r3allys3cu4ePassw0rd!",
+							DisplayName:           "disp_name",
+							RoleName:              roleName,
+							IssueTime:             now.Format(time.RFC3339),
+							IssueTimeSeconds:      now.Unix(),
+							ExpirationTime:        now.Add(1 * time.Minute).Format(time.RFC3339),
+							ExpirationTimeSeconds: now.Add(1 * time.Minute).Unix(),
+						},
 					},
 					LeaseID: "foo bar",
 				},
@@ -429,10 +441,18 @@ func TestSecretCredsRenew(t *testing.T) {
 			expectedResp: &logical.Response{
 				Secret: &logical.Secret{
 					InternalData: map[string]interface{}{
-						"name":     roleName,
-						"username": "alice",
-						"password": "r3allys3cu4ePassw0rd!",
-						"dn":       "cn=alice,ou=users,dc=learn,dc=example",
+						"name":          roleName,
+						"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+						"template_data": dynamicTemplateData{
+							Username:              "alice",
+							Password:              "r3allys3cu4ePassw0rd!",
+							DisplayName:           "disp_name",
+							RoleName:              roleName,
+							IssueTime:             now.Format(time.RFC3339),
+							IssueTimeSeconds:      now.Unix(),
+							ExpirationTime:        now.Add(1 * time.Minute).Format(time.RFC3339),
+							ExpirationTimeSeconds: now.Add(1 * time.Minute).Unix(),
+						},
 					},
 					LeaseID: "foo bar",
 				},
@@ -612,7 +632,7 @@ func TestSecretCredsRevoke(t *testing.T) {
 		defer storage.AssertExpectations(t)
 
 		client := new(mockLDAPClient)
-		client.On("Del", mock.Anything, mock.Anything).
+		client.On("Execute", mock.Anything, mock.Anything, mock.Anything).
 			Return(fmt.Errorf("test error")).
 			Once()
 		defer client.AssertExpectations(t)
@@ -623,7 +643,8 @@ func TestSecretCredsRevoke(t *testing.T) {
 			Storage: storage,
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{
-					"dn": "foobar",
+					"dn":            "foobar",
+					"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
 				},
 			},
 		}
@@ -648,7 +669,7 @@ func TestSecretCredsRevoke(t *testing.T) {
 		defer storage.AssertExpectations(t)
 
 		client := new(mockLDAPClient)
-		client.On("Del", mock.Anything, mock.Anything).
+		client.On("Execute", mock.Anything, mock.Anything, mock.Anything).
 			Return(error(nil)).
 			Once()
 		defer client.AssertExpectations(t)
@@ -659,7 +680,8 @@ func TestSecretCredsRevoke(t *testing.T) {
 			Storage: storage,
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{
-					"dn": "foobar",
+					"dn":            "foobar",
+					"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
 				},
 			},
 		}
@@ -844,4 +866,34 @@ func getStringT(t *testing.T, m map[string]interface{}, key string) string {
 		t.Fatalf("%s", err)
 	}
 	return str
+}
+
+func getStringSlice(t *testing.T, m map[string]interface{}, key string) []string {
+	t.Helper()
+
+	rawSlice, ok := m[key]
+	if !ok {
+		t.Fatalf("Key %s is missing from map", key)
+	}
+
+	strSlice, ok := rawSlice.([]string)
+	if ok {
+		return strSlice
+	}
+
+	iSlice, ok := rawSlice.([]interface{})
+	if !ok {
+		t.Fatalf("Unable to coerce key %s to a string slice: is a %T", key, rawSlice)
+	}
+
+	strSlice = []string{}
+	for _, rawVal := range iSlice {
+		str, ok := rawVal.(string)
+		if !ok {
+			t.Fatalf("Unable to coerce value within slice to string")
+		}
+		strSlice = append(strSlice, str)
+	}
+
+	return strSlice
 }

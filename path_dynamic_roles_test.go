@@ -30,8 +30,10 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 	tests := map[string]testCase{
 		"bad default_ttl": {
 			createData: dynamicRoleFieldData(map[string]interface{}{
-				"name":        roleName,
-				"default_ttl": "foo",
+				"name":          roleName,
+				"default_ttl":   "foo",
+				"creation_ldif": ldifCreationTemplate,
+				"deletion_ldif": ldifDeleteTemplate,
 			}),
 
 			putErr:   nil,
@@ -41,8 +43,10 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 		},
 		"bad max_ttl": {
 			createData: dynamicRoleFieldData(map[string]interface{}{
-				"name":    roleName,
-				"max_ttl": "foo",
+				"name":          roleName,
+				"max_ttl":       "foo",
+				"creation_ldif": ldifCreationTemplate,
+				"deletion_ldif": ldifDeleteTemplate,
 			}),
 
 			putErr:   nil,
@@ -52,7 +56,19 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 		},
 		"missing creation_ldif": {
 			createData: dynamicRoleFieldData(map[string]interface{}{
-				"name": roleName,
+				"name":          roleName,
+				"deletion_ldif": ldifDeleteTemplate,
+			}),
+
+			putErr:   nil,
+			putTimes: 0,
+
+			expectErr: true,
+		},
+		"missing deletion_ldif": {
+			createData: dynamicRoleFieldData(map[string]interface{}{
+				"name":          roleName,
+				"creation_ldif": ldifCreationTemplate,
 			}),
 
 			putErr:   nil,
@@ -64,6 +80,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": `dn: cn={{.Username,ou=users,dc=learn,dc=example`,
+				"deletion_ldif": ldifDeleteTemplate,
 			}),
 
 			putErr:   nil,
@@ -75,6 +92,57 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": `foo bar`,
+				"deletion_ldif": ldifDeleteTemplate,
+			}),
+
+			putErr:   nil,
+			putTimes: 0,
+
+			expectErr: true,
+		},
+		"deletion_ldif bad template syntax": {
+			createData: dynamicRoleFieldData(map[string]interface{}{
+				"name":          roleName,
+				"creation_ldif": ldifCreationTemplate,
+				"deletion_ldif": "dn: cn={{.Username,ou=users,dc=learn,dc=example\nchangetype: delete",
+			}),
+
+			putErr:   nil,
+			putTimes: 0,
+
+			expectErr: true,
+		},
+		"deletion_ldif bad LDIF syntax": {
+			createData: dynamicRoleFieldData(map[string]interface{}{
+				"name":          roleName,
+				"creation_ldif": ldifCreationTemplate,
+				"deletion_ldif": `foo bar`,
+			}),
+
+			putErr:   nil,
+			putTimes: 0,
+
+			expectErr: true,
+		},
+		"rollback_ldif bad template syntax": {
+			createData: dynamicRoleFieldData(map[string]interface{}{
+				"name":          roleName,
+				"creation_ldif": ldifCreationTemplate,
+				"deletion_ldif": ldifDeleteTemplate,
+				"rollback_ldif": "dn: cn={{.Username,ou=users,dc=learn,dc=example\nchangetype: delete",
+			}),
+
+			putErr:   nil,
+			putTimes: 0,
+
+			expectErr: true,
+		},
+		"rollback_ldif bad LDIF syntax": {
+			createData: dynamicRoleFieldData(map[string]interface{}{
+				"name":          roleName,
+				"creation_ldif": ldifCreationTemplate,
+				"deletion_ldif": ldifDeleteTemplate,
+				"rollback_ldif": `foo bar`,
 			}),
 
 			putErr:   nil,
@@ -85,60 +153,20 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 		"multiple LDIF entries": {
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
-				"creation_ldif": simpleLDAPTemplate + "\n\n" + simpleLDAPTemplate,
-				// 				"creation_ldif": `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
-				// objectClass: person
-				// objectClass: top
-				// cn: learn
-				// sn: learn
-				// memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
-				// userPassword: {{.Password}}
-				//
-				// dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
-				// objectClass: person
-				// objectClass: top
-				// cn: learn
-				// sn: learn
-				// memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
-				// userPassword: {{.Password}}`,
+				"creation_ldif": ldifCreateAndModifyTemplate,
+				"deletion_ldif": ldifDeleteTemplate,
 			}),
 
 			putErr:   nil,
-			putTimes: 0,
+			putTimes: 1,
 
-			expectErr: true,
-		},
-		"modify LDIF entry": {
-			createData: dynamicRoleFieldData(map[string]interface{}{
-				"name": roleName,
-				"creation_ldif": `dn: cn=testuser,ou=users,dc=hashicorp,dc=com
-changetype: modify
-add: mail
-mail: test@hashicorp.com
--`,
-			}),
-
-			putErr:   nil,
-			putTimes: 0,
-
-			expectErr: true,
-		},
-		"delete LDIF entry": {
-			createData: dynamicRoleFieldData(map[string]interface{}{
-				"name": roleName,
-				"creation_ldif": `dn: cn=testuser,ou=users,dc=hashicorp,dc=com
-changetype: delete`,
-			}),
-
-			putErr:   nil,
-			putTimes: 0,
-
-			expectErr: true,
+			expectErr: false,
 		},
 		"storage error": {
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
-				"creation_ldif": simpleLDAPTemplate,
+				"creation_ldif": ldifCreationTemplate,
+				"deletion_ldif": ldifDeleteTemplate,
 			}),
 
 			putErr:   fmt.Errorf("test error"),
@@ -149,7 +177,8 @@ changetype: delete`,
 		"happy path": {
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
-				"creation_ldif": simpleLDAPTemplate,
+				"creation_ldif": ldifCreationTemplate,
+				"deletion_ldif": ldifDeleteTemplate,
 			}),
 
 			putErr:   nil,
@@ -157,10 +186,12 @@ changetype: delete`,
 
 			expectErr: false,
 		},
-		"base64 encoded creation_ldif": {
+		"base64 encoded templates": {
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
-				"creation_ldif": base64Encode(simpleLDAPTemplate),
+				"creation_ldif": base64Encode(ldifCreationTemplate),
+				"rollback_ldif": base64Encode(ldifRollbackTemplate),
+				"deletion_ldif": base64Encode(ldifDeleteTemplate),
 			}),
 
 			putErr:   nil,
@@ -190,7 +221,6 @@ changetype: delete`,
 			defer cancel()
 
 			_, err := b.pathDynamicRoleCreateUpdate(ctx, req, test.createData)
-			t.Logf("err: %s", err)
 			if test.expectErr && err == nil {
 				t.Fatalf("err expected, got nil")
 			}
@@ -229,14 +259,10 @@ func TestDynamicRoleRead(t *testing.T) {
 			storageResp: &logical.StorageEntry{
 				Key: paths.Join(dynamicRolePath, roleName),
 				Value: jsonEncode(t, dynamicRole{
-					Name: roleName,
-					CreationLDIF: `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
-objectClass: person
-objectClass: top
-cn: learn
-sn: learn
-memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
-userPassword: {{.Password}}`,
+					Name:             roleName,
+					CreationLDIF:     ldifCreationTemplate,
+					RollbackLDIF:     ldifRollbackTemplate,
+					DeletionLDIF:     ldifDeleteTemplate,
 					UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
 					DefaultTTL:       24 * time.Hour,
 					MaxTTL:           5 * 24 * time.Hour,
@@ -245,13 +271,9 @@ userPassword: {{.Password}}`,
 			storageErr: nil,
 			expectedResp: &logical.Response{
 				Data: map[string]interface{}{
-					"creation_ldif": `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
-objectClass: person
-objectClass: top
-cn: learn
-sn: learn
-memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
-userPassword: {{.Password}}`,
+					"creation_ldif":     ldifCreationTemplate,
+					"rollback_ldif":     ldifRollbackTemplate,
+					"deletion_ldif":     ldifDeleteTemplate,
 					"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
 					"default_ttl":       (24 * time.Hour).Seconds(),
 					"max_ttl":           (5 * 24 * time.Hour).Seconds(),
@@ -655,10 +677,32 @@ func jsonEncode(t *testing.T, value interface{}) []byte {
 	return b
 }
 
-const simpleLDAPTemplate = `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
+const (
+	ldifCreationTemplate = `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
 objectClass: person
 objectClass: top
 cn: learn
 sn: learn
 memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
 userPassword: {{.Password}}`
+
+	ldifCreateAndModifyTemplate = `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
+objectClass: person
+objectClass: top
+cn: learn
+sn: learn
+memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
+userPassword: {{.Password}}
+
+dn: cn=testuser,ou=users,dc=hashicorp,dc=com
+changetype: modify
+add: mail
+mail: test@hashicorp.com
+-`
+
+	ldifDeleteTemplate = `dn: cn={{.Username}},ou=users,dc=learn,dc=example
+changetype: delete`
+
+	ldifRollbackTemplate = `dn: cn={{.Username}},ou=users,dc=learn,dc=example
+changetype: delete`
+)

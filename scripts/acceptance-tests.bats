@@ -56,13 +56,16 @@ openldap_port_unsecure=${OPENLDAP_PORT_UNSECURE:-389}
 openldap_port_secure=${OPENLDAP_PORT_SECURE:-636}
 admin_password="2LearnVault"
 
-simple_template='dn: cn={{.Username}},ou=users,dc=learn,dc=example
+creation_ldif='dn: cn={{.Username}},ou=users,dc=learn,dc=example
 objectClass: person
 objectClass: top
 cn: learn
 sn: learn
 memberOf: cn=dev,ou=groups,dc=learn,dc=example
 userPassword: {{.Password}}'
+
+deletion_ldif='dn: cn={{.Username}},ou=users,dc=learn,dc=example
+changetype: delete'
 
 log() {
   printf "# $(date) - %s\n" "${1}" >&3
@@ -193,7 +196,7 @@ teardown() {
   max_ttl=10
 
   # Create role
-  run vault write openldap/role/testrole creation_ldif="${simple_template}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  run vault write openldap/role/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
   [ ${status} -eq 0 ]
 
   # Read role and make sure it matches what we expect
@@ -201,6 +204,8 @@ teardown() {
   [ ${status} -eq 0 ]
   expected='{
     "creation_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nobjectClass: person\nobjectClass: top\ncn: learn\nsn: learn\nmemberOf: cn=dev,ou=groups,dc=learn,dc=example\nuserPassword: {{.Password}}",
+    "deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+    "rollback_ldif": "",
     "default_ttl": 5,
     "max_ttl": 10,
     "username_template": ""
@@ -224,11 +229,11 @@ teardown() {
   # Create a bunch of roles with different prefixes
   for id in $(seq -f "%02g" 0 10); do
     rolename="testrole${id}"
-    run vault write "openldap/role/${rolename}" creation_ldif="${simple_template}" default_ttl="5s" max_ttl="10s"
+    run vault write "openldap/role/${rolename}" creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="5s" max_ttl="10s"
     [ ${status} -eq 0 ]
 
     rolename="roletest${id}"
-    run vault write "openldap/role/${rolename}" creation_ldif="${simple_template}" default_ttl="5s" max_ttl="10s"
+    run vault write "openldap/role/${rolename}" creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="5s" max_ttl="10s"
     [ ${status} -eq 0 ]
   done
 
@@ -270,7 +275,7 @@ teardown() {
   max_ttl=20
 
   # Create role
-  run vault write openldap/role/testrole creation_ldif="${simple_template}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  run vault write openldap/role/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
   [ ${status} -eq 0 ]
 
   # Get credentials
@@ -285,7 +290,7 @@ teardown() {
   assertion=$(echo "${output}" | jq '.data | has("password")')
   [ "${assertion}" == "true" ]
 
-  assertion=$(echo "${output}" | jq '.data | has("dn")')
+  assertion=$(echo "${output}" | jq '.data | has("DNs")')
   [ "${assertion}" == "true" ]
 
   ## Assert the fields are structured correctly
@@ -295,7 +300,10 @@ teardown() {
   password="$(echo "${output}" | jq -r '.data.password')"
   [[ "${password}" =~ ^[a-zA-Z0-9]{64}$ ]]
 
-  dn="$(echo "${output}" | jq -r '.data.dn')"
+  numDNs="$(echo "${output}" | jq -r '.data.DNs | length')"
+  [[ ${numDNs} -eq 1 ]]
+
+  dn="$(echo "${output}" | jq -r '.data.DNs[0]')"
   [[ "${dn}" =~ ^cn=${username},ou=users,dc=learn,dc=example$ ]]
 
   ## Assert the credentials work in OpenLDAP
@@ -303,10 +311,11 @@ teardown() {
   if [ ${status} -ne 0 ]; then
     log "FAILED!!!"
     sleep 30
+    [ ${status} -ne 0 ]
   fi
 
   ## Assert the credentials no longer work after their TTL
-  sleep ${default_ttl}
+  sleep $((default_ttl + 1))
 
   run ldapsearch -b "${dn}" -D "${dn}" -w "${password}"
   [ ${status} -ne 0 ]
@@ -317,7 +326,7 @@ teardown() {
   max_ttl=20
 
   # Create role
-  run vault write openldap/role/testrole creation_ldif="${simple_template}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  run vault write openldap/role/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
   [ ${status} -eq 0 ]
 
   # Get credentials
@@ -334,7 +343,7 @@ teardown() {
   assertion=$(echo "${output}" | jq '.data | has("password")')
   [ "${assertion}" == "true" ]
 
-  assertion=$(echo "${output}" | jq '.data | has("dn")')
+  assertion=$(echo "${output}" | jq '.data | has("DNs")')
   [ "${assertion}" == "true" ]
 
   ## Assert the fields are structured correctly
@@ -344,7 +353,10 @@ teardown() {
   password="$(echo "${output}" | jq -r '.data.password')"
   [[ "${password}" =~ ^[a-zA-Z0-9]{64}$ ]]
 
-  dn="$(echo "${output}" | jq -r '.data.dn')"
+  numDNs="$(echo "${output}" | jq -r '.data.DNs | length')"
+  [[ ${numDNs} -eq 1 ]]
+
+  dn="$(echo "${output}" | jq -r '.data.DNs[0]')"
   [[ "${dn}" =~ ^cn=${username},ou=users,dc=learn,dc=example$ ]]
 
   ## Assert the credentials work in OpenLDAP

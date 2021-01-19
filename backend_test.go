@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
+	"github.com/go-ldap/ldif"
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/helper/logging"
@@ -86,6 +87,10 @@ func (f *fakeLdapClient) Add(_ *client.Config, _ *ldap.AddRequest) error {
 }
 
 func (f *fakeLdapClient) Del(_ *client.Config, _ *ldap.DelRequest) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (f *fakeLdapClient) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {
 	return fmt.Errorf("not implemented")
 }
 

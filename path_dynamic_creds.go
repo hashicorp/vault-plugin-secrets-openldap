@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-ldap/ldap/v3"
 	"github.com/go-ldap/ldif"
+	"github.com/hashicorp/go-multierror"
+	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
-	"github.com/hashicorp/vault/sdk/helper/base62"
 	"github.com/hashicorp/vault/sdk/helper/template"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -43,7 +43,7 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 		return nil, err
 	}
 
-	// Apply the template
+	// Apply the template & execute
 	now := time.Now()
 	exp := now.Add(dRole.DefaultTTL)
 	templateData := dynamicTemplateData{
@@ -56,33 +56,31 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 		ExpirationTime:        exp.Format(time.RFC3339),
 		ExpirationTimeSeconds: exp.Unix(),
 	}
-	createLDIF, err := applyTemplate(dRole.CreationLDIF, templateData)
+	dns, err := b.executeLDIF(config.LDAP, dRole.CreationLDIF, templateData, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to apply creation_ldif template: %w", err)
-	}
+		// Creation failed, attempt a rollback if one is specified
+		if dRole.RollbackLDIF == "" {
+			return nil, fmt.Errorf("failed to create user: %w", err)
+		}
 
-	// Parse the raw LDIF & run it against the LDAP client
-	entries, err := ldif.Parse(createLDIF)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse generated LDIF: %w", err)
-	}
-
-	addReq := getAddRequest(entries.Entries[0])
-
-	err = b.client.Add(config.LDAP, addReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create LDAP entry: %w", err)
+		merr := multierror.Append(fmt.Errorf("failed to create user: %w", err))
+		_, err = b.executeLDIF(config.LDAP, dRole.RollbackLDIF, templateData, true)
+		if err != nil {
+			merr = multierror.Append(fmt.Errorf("failed to roll back user creation: %w", err))
+		}
+		return nil, merr
 	}
 	respData := map[string]interface{}{
 		"username": username,
 		"password": password,
-		"dn":       addReq.DN,
+		"DNs":      dns,
 	}
 	internal := map[string]interface{}{
-		"name":     roleName,
-		"username": username,
-		"password": password,
-		"dn":       addReq.DN,
+		"name": roleName,
+		// Including the deletion_ldif in the event that the role is deleted while
+		// leases are active otherwise leases will fail to revoke
+		"deletion_ldif": dRole.DeletionLDIF,
+		"template_data": templateData,
 	}
 	resp := b.Secret(secretCredsType).Response(respData, internal)
 	resp.Secret.TTL = dRole.DefaultTTL
@@ -91,30 +89,51 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 	return resp, nil
 }
 
-func getAddRequest(req *ldif.Entry) *ldap.AddRequest {
-	if req.Add != nil {
-		return req.Add
+func (b *backend) executeLDIF(config *client.Config, ldifTemplate string, templateData interface{}, continueOnError bool) (dns []string, err error) {
+	tmpl, err := template.NewTemplate(
+		template.Template(ldifTemplate),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+	rawLDIF, err := tmpl.Generate(templateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	if req.Entry == nil {
-		return nil
+	// Parse the raw LDIF & run it against the LDAP client
+	entries, err := ldif.Parse(rawLDIF)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse generated LDIF: %w", err)
 	}
 
-	// Attempt to convert the Entry to an AddRequest
-	attributes := make([]ldap.Attribute, 0, len(req.Entry.Attributes))
-	for _, entryAttribute := range req.Entry.Attributes {
-		attribute := ldap.Attribute{
-			Type: entryAttribute.Name,
-			Vals: entryAttribute.Values,
+	err = b.client.Execute(config, entries.Entries, continueOnError)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute statements: %w", err)
+	}
+	dns = getDNs(entries.Entries)
+	return dns, nil
+}
+
+func getDNs(entries []*ldif.Entry) []string {
+	dns := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil {
+			continue
 		}
-		attributes = append(attributes, attribute)
+
+		switch {
+		case entry.Entry != nil:
+			dns = append(dns, entry.Entry.DN)
+		case entry.Add != nil:
+			dns = append(dns, entry.Add.DN)
+		case entry.Modify != nil:
+			dns = append(dns, entry.Modify.DN)
+		case entry.Del != nil:
+			dns = append(dns, entry.Del.DN)
+		}
 	}
-	addReq := &ldap.AddRequest{
-		DN:         req.Entry.DN,
-		Attributes: attributes,
-		Controls:   nil,
-	}
-	return addReq
+	return dns
 }
 
 func (b *backend) secretCredsRenew() framework.OperationFunc {
@@ -151,23 +170,13 @@ func (b *backend) secretCredsRevoke() framework.OperationFunc {
 			return nil, fmt.Errorf("missing OpenLDAP configuration")
 		}
 
-		dn, err := getString(req.Secret.InternalData, "dn")
+		deletionTemplate, err := getString(req.Secret.InternalData, "deletion_ldif")
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve dn from revocation data: %w", err)
-		}
-		if dn == "" {
-			return nil, fmt.Errorf("no DN found in revocation data")
+			return nil, fmt.Errorf("broken internal data: unable to retrieve deletion_ldif: %w", err)
 		}
 
-		delReq := &ldap.DelRequest{
-			DN: dn,
-		}
-
-		err = b.client.Del(config.LDAP, delReq)
-		if err != nil {
-			return nil, fmt.Errorf("failed to revoke OpenLDAP credentials: %w", err)
-		}
-		return nil, nil
+		_, err = b.executeLDIF(config.LDAP, deletionTemplate, req.Secret.InternalData["template_data"], true)
+		return nil, err
 	}
 }
 
@@ -176,17 +185,15 @@ type usernameTemplateData struct {
 	RoleName    string
 }
 
+const defaultUsernameTemplate = "v_{{.DisplayName}}_{{.RoleName}}_{{random 10}}_{{unix_time}}"
+
 func generateUsername(req *logical.Request, role *dynamicRole) (string, error) {
+	usernameTemplate := role.UsernameTemplate
 	if role.UsernameTemplate == "" {
-		randStr, err := base62.Random(20)
-		if err != nil {
-			return "", err
-		}
-		username := fmt.Sprintf("v_%s_%s_%s_%d", req.DisplayName, role.Name, randStr, time.Now().Unix())
-		return username, nil
+		usernameTemplate = defaultUsernameTemplate
 	}
 	tmpl, err := template.NewTemplate(
-		template.Template(role.UsernameTemplate),
+		template.Template(usernameTemplate),
 	)
 	if err != nil {
 		return "", err

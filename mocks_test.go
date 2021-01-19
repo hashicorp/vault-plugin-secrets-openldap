@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-ldap/ldap/v3"
+	"github.com/go-ldap/ldif"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/mock"
@@ -37,6 +38,11 @@ func (m *mockLDAPClient) UpdatePassword(conf *client.Config, dn string, newPassw
 
 func (m *mockLDAPClient) UpdateRootPassword(conf *client.Config, newPassword string) error {
 	args := m.Called(conf, newPassword)
+	return args.Error(0)
+}
+
+func (m *mockLDAPClient) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {
+	args := m.Called(conf, entries, continueOnError)
 	return args.Error(0)
 }
 

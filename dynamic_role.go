@@ -13,11 +13,13 @@ type dynamicRole struct {
 	// required fields
 	Name         string `json:"name"          mapstructure:"name"`
 	CreationLDIF string `json:"creation_ldif" mapstructure:"creation_ldif"`
+	DeletionLDIF string `json:"deletion_ldif" mapstructure:"deletion_ldif"`
 
 	// optional fields
-	UsernameTemplate string        `json:"username_template,omitempty" mapstructure:"username_template"`
-	DefaultTTL       time.Duration `json:"default_ttl,omitempty"       mapstructure:"default_ttl"`
-	MaxTTL           time.Duration `json:"max_ttl,omitempty"           mapstructure:"max_ttl"`
+	RollbackLDIF     string        `json:"rollback_ldif"               mapstructure:"rollback_ldif,omitempty"`
+	UsernameTemplate string        `json:"username_template,omitempty" mapstructure:"username_template,omitempty"`
+	DefaultTTL       time.Duration `json:"default_ttl,omitempty"       mapstructure:"default_ttl,omitempty"`
+	MaxTTL           time.Duration `json:"max_ttl,omitempty"           mapstructure:"max_ttl,omitempty"`
 }
 
 func retrieveDynamicRole(ctx context.Context, s logical.Storage, roleName string) (*dynamicRole, error) {
@@ -37,11 +39,11 @@ func retrieveDynamicRole(ctx context.Context, s logical.Storage, roleName string
 	return result, nil
 }
 
-func storeDynamicRole(ctx context.Context, s logical.Storage, roleName string, role *dynamicRole) error {
-	if roleName == "" {
+func storeDynamicRole(ctx context.Context, s logical.Storage, role *dynamicRole) error {
+	if role.Name == "" {
 		return fmt.Errorf("missing role name")
 	}
-	entry, err := logical.StorageEntryJSON(path.Join(dynamicRolePath, roleName), role)
+	entry, err := logical.StorageEntryJSON(path.Join(dynamicRolePath, role.Name), role)
 	if err != nil {
 		return fmt.Errorf("unable to marshal storage entry: %w", err)
 	}

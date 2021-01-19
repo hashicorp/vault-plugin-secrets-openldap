@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-ldap/ldap/v3"
-
+	"github.com/go-ldap/ldif"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 )
 
@@ -14,6 +14,8 @@ type ldapClient interface {
 	Del(conf *client.Config, req *ldap.DelRequest) error
 	UpdatePassword(conf *client.Config, dn string, newPassword string) error
 	UpdateRootPassword(conf *client.Config, newPassword string) error
+
+	Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error)
 }
 
 func NewClient() *Client {
@@ -71,4 +73,8 @@ func (c *Client) Add(conf *client.Config, req *ldap.AddRequest) error {
 
 func (c *Client) Del(conf *client.Config, req *ldap.DelRequest) error {
 	return c.ldap.Del(conf, req)
+}
+
+func (c *Client) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {
+	return c.ldap.Execute(conf, entries, continueOnError)
 }

@@ -38,6 +38,15 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 					Description: "LDIF string used to create new entities within OpenLDAP. This LDIF can be templated.",
 					Required:    true,
 				},
+				"deletion_ldif": {
+					Type:        framework.TypeString,
+					Description: "LDIF string used to delete entities created within OpenLDAP. This LDIF can be templated.",
+					Required:    true,
+				},
+				"rollback_ldif": {
+					Type:        framework.TypeString,
+					Description: "LDIF string used to rollback changes in the event of a failure to create credentials. This LDIF can be templated.",
+				},
 				"username_template": {
 					Type:        framework.TypeString,
 					Description: "The template used to create a username",
@@ -129,8 +138,6 @@ func secretCreds(b *backend) *framework.Secret {
 }
 
 func (b *backend) pathDynamicRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleName := data.Get("name").(string)
-
 	rawData := data.Raw
 	err := convertToDuration(rawData, "default_ttl", "max_ttl")
 	if err != nil {
@@ -143,23 +150,49 @@ func (b *backend) pathDynamicRoleCreateUpdate(ctx context.Context, req *logical.
 		return nil, fmt.Errorf("failed to decode request: %w", err)
 	}
 
-	if dRole.CreationLDIF == "" {
-		return nil, fmt.Errorf("missing creation_ldif")
-	}
-
-	dRole.CreationLDIF = decodeBase64(dRole.CreationLDIF)
-
-	err = assertValidLDIFTemplate(dRole.CreationLDIF)
+	err = validateDynamicRole(dRole)
 	if err != nil {
 		return nil, err
 	}
 
-	err = storeDynamicRole(ctx, req.Storage, roleName, dRole)
+	dRole.CreationLDIF = decodeBase64(dRole.CreationLDIF)
+	dRole.RollbackLDIF = decodeBase64(dRole.RollbackLDIF)
+	dRole.DeletionLDIF = decodeBase64(dRole.DeletionLDIF)
+
+	err = assertValidLDIFTemplate(dRole.CreationLDIF)
+	if err != nil {
+		return nil, fmt.Errorf("invalid creation_ldif: %w", err)
+	}
+
+	if dRole.RollbackLDIF != "" {
+		err := assertValidLDIFTemplate(dRole.RollbackLDIF)
+		if err != nil {
+			return nil, fmt.Errorf("invalid rollback_ldif: %w", err)
+		}
+	}
+
+	err = assertValidLDIFTemplate(dRole.DeletionLDIF)
+	if err != nil {
+		return nil, fmt.Errorf("invalid deletion_ldif: %w", err)
+	}
+
+	err = storeDynamicRole(ctx, req.Storage, dRole)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save dynamic role: %w", err)
 	}
 
 	return nil, nil
+}
+
+func validateDynamicRole(dRole *dynamicRole) error {
+	merr := new(multierror.Error)
+	if dRole.CreationLDIF == "" {
+		merr = multierror.Append(merr, fmt.Errorf("missing creation_ldif"))
+	}
+	if dRole.DeletionLDIF == "" {
+		merr = multierror.Append(merr, fmt.Errorf("missing deletion_ldif"))
+	}
+	return merr.ErrorOrNil()
 }
 
 // convertToDuration all keys in the data map into time.Duration objects. Keys not found in the map will be ignored
@@ -203,44 +236,47 @@ func convertToDuration(data map[string]interface{}, keys ...string) error {
 	return merr.ErrorOrNil()
 }
 
-func decodeBase64(creationLDIF string) string {
-	decoded, err := base64.StdEncoding.DecodeString(creationLDIF)
+func decodeBase64(str string) string {
+	if str == "" {
+		return ""
+	}
+	decoded, err := base64.StdEncoding.DecodeString(str)
 	if err != nil {
-		return creationLDIF
+		return str
 	}
 	return string(decoded)
 }
 
 func assertValidLDIFTemplate(rawTemplate string) error {
 	// Test the template to ensure there aren't any errors in the template syntax
+	now := time.Now()
+	exp := now.Add(24 * time.Hour)
 	testTemplateData := dynamicTemplateData{
-		Username:    "testuser",
-		Password:    "testpass",
-		DisplayName: "testdisplayname",
-		RoleName:    "testrolename",
+		Username:              "testuser",
+		Password:              "testpass",
+		DisplayName:           "testdisplayname",
+		RoleName:              "testrolename",
+		IssueTime:             now.Format(time.RFC3339),
+		IssueTimeSeconds:      now.Unix(),
+		ExpirationTime:        exp.Format(time.RFC3339),
+		ExpirationTimeSeconds: exp.Unix(),
 	}
+
 	testLDIF, err := applyTemplate(rawTemplate, testTemplateData)
 	if err != nil {
-		return fmt.Errorf("invalid createion_ldif template: %w", err)
+		return fmt.Errorf("invalid template: %w", err)
 	}
 
 	// Test the LDIF to ensure there aren't any errors in the syntax
 	entries, err := ldif.Parse(testLDIF)
 	if err != nil {
-		return fmt.Errorf("creation_ldif is invalid: %w", err)
+		return fmt.Errorf("LDIF is invalid: %w", err)
 	}
 
-	// Only allow for a single LDIF record
-	if len(entries.Entries) > 1 {
-		return fmt.Errorf("cannot specify more than one LDIF record in `creation_ldif`")
+	if len(entries.Entries) == 0 {
+		return fmt.Errorf("must specify at least one LDIF entry")
 	}
 
-	entry := entries.Entries[0]
-
-	// Only creation operations are allowed
-	if entry.Modify != nil || entry.Del != nil {
-		return fmt.Errorf("invalid `creation_ldif`: cannot specify modify or delete createtype")
-	}
 	return nil
 }
 
@@ -258,6 +294,8 @@ func (b *backend) pathDynamicRoleRead(ctx context.Context, req *logical.Request,
 	resp := &logical.Response{
 		Data: map[string]interface{}{
 			"creation_ldif":     dRole.CreationLDIF,
+			"deletion_ldif":     dRole.DeletionLDIF,
+			"rollback_ldif":     dRole.RollbackLDIF,
 			"username_template": dRole.UsernameTemplate,
 			"default_ttl":       dRole.DefaultTTL.Seconds(),
 			"max_ttl":           dRole.MaxTTL.Seconds(),

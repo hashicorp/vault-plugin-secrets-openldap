@@ -10,6 +10,7 @@ import (
 	"github.com/go-ldap/ldif"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/helper/parseutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/mitchellh/mapstructure"
 )
@@ -204,34 +205,12 @@ func convertToDuration(data map[string]interface{}, keys ...string) error {
 			continue
 		}
 
-		switch v := val.(type) {
-		case time.Duration:
+		dur, err := parseutil.ParseDurationSecond(val)
+		if err != nil {
+			merr = multierror.Append(merr, fmt.Errorf("invalid duration %s: %w", key, err))
 			continue
-		case int:
-			dur := time.Duration(v)
-			data[key] = dur
-		case int8:
-			dur := time.Duration(v)
-			data[key] = dur
-		case int16:
-			dur := time.Duration(v)
-			data[key] = dur
-		case int32:
-			dur := time.Duration(v)
-			data[key] = dur
-		case int64:
-			dur := time.Duration(v)
-			data[key] = dur
-		case string:
-			dur, err := time.ParseDuration(v)
-			if err != nil {
-				merr = multierror.Append(merr, fmt.Errorf("failed to parse key %s: %w", key, err))
-				continue
-			}
-			data[key] = dur
-		default:
-			merr = multierror.Append(merr, fmt.Errorf("key %s cannot be coerced to a duration", key))
 		}
+		data[key] = dur
 	}
 	return merr.ErrorOrNil()
 }

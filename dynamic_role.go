@@ -31,7 +31,7 @@ func retrieveDynamicRole(ctx context.Context, s logical.Storage, roleName string
 		return nil, nil
 	}
 
-	var result *dynamicRole
+	result := new(dynamicRole)
 	if err := entry.DecodeJSON(result); err != nil {
 		return nil, err
 	}

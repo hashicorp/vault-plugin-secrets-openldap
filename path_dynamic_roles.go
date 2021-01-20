@@ -26,7 +26,6 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 	return []*framework.Path{
 		// POST/GET/DELETE role/:name
 		{
-			// Pattern: path.Join(dynamicRolePath, framework.GenericNameRegex("name")),
 			Pattern: path.Join(dynamicRolePath, framework.GenericNameRegex("name")),
 			Fields: map[string]*framework.FieldSchema{
 				"name": {

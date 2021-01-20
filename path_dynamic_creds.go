@@ -153,6 +153,9 @@ func (b *backend) secretCredsRenew() framework.OperationFunc {
 			return nil, fmt.Errorf("unable to renew: role does not exist")
 		}
 
+		secret := req.Secret
+		secret.TTL = dRole.DefaultTTL
+		secret.MaxTTL = dRole.MaxTTL
 		resp := &logical.Response{
 			Secret: req.Secret,
 		}

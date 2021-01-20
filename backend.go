@@ -47,7 +47,7 @@ func Backend(client ldapClient) *backend {
 		InitializeFunc: b.initialize,
 
 		Secrets: []*framework.Secret{
-			secretCreds(&b),
+			dynamicSecretCreds(&b),
 		},
 		Clean:       b.clean,
 		BackendType: logical.TypeLogical,

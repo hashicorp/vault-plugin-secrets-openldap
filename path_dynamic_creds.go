@@ -71,9 +71,9 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 		return nil, merr
 	}
 	respData := map[string]interface{}{
-		"username": username,
-		"password": password,
-		"DNs":      dns,
+		"username":            username,
+		"password":            password,
+		"distinguished_names": dns,
 	}
 	internal := map[string]interface{}{
 		"name": roleName,
@@ -153,9 +153,11 @@ func (b *backend) secretCredsRenew() framework.OperationFunc {
 			return nil, fmt.Errorf("unable to renew: role does not exist")
 		}
 
+		// Update the default TTL & MaxTTL to the latest from the role in the event the role definition has changed
 		secret := req.Secret
 		secret.TTL = dRole.DefaultTTL
 		secret.MaxTTL = dRole.MaxTTL
+
 		resp := &logical.Response{
 			Secret: req.Secret,
 		}

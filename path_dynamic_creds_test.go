@@ -358,7 +358,7 @@ func TestDynamicCredsRead_success(t *testing.T) {
 			password := getStringT(t, resp.Data, "password")
 			require.Regexp(t, test.expectedPasswordRegex, password)
 
-			dns := getStringSlice(t, resp.Data, "DNs")
+			dns := getStringSlice(t, resp.Data, "distinguished_names")
 			require.Len(t, dns, 1)
 			require.Regexp(t, test.expectedDNRegex, dns[0])
 		})
@@ -385,7 +385,7 @@ func TestSecretCredsRenew(t *testing.T) {
 				Secret: &logical.Secret{
 					InternalData: map[string]interface{}{
 						"name":          roleName,
-						"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+						"deletion_ldif": ldifDeleteTemplate,
 					},
 					LeaseID: "foo bar",
 				},
@@ -400,7 +400,7 @@ func TestSecretCredsRenew(t *testing.T) {
 				Secret: &logical.Secret{
 					InternalData: map[string]interface{}{
 						"name":          roleName,
-						"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+						"deletion_ldif": ldifDeleteTemplate,
 					},
 					LeaseID: "foo bar",
 				},
@@ -415,7 +415,7 @@ func TestSecretCredsRenew(t *testing.T) {
 				Secret: &logical.Secret{
 					InternalData: map[string]interface{}{
 						"name":          roleName,
-						"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+						"deletion_ldif": ldifDeleteTemplate,
 						"template_data": dynamicTemplateData{
 							Username:              "alice",
 							Password:              "r3allys3cu4ePassw0rd!",
@@ -442,7 +442,7 @@ func TestSecretCredsRenew(t *testing.T) {
 				Secret: &logical.Secret{
 					InternalData: map[string]interface{}{
 						"name":          roleName,
-						"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+						"deletion_ldif": ldifDeleteTemplate,
 						"template_data": dynamicTemplateData{
 							Username:              "alice",
 							Password:              "r3allys3cu4ePassw0rd!",
@@ -514,7 +514,7 @@ func TestSecretCredsRevoke(t *testing.T) {
 			Storage: storage,
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{
-					"dn": "foobar",
+					"deletion_ldif": ldifDeleteTemplate,
 				},
 			},
 		}
@@ -543,7 +543,7 @@ func TestSecretCredsRevoke(t *testing.T) {
 			Storage: storage,
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{
-					"dn": "foobar",
+					"deletion_ldif": ldifDeleteTemplate,
 				},
 			},
 		}
@@ -555,40 +555,7 @@ func TestSecretCredsRevoke(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("invalid DN", func(t *testing.T) {
-		storage := new(mockStorage)
-
-		storageResp := &logical.StorageEntry{
-			Key:   configPath,
-			Value: jsonEncode(t, config{}),
-		}
-		storage.On("Get", mock.Anything, configPath).
-			Return(storageResp, error(nil)).
-			Once()
-		defer storage.AssertExpectations(t)
-
-		client := new(mockLDAPClient)
-		defer client.AssertExpectations(t)
-
-		b := Backend(client)
-
-		req := &logical.Request{
-			Storage: storage,
-			Secret: &logical.Secret{
-				InternalData: map[string]interface{}{
-					"dn": 42, // Not a string
-				},
-			},
-		}
-		var data *framework.FieldData
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-
-		_, err := b.secretCredsRevoke()(ctx, req, data)
-		require.Error(t, err)
-	})
-
-	t.Run("missing DN", func(t *testing.T) {
+	t.Run("missing deletion_ldif template", func(t *testing.T) {
 		storage := new(mockStorage)
 
 		storageResp := &logical.StorageEntry{
@@ -609,6 +576,39 @@ func TestSecretCredsRevoke(t *testing.T) {
 			Storage: storage,
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{},
+			},
+		}
+		var data *framework.FieldData
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		_, err := b.secretCredsRevoke()(ctx, req, data)
+		require.Error(t, err)
+	})
+
+	t.Run("bad deletion_ldif template", func(t *testing.T) {
+		storage := new(mockStorage)
+
+		storageResp := &logical.StorageEntry{
+			Key:   configPath,
+			Value: jsonEncode(t, config{}),
+		}
+		storage.On("Get", mock.Anything, configPath).
+			Return(storageResp, error(nil)).
+			Once()
+		defer storage.AssertExpectations(t)
+
+		client := new(mockLDAPClient)
+		defer client.AssertExpectations(t)
+
+		b := Backend(client)
+
+		req := &logical.Request{
+			Storage: storage,
+			Secret: &logical.Secret{
+				InternalData: map[string]interface{}{
+					"deletion_ldif": "foo bar",
+				},
 			},
 		}
 		var data *framework.FieldData
@@ -644,7 +644,7 @@ func TestSecretCredsRevoke(t *testing.T) {
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{
 					"dn":            "foobar",
-					"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+					"deletion_ldif": ldifDeleteTemplate,
 				},
 			},
 		}
@@ -681,7 +681,7 @@ func TestSecretCredsRevoke(t *testing.T) {
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{
 					"dn":            "foobar",
-					"deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
+					"deletion_ldif": ldifDeleteTemplate,
 				},
 			},
 		}

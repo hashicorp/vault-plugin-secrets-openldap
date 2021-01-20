@@ -475,8 +475,8 @@ userPassword: {{.Password}}`,
 
 func TestConvertToDuration(t *testing.T) {
 	type testCase struct {
-		input map[string]interface{}
-		keys  []string
+		input         map[string]interface{}
+		keysToConvert []string
 
 		expectedOutput map[string]interface{}
 		expectErr      bool
@@ -487,7 +487,7 @@ func TestConvertToDuration(t *testing.T) {
 			input: map[string]interface{}{
 				"foo": "1h",
 			},
-			keys: []string{
+			keysToConvert: []string{
 				"bar",
 			},
 			expectedOutput: map[string]interface{}{
@@ -499,7 +499,7 @@ func TestConvertToDuration(t *testing.T) {
 			input: map[string]interface{}{
 				"foo": 1 * time.Hour,
 			},
-			keys: []string{
+			keysToConvert: []string{
 				"foo",
 			},
 			expectedOutput: map[string]interface{}{
@@ -509,37 +509,13 @@ func TestConvertToDuration(t *testing.T) {
 		},
 		"int": {
 			input: map[string]interface{}{
-				"foo": int(1 * time.Hour),
+				"foo": int(1),
 			},
-			keys: []string{
+			keysToConvert: []string{
 				"foo",
 			},
 			expectedOutput: map[string]interface{}{
-				"foo": 1 * time.Hour,
-			},
-			expectErr: false,
-		},
-		"int8": {
-			input: map[string]interface{}{
-				"foo": int8(123),
-			},
-			keys: []string{
-				"foo",
-			},
-			expectedOutput: map[string]interface{}{
-				"foo": time.Duration(123),
-			},
-			expectErr: false,
-		},
-		"int16": {
-			input: map[string]interface{}{
-				"foo": int16(123),
-			},
-			keys: []string{
-				"foo",
-			},
-			expectedOutput: map[string]interface{}{
-				"foo": time.Duration(123),
+				"foo": 1 * time.Second,
 			},
 			expectErr: false,
 		},
@@ -547,23 +523,23 @@ func TestConvertToDuration(t *testing.T) {
 			input: map[string]interface{}{
 				"foo": int32(123),
 			},
-			keys: []string{
+			keysToConvert: []string{
 				"foo",
 			},
 			expectedOutput: map[string]interface{}{
-				"foo": time.Duration(123),
+				"foo": 123 * time.Second,
 			},
 			expectErr: false,
 		},
 		"int64": {
 			input: map[string]interface{}{
-				"foo": int64(123),
+				"foo": int64(321),
 			},
-			keys: []string{
+			keysToConvert: []string{
 				"foo",
 			},
 			expectedOutput: map[string]interface{}{
-				"foo": time.Duration(123),
+				"foo": 321 * time.Second,
 			},
 			expectErr: false,
 		},
@@ -571,7 +547,7 @@ func TestConvertToDuration(t *testing.T) {
 			input: map[string]interface{}{
 				"foo": "1h",
 			},
-			keys: []string{
+			keysToConvert: []string{
 				"foo",
 			},
 			expectedOutput: map[string]interface{}{
@@ -583,7 +559,7 @@ func TestConvertToDuration(t *testing.T) {
 			input: map[string]interface{}{
 				"foo": "foo",
 			},
-			keys: []string{
+			keysToConvert: []string{
 				"foo",
 			},
 			expectedOutput: map[string]interface{}{
@@ -599,7 +575,7 @@ func TestConvertToDuration(t *testing.T) {
 					Dur: "1h",
 				},
 			},
-			keys: []string{
+			keysToConvert: []string{
 				"foo",
 			},
 			expectedOutput: map[string]interface{}{
@@ -616,7 +592,7 @@ func TestConvertToDuration(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			data := test.input // The original map is being modified so let's make this an explicit variable
-			err := convertToDuration(data, test.keys...)
+			err := convertToDuration(data, test.keysToConvert...)
 			if test.expectErr && err == nil {
 				t.Fatalf("err expected, got nil")
 			}

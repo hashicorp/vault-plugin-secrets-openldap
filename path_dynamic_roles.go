@@ -91,8 +91,8 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 			HelpSynopsis:    "List all the dynamic roles Vault is currently managing in OpenLDAP.",
 			HelpDescription: "List all the dynamic roles being managed by Vault.",
 		},
+		// GET credentials
 		{
-			// Pattern: dynamicCredPath + framework.GenericNameRegex("name"),
 			Pattern: path.Join(dynamicCredPath, framework.MatchAllRegex("name")),
 			Fields: map[string]*framework.FieldSchema{
 				"name": {
@@ -114,7 +114,7 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 	}
 }
 
-func secretCreds(b *backend) *framework.Secret {
+func dynamicSecretCreds(b *backend) *framework.Secret {
 	return &framework.Secret{
 		Type: secretCredsType,
 		Fields: map[string]*framework.FieldSchema{
@@ -126,9 +126,11 @@ func secretCreds(b *backend) *framework.Secret {
 				Type:        framework.TypeString,
 				Description: "Password to access the generated account",
 			},
-			"DNs": {
-				Type:        framework.TypeStringSlice,
-				Description: "List of the DNs created",
+			"distinguished_names": {
+				Type: framework.TypeStringSlice,
+				Description: "List of the distinguished names (DN) created. Each name in this list corresponds to" +
+					"each action taken within the creation_ldif statements. This does not de-duplicate entries, " +
+					"so this will have one entry for each LDIF statement within creation_ldif.",
 			},
 		},
 

@@ -216,6 +216,9 @@ func convertToDuration(data map[string]interface{}, keys ...string) error {
 	return merr.ErrorOrNil()
 }
 
+// decodeBase64 attempts to base64 decode the provided string. If the string is not base64 encoded, this
+// returns the original string.
+// This is equivalent to "if string is base64 encoded, decode it and return, otherwise return the original string"
 func decodeBase64(str string) string {
 	if str == "" {
 		return ""

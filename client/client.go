@@ -217,13 +217,13 @@ func (c *Client) Execute(cfg *Config, entries []*ldif.Entry, continueOnFailure b
 		switch {
 		case entry.Entry != nil:
 			addReq := coerceToAddRequest(entry.Entry)
-			err = errorf("failed to run AddRequest", conn.Add(addReq))
+			err = errorf("failed to run AddRequest: %w", conn.Add(addReq))
 		case entry.Add != nil:
-			err = errorf("failed to run AddRequest", conn.Add(entry.Add))
+			err = errorf("failed to run AddRequest: %w", conn.Add(entry.Add))
 		case entry.Modify != nil:
-			err = errorf("failed to run ModifyRequest", conn.Modify(entry.Modify))
+			err = errorf("failed to run ModifyRequest: %w", conn.Modify(entry.Modify))
 		case entry.Del != nil:
-			err = errorf("failed to run DelRequest", conn.Del(entry.Del))
+			err = errorf("failed to run DelRequest: %w", conn.Del(entry.Del))
 		default:
 			err = fmt.Errorf("unrecognized or missing LDIF command")
 		}

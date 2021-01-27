@@ -11,6 +11,8 @@ import (
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/template"
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/mitchellh/mapstructure"
+	"golang.org/x/text/encoding/unicode"
 )
 
 func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
@@ -89,16 +91,16 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 	return resp, nil
 }
 
-func (b *backend) executeLDIF(config *client.Config, ldifTemplate string, templateData interface{}, continueOnError bool) (dns []string, err error) {
-	tmpl, err := template.NewTemplate(
-		template.Template(ldifTemplate),
-	)
+func encodeUTF16LE(str string) (string, error) {
+	enc := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
+	return enc.String(str)
+}
+
+func (b *backend) executeLDIF(config *client.Config, ldifTemplate string, templateData dynamicTemplateData, continueOnError bool) (dns []string, err error) {
+	rawLDIF, err := applyTemplate(ldifTemplate, templateData)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
-	}
-	rawLDIF, err := tmpl.Generate(templateData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute template: %w", err)
+		return nil, fmt.Errorf("failed to apply template: %w", err)
 	}
 
 	// Parse the raw LDIF & run it against the LDAP client
@@ -180,7 +182,25 @@ func (b *backend) secretCredsRevoke() framework.OperationFunc {
 			return nil, fmt.Errorf("broken internal data: unable to retrieve deletion_ldif: %w", err)
 		}
 
-		_, err = b.executeLDIF(config.LDAP, deletionTemplate, req.Secret.InternalData["template_data"], true)
+		if deletionTemplate == "" {
+			return nil, fmt.Errorf("broken internal data: missing deletion_ldif")
+		}
+
+		var templateData dynamicTemplateData
+		rawTemplateData := req.Secret.InternalData["template_data"]
+		switch td := rawTemplateData.(type) {
+		case dynamicTemplateData:
+			templateData = td
+		case map[string]interface{}:
+			err := mapstructure.WeakDecode(td, &templateData)
+			if err != nil {
+				return nil, fmt.Errorf("unable to decode internal data: %w", err)
+			}
+		default:
+			return nil, fmt.Errorf("unable to revoke OpenLDAP dynamic credentials: unrecognized internal data type: %T", td)
+		}
+
+		_, err = b.executeLDIF(config.LDAP, deletionTemplate, templateData, true)
 		return nil, err
 	}
 }
@@ -224,6 +244,7 @@ type dynamicTemplateData struct {
 func applyTemplate(rawTemplate string, data dynamicTemplateData) (string, error) {
 	tmpl, err := template.NewTemplate(
 		template.Template(rawTemplate),
+		template.Function("utf16le", encodeUTF16LE),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)

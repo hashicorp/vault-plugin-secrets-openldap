@@ -60,7 +60,7 @@ creation_ldif='dn: cn={{.Username}},ou=users,dc=learn,dc=example
 objectClass: person
 objectClass: top
 cn: learn
-sn: learn
+sn: learn-{{.Username | utf16le | base64}}
 memberOf: cn=dev,ou=groups,dc=learn,dc=example
 userPassword: {{.Password}}'
 
@@ -203,7 +203,7 @@ teardown() {
   run vault read openldap/role/testrole -format=json
   [ ${status} -eq 0 ]
   expected='{
-    "creation_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nobjectClass: person\nobjectClass: top\ncn: learn\nsn: learn\nmemberOf: cn=dev,ou=groups,dc=learn,dc=example\nuserPassword: {{.Password}}",
+    "creation_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nobjectClass: person\nobjectClass: top\ncn: learn\nsn: learn-{{.Username | utf16le | base64}}\nmemberOf: cn=dev,ou=groups,dc=learn,dc=example\nuserPassword: {{.Password}}",
     "deletion_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nchangetype: delete",
     "rollback_ldif": "",
     "default_ttl": 5,
@@ -290,7 +290,7 @@ teardown() {
   assertion=$(echo "${output}" | jq '.data | has("password")')
   [ "${assertion}" == "true" ]
 
-  assertion=$(echo "${output}" | jq '.data | has("DNs")')
+  assertion=$(echo "${output}" | jq '.data | has("distinguished_names")')
   [ "${assertion}" == "true" ]
 
   ## Assert the fields are structured correctly
@@ -300,10 +300,10 @@ teardown() {
   password="$(echo "${output}" | jq -r '.data.password')"
   [[ "${password}" =~ ^[a-zA-Z0-9]{64}$ ]]
 
-  numDNs="$(echo "${output}" | jq -r '.data.DNs | length')"
+  numDNs="$(echo "${output}" | jq -r '.data.distinguished_names | length')"
   [[ ${numDNs} -eq 1 ]]
 
-  dn="$(echo "${output}" | jq -r '.data.DNs[0]')"
+  dn="$(echo "${output}" | jq -r '.data.distinguished_names[0]')"
   [[ "${dn}" =~ ^cn=${username},ou=users,dc=learn,dc=example$ ]]
 
   ## Assert the credentials work in OpenLDAP
@@ -343,7 +343,7 @@ teardown() {
   assertion=$(echo "${output}" | jq '.data | has("password")')
   [ "${assertion}" == "true" ]
 
-  assertion=$(echo "${output}" | jq '.data | has("DNs")')
+  assertion=$(echo "${output}" | jq '.data | has("distinguished_names")')
   [ "${assertion}" == "true" ]
 
   ## Assert the fields are structured correctly
@@ -353,10 +353,10 @@ teardown() {
   password="$(echo "${output}" | jq -r '.data.password')"
   [[ "${password}" =~ ^[a-zA-Z0-9]{64}$ ]]
 
-  numDNs="$(echo "${output}" | jq -r '.data.DNs | length')"
+  numDNs="$(echo "${output}" | jq -r '.data.distinguished_names | length')"
   [[ ${numDNs} -eq 1 ]]
 
-  dn="$(echo "${output}" | jq -r '.data.DNs[0]')"
+  dn="$(echo "${output}" | jq -r '.data.distinguished_names[0]')"
   [[ "${dn}" =~ ^cn=${username},ou=users,dc=learn,dc=example$ ]]
 
   ## Assert the credentials work in OpenLDAP

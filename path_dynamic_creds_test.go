@@ -639,12 +639,24 @@ func TestSecretCredsRevoke(t *testing.T) {
 
 		b := Backend(client)
 
+		now := time.Now()
+		exp := now.Add(1 * time.Hour)
 		req := &logical.Request{
 			Storage: storage,
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{
-					"dn":            "foobar",
+					"name":          "testrole",
 					"deletion_ldif": ldifDeleteTemplate,
+					"template_data": dynamicTemplateData{
+						Username:              "testuser",
+						Password:              "asdfa08ay4t98hoizvohiuz",
+						DisplayName:           "token",
+						RoleName:              "testrole",
+						IssueTime:             now.Format(time.RFC3339),
+						IssueTimeSeconds:      now.Unix(),
+						ExpirationTime:        exp.Format(time.RFC3339),
+						ExpirationTimeSeconds: exp.Unix(),
+					},
 				},
 			},
 		}
@@ -676,12 +688,24 @@ func TestSecretCredsRevoke(t *testing.T) {
 
 		b := Backend(client)
 
+		now := time.Now()
+		exp := now.Add(1 * time.Hour)
 		req := &logical.Request{
 			Storage: storage,
 			Secret: &logical.Secret{
 				InternalData: map[string]interface{}{
-					"dn":            "foobar",
+					"name":          "testrole",
 					"deletion_ldif": ldifDeleteTemplate,
+					"template_data": dynamicTemplateData{
+						Username:              "testuser",
+						Password:              "asdfa08ay4t98hoizvohiuz",
+						DisplayName:           "token",
+						RoleName:              "testrole",
+						IssueTime:             now.Format(time.RFC3339),
+						IssueTimeSeconds:      now.Unix(),
+						ExpirationTime:        exp.Format(time.RFC3339),
+						ExpirationTimeSeconds: exp.Unix(),
+					},
 				},
 			},
 		}
@@ -807,7 +831,7 @@ func TestApplyTemplate(t *testing.T) {
 objectClass: person
 objectClass: top
 cn: learn
-sn: learn
+sn: {{.DisplayName | utf16le | base64}}
 memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
 userPassword: {{.Password}}
 displayName: {{.DisplayName}}
@@ -831,7 +855,7 @@ expirationTimeSeconds: {{.ExpirationTimeSeconds}}`,
 objectClass: person
 objectClass: top
 cn: learn
-sn: learn
+sn: dABvAGsAZQBuAA==
 memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
 userPassword: myreallysecurepassword
 displayName: token

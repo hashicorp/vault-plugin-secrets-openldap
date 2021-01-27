@@ -2,10 +2,13 @@ package template
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/text/encoding/unicode"
 
 	UUID "github.com/hashicorp/go-uuid"
 )
@@ -53,6 +56,15 @@ func truncateSHA256(maxLen int, str string) (string, error) {
 
 func hashSHA256(str string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(str)))
+}
+
+func encodeBase64(str string) string {
+	return base64.StdEncoding.EncodeToString([]byte(str))
+}
+
+func encodeUTF16LE(str string) (string, error) {
+	enc := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
+	return enc.String(str)
 }
 
 func uppercase(str string) string {

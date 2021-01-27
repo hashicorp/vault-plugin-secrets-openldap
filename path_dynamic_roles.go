@@ -170,54 +170,31 @@ func (b *backend) pathDynamicRoleCreateUpdate(ctx context.Context, req *logical.
 }
 
 func validateDynamicRole(dRole *dynamicRole) error {
-	merr := new(multierror.Error)
+	if dRole.CreationLDIF == "" {
+		return fmt.Errorf("missing creation_ldif")
+	}
 
-	merr = multierror.Append(merr,
-		firstError(
-			errIfTrue(dRole.CreationLDIF == "", "missing creation_ldif"),
-			errWrap(assertValidLDIFTemplate(dRole.CreationLDIF), "invalid creation_ldif: %w"),
-		),
-	)
+	if dRole.DeletionLDIF == "" {
+		return fmt.Errorf("missing deletion_ldif")
+	}
 
-	merr = multierror.Append(merr,
-		firstError(
-			errIfTrue(dRole.DeletionLDIF == "", "missing deletion_ldif"),
-			errWrap(assertValidLDIFTemplate(dRole.DeletionLDIF), "invalid deletion_ldif: %w"),
-		),
-	)
+	err := assertValidLDIFTemplate(dRole.CreationLDIF)
+	if err != nil {
+		return fmt.Errorf("invalid creation_ldif: %w", err)
+	}
 
-	merr = multierror.Append(merr,
-		errWrap(assertValidOrEmptyLDIFTemplate(dRole.RollbackLDIF), "invalid rollback_ldif: %w"),
-	)
+	err = assertValidLDIFTemplate(dRole.DeletionLDIF)
+	if err != nil {
+		return fmt.Errorf("invalid deletion_ldif: %w", err)
+	}
 
-	return merr.ErrorOrNil()
-}
-
-// firstError returns the first non-nil error
-func firstError(errs ...error) error {
-	for _, err := range errs {
+	if dRole.RollbackLDIF != "" {
+		err = assertValidLDIFTemplate(dRole.RollbackLDIF)
 		if err != nil {
-			return err
+			return fmt.Errorf("invalid rollback_ldif: %w", err)
 		}
 	}
-	return nil
-}
 
-// errWrap conditionally wraps the provided error with additional information. This will only return an error if
-// the provided error is not nil
-func errWrap(err error, format string, data ...interface{}) error {
-	if err == nil {
-		return nil
-	}
-	data = append(data, err)
-	return fmt.Errorf(format, data...)
-}
-
-// errIfTrue returns an error if the provided condition is true
-func errIfTrue(cond bool, format string, data ...interface{}) error {
-	if cond {
-		return fmt.Errorf(format, data...)
-	}
 	return nil
 }
 
@@ -252,13 +229,6 @@ func decodeBase64(str string) string {
 		return str
 	}
 	return string(decoded)
-}
-
-func assertValidOrEmptyLDIFTemplate(rawTemplate string) error {
-	if rawTemplate == "" {
-		return nil
-	}
-	return assertValidLDIFTemplate(rawTemplate)
 }
 
 func assertValidLDIFTemplate(rawTemplate string) error {

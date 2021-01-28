@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/text/encoding/unicode"
-
 	UUID "github.com/hashicorp/go-uuid"
 )
 
@@ -60,11 +58,6 @@ func hashSHA256(str string) string {
 
 func encodeBase64(str string) string {
 	return base64.StdEncoding.EncodeToString([]byte(str))
-}
-
-func encodeUTF16LE(str string) (string, error) {
-	enc := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
-	return enc.String(str)
 }
 
 func uppercase(str string) string {

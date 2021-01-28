@@ -60,7 +60,7 @@ github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
 # github.com/hashicorp/vault/api v1.0.5-0.20200826195146-c03009a7e370
 github.com/hashicorp/vault/api
-# github.com/hashicorp/vault/sdk v0.1.14-0.20210127185906-6b455835fa8c => ../../../vault/sdk/
+# github.com/hashicorp/vault/sdk v0.1.14-0.20210127185906-6b455835fa8c
 github.com/hashicorp/vault/sdk/framework
 github.com/hashicorp/vault/sdk/helper/base62
 github.com/hashicorp/vault/sdk/helper/certutil

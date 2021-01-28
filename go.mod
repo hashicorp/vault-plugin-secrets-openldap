@@ -16,5 +16,3 @@ require (
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/text v0.3.2
 )
-
-replace github.com/hashicorp/vault/sdk => ../../../vault/sdk/

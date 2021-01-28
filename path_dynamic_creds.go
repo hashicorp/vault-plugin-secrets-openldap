@@ -91,11 +91,6 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 	return resp, nil
 }
 
-func encodeUTF16LE(str string) (string, error) {
-	enc := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
-	return enc.String(str)
-}
-
 func (b *backend) executeLDIF(config *client.Config, ldifTemplate string, templateData dynamicTemplateData, continueOnError bool) (dns []string, err error) {
 	rawLDIF, err := applyTemplate(ldifTemplate, templateData)
 
@@ -255,6 +250,11 @@ func applyTemplate(rawTemplate string, data dynamicTemplateData) (string, error)
 	}
 
 	return str, nil
+}
+
+func encodeUTF16LE(str string) (string, error) {
+	enc := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM).NewEncoder()
+	return enc.String(str)
 }
 
 func getString(m map[string]interface{}, key string) (string, error) {

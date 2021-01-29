@@ -146,7 +146,14 @@ func (b *backend) pathDynamicRoleCreateUpdate(ctx context.Context, req *logical.
 		return nil, fmt.Errorf("failed to convert TTLs to duration: %w", err)
 	}
 
-	dRole := &dynamicRole{}
+	roleName := data.Get("name").(string)
+	dRole, err := retrieveDynamicRole(ctx, req.Storage, roleName)
+	if err != nil {
+		return nil, fmt.Errorf("unable to look for existing role: %w", err)
+	}
+	if dRole == nil {
+		dRole = &dynamicRole{}
+	}
 	err = mapstructure.WeakDecode(rawData, dRole)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode request: %w", err)

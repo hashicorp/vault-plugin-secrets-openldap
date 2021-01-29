@@ -5,10 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	paths "path"
+	"path"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -209,6 +211,8 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			b := Backend(client)
 
 			storage := new(mockStorage)
+			storage.On("Get", mock.Anything, mock.Anything).
+				Return((*logical.StorageEntry)(nil), (error)(nil)).Maybe()
 			storage.On("Put", mock.Anything, mock.Anything).
 				Return(test.putErr)
 			defer storage.AssertNumberOfCalls(t, "Put", test.putTimes)
@@ -217,8 +221,9 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 				Storage: storage,
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-			defer cancel()
+			// ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			ctx := context.Background()
+			// defer cancel()
 
 			_, err := b.pathDynamicRoleCreateUpdate(ctx, req, test.createData)
 			if test.expectErr && err == nil {
@@ -227,6 +232,591 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			if !test.expectErr && err != nil {
 				t.Fatalf("no error expected, got: %s", err)
 			}
+		})
+	}
+}
+
+func TestDynamicRole_partialUpdate(t *testing.T) {
+	type testCase struct {
+		initialData map[string]interface{}
+		initialRole *dynamicRole
+
+		updateData map[string]interface{}
+		updateRole *dynamicRole
+		expectErr  bool
+	}
+
+	roleName := "test-role"
+
+	tests := map[string]testCase{
+		"new default_ttl": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":        roleName,
+				"default_ttl": "30s",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       30 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"new max_ttl": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":    roleName,
+				"max_ttl": "2m",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           2 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"new creation_ldif": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name": roleName,
+				"creation_ldif": `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
+objectClass: person2
+objectClass: top2
+cn: learn2
+sn: learn2
+memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
+userPassword: {{.Password}}`,
+			},
+			updateRole: &dynamicRole{
+				Name: roleName,
+				CreationLDIF: `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
+objectClass: person2
+objectClass: top2
+cn: learn2
+sn: learn2
+memberOf: cn=dev,ou=groups,dc=hashicorp,dc=com
+userPassword: {{.Password}}`,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"new deletion_ldif": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name": roleName,
+				"deletion_ldif": `dn: cn={{.Username | lowercase}},ou=users,dc=learn,dc=example
+changetype: delete`,
+			},
+			updateRole: &dynamicRole{
+				Name:         roleName,
+				CreationLDIF: ldifCreationTemplate,
+				DeletionLDIF: `dn: cn={{.Username | lowercase}},ou=users,dc=learn,dc=example
+changetype: delete`,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"new rollback_ldif": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name": roleName,
+				"rollback_ldif": `dn: cn={{.Username | lowercase}},ou=users,dc=learn,dc=example
+changetype: delete`,
+			},
+			updateRole: &dynamicRole{
+				Name:         roleName,
+				CreationLDIF: ldifCreationTemplate,
+				DeletionLDIF: ldifDeleteTemplate,
+				RollbackLDIF: `dn: cn={{.Username | lowercase}},ou=users,dc=learn,dc=example
+changetype: delete`,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"new username_template": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":              roleName,
+				"username_template": "v.{{.RoleName | lowercase}}.{{rand 10}}",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v.{{.RoleName | lowercase}}.{{rand 10}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"removed creation_ldif": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":          roleName,
+				"creation_ldif": "",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: true,
+		},
+		"removed deletion_ldif": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":          roleName,
+				"deletion_ldif": "",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: true,
+		},
+		"removed rollback_ldif": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":          roleName,
+				"rollback_ldif": "", // This field is optional, so deleting it is okay
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     "",
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"removed username_template": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":              roleName,
+				"username_template": "",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"removed default_ttl (empty string)": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":        roleName,
+				"default_ttl": "",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       0,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"removed default_ttl (zero)": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":        roleName,
+				"default_ttl": "0",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       0,
+				MaxTTL:           1 * time.Minute,
+			},
+			expectErr: false,
+		},
+		"removed max_ttl (empty string)": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":    roleName,
+				"max_ttl": "",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           0,
+			},
+			expectErr: false,
+		},
+		"removed max_ttl (zero)": {
+			initialData: map[string]interface{}{
+				"name":              roleName,
+				"creation_ldif":     ldifCreationTemplate,
+				"deletion_ldif":     ldifDeleteTemplate,
+				"rollback_ldif":     ldifRollbackTemplate,
+				"username_template": "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				"default_ttl":       "10s",
+				"max_ttl":           "1m",
+			},
+			initialRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           1 * time.Minute,
+			},
+
+			updateData: map[string]interface{}{
+				"name":    roleName,
+				"max_ttl": "0",
+			},
+			updateRole: &dynamicRole{
+				Name:             roleName,
+				CreationLDIF:     ldifCreationTemplate,
+				DeletionLDIF:     ldifDeleteTemplate,
+				RollbackLDIF:     ldifRollbackTemplate,
+				UsernameTemplate: "v-foo-{{.RoleName}}-{{rand 20}}-{{unix_seconds}}",
+				DefaultTTL:       10 * time.Second,
+				MaxTTL:           0,
+			},
+			expectErr: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := new(mockLDAPClient)
+			defer client.AssertExpectations(t) // No expectations
+
+			b := Backend(client)
+
+			storage := &logical.InmemStorage{}
+
+			// Find the creation endpoint & use its schema
+			var schema map[string]*framework.FieldSchema
+			for _, endpoint := range b.pathDynamicRoles() {
+				if endpoint.Pattern != path.Join(dynamicRolePath, framework.GenericNameRegex("name")) {
+					continue
+				}
+				if _, exists := endpoint.Operations[logical.CreateOperation]; !exists {
+					continue
+				}
+				schema = endpoint.Fields
+			}
+
+			initialData := &framework.FieldData{
+				Raw:    test.initialData,
+				Schema: schema,
+			}
+
+			req := &logical.Request{
+				Storage: storage,
+			}
+
+			// Shared context, but with timeout to ensure the test ends
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+
+			// Save original version
+			resp, err := b.pathDynamicRoleCreateUpdate(ctx, req, initialData)
+			require.NoError(t, err)
+			require.Nil(t, resp)
+
+			actualRole, err := retrieveDynamicRole(ctx, storage, roleName)
+			require.NoError(t, err)
+			require.Equal(t, test.initialRole, actualRole)
+
+			// Update to new version
+			updateData := &framework.FieldData{
+				Raw:    test.updateData,
+				Schema: schema,
+			}
+			resp, err = b.pathDynamicRoleCreateUpdate(ctx, req, updateData)
+			if test.expectErr && err == nil {
+				t.Fatalf("err expected, got nil")
+			}
+			if !test.expectErr && err != nil {
+				t.Fatalf("no error expected, got: %s", err)
+			}
+			require.Nil(t, resp)
+
+			actualRole, err = retrieveDynamicRole(ctx, storage, roleName)
+			require.NoError(t, err)
+			require.Equal(t, test.updateRole, actualRole)
 		})
 	}
 }
@@ -257,7 +847,7 @@ func TestDynamicRoleRead(t *testing.T) {
 		},
 		"happy path": {
 			storageResp: &logical.StorageEntry{
-				Key: paths.Join(dynamicRolePath, roleName),
+				Key: path.Join(dynamicRolePath, roleName),
 				Value: jsonEncode(t, dynamicRole{
 					Name:             roleName,
 					CreationLDIF:     ldifCreationTemplate,
@@ -291,7 +881,7 @@ func TestDynamicRoleRead(t *testing.T) {
 			b := Backend(client)
 
 			storage := new(mockStorage)
-			storage.On("Get", mock.Anything, paths.Join(dynamicRolePath, roleName)).
+			storage.On("Get", mock.Anything, path.Join(dynamicRolePath, roleName)).
 				Return(test.storageResp, test.storageErr)
 			defer storage.AssertNumberOfCalls(t, "Get", 1)
 
@@ -413,7 +1003,7 @@ func TestDynamicRoleExistenceCheck(t *testing.T) {
 		},
 		"happy path": {
 			storageResp: &logical.StorageEntry{
-				Key: paths.Join(dynamicRolePath, roleName),
+				Key: path.Join(dynamicRolePath, roleName),
 				Value: jsonEncode(t, dynamicRole{
 					Name: roleName,
 					CreationLDIF: `dn: cn={{.Username}},ou=users,dc=hashicorp,dc=com
@@ -442,7 +1032,7 @@ userPassword: {{.Password}}`,
 			b := Backend(client)
 
 			storage := new(mockStorage)
-			storage.On("Get", mock.Anything, paths.Join(dynamicRolePath, roleName)).
+			storage.On("Get", mock.Anything, path.Join(dynamicRolePath, roleName)).
 				Return(test.storageResp, test.storageErr)
 			defer storage.AssertNumberOfCalls(t, "Get", 1)
 

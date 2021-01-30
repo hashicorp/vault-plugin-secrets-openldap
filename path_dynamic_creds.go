@@ -91,6 +91,12 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 	return resp, nil
 }
 
+// executeLDIF applies the template data against the LDIF template & executes the LDIF statements against the LDAP
+// server. If more than one statement is specified within the LDIF string, this will result in multiple operations
+// against the LDAP server. This is due to the fact that LDAP does not have transactions, nor any other form of
+// atomic operations across multiple LDIF entries. If `continueOnError` is false, this will exit immediately upon
+// any error occurring. If true, this will attempt to execute all of the specified LDIF statements and returns an error
+// upon completion if any occurred.
 func (b *backend) executeLDIF(config *client.Config, ldifTemplate string, templateData dynamicTemplateData, continueOnError bool) (dns []string, err error) {
 	rawLDIF, err := applyTemplate(ldifTemplate, templateData)
 

@@ -72,9 +72,7 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 					Callback: b.pathDynamicRoleRead,
 				},
 				logical.DeleteOperation: &framework.PathOperation{
-					Callback:                    b.pathDynamicRoleDelete,
-					ForwardPerformanceStandby:   true,
-					ForwardPerformanceSecondary: true,
+					Callback: b.pathDynamicRoleDelete,
 				},
 			},
 			HelpSynopsis:    staticRoleHelpSynopsis,

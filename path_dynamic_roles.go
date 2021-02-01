@@ -150,6 +150,9 @@ func (b *backend) pathDynamicRoleCreateUpdate(ctx context.Context, req *logical.
 		return nil, fmt.Errorf("unable to look for existing role: %w", err)
 	}
 	if dRole == nil {
+		if req.Operation == logical.UpdateOperation {
+			return nil, fmt.Errorf("unable to update role: role does not exist")
+		}
 		dRole = &dynamicRole{}
 	}
 	err = mapstructure.WeakDecode(rawData, dRole)

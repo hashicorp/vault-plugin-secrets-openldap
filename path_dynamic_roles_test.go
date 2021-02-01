@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDynamicRoleCreateUpdate(t *testing.T) {
 	roleName := "testrole"
 
 	type testCase struct {
+		operation  logical.Operation
 		createData *framework.FieldData
 
 		putErr   error
@@ -31,6 +31,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 
 	tests := map[string]testCase{
 		"bad default_ttl": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"default_ttl":   "foo",
@@ -44,6 +45,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"bad max_ttl": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"max_ttl":       "foo",
@@ -57,6 +59,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"missing creation_ldif": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"deletion_ldif": ldifDeleteTemplate,
@@ -68,6 +71,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"missing deletion_ldif": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": ldifCreationTemplate,
@@ -79,6 +83,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"creation_ldif bad template syntax": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": `dn: cn={{.Username,ou=users,dc=learn,dc=example`,
@@ -91,6 +96,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"creation_ldif bad LDIF syntax": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": `foo bar`,
@@ -103,6 +109,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"deletion_ldif bad template syntax": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": ldifCreationTemplate,
@@ -115,6 +122,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"deletion_ldif bad LDIF syntax": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": ldifCreationTemplate,
@@ -127,6 +135,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"rollback_ldif bad template syntax": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": ldifCreationTemplate,
@@ -140,6 +149,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"rollback_ldif bad LDIF syntax": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": ldifCreationTemplate,
@@ -153,6 +163,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"multiple LDIF entries": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": ldifCreateAndModifyTemplate,
@@ -165,6 +176,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: false,
 		},
 		"storage error": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": ldifCreationTemplate,
@@ -177,6 +189,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: true,
 		},
 		"happy path": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": ldifCreationTemplate,
@@ -189,6 +202,7 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			expectErr: false,
 		},
 		"base64 encoded templates": {
+			operation: logical.CreateOperation,
 			createData: dynamicRoleFieldData(map[string]interface{}{
 				"name":          roleName,
 				"creation_ldif": base64Encode(ldifCreationTemplate),
@@ -200,6 +214,20 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			putTimes: 1,
 
 			expectErr: false,
+		},
+		"update operation with missing role": {
+			operation: logical.UpdateOperation,
+			createData: dynamicRoleFieldData(map[string]interface{}{
+				"name":          roleName,
+				"creation_ldif": base64Encode(ldifCreationTemplate),
+				"rollback_ldif": base64Encode(ldifRollbackTemplate),
+				"deletion_ldif": base64Encode(ldifDeleteTemplate),
+			}),
+
+			putErr:   nil,
+			putTimes: 0,
+
+			expectErr: true,
 		},
 	}
 
@@ -218,7 +246,8 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 			defer storage.AssertNumberOfCalls(t, "Put", test.putTimes)
 
 			req := &logical.Request{
-				Storage: storage,
+				Operation: test.operation,
+				Storage:   storage,
 			}
 
 			// ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
@@ -235,6 +264,61 @@ func TestDynamicRoleCreateUpdate(t *testing.T) {
 		})
 	}
 }
+
+// func TestDynamicRole_missingRole(t *testing.T) {
+// 	type testCase struct {
+// 		operation logical.Operation
+// 		expectErr bool
+// 	}
+//
+// 	tests := map[string]testCase{
+// 		"create operation": {
+// 			operation: logical.CreateOperation,
+// 			expectErr: false,
+// 		},
+// 		"update operation": {
+// 			operation: logical.UpdateOperation,
+// 			expectErr: true,
+// 		},
+// 	}
+//
+// 	for name, test := range tests {
+// 		t.Run(name, func(t *testing.T) {
+// 			client := new(mockLDAPClient)
+// 			defer client.AssertExpectations(t) // No expectations
+//
+// 			b := Backend(client)
+//
+// 			storage := new(mockStorage)
+// 			storage.On("Get", mock.Anything, mock.Anything).
+// 				Return((*logical.StorageEntry)(nil), (error)(nil)).Once()
+// 			storage.On("Put", mock.Anything, mock.Anything).
+// 				Return(nil).Maybe()
+// 			defer storage.AssertExpectations(t)
+//
+// 			req := &logical.Request{
+// 				Storage:   storage,
+// 				Operation: test.operation,
+// 			}
+//
+// 			ctx := context.Background()
+//
+// 			data := dynamicRoleFieldData(map[string]interface{}{
+// 				"name":          "testrole",
+// 				"creation_ldif": ldifCreationTemplate,
+// 				"deletion_ldif": ldifDeleteTemplate,
+// 			})
+//
+// 			_, err := b.pathDynamicRoleCreateUpdate(ctx, req, data)
+// 			if test.expectErr && err == nil {
+// 				t.Fatalf("err expected, got nil")
+// 			}
+// 			if !test.expectErr && err != nil {
+// 				t.Fatalf("no error expected, got: %s", err)
+// 			}
+// 		})
+// 	}
+// }
 
 func TestDynamicRole_partialUpdate(t *testing.T) {
 	type testCase struct {

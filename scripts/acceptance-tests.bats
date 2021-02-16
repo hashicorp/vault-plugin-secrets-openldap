@@ -183,11 +183,11 @@ teardown() {
   vault delete openldap/config
 
   # Remove any roles that were created so they don't bleed over to other tests
-  output=$(vault list -format=json openldap/role || true) # "or true" so it doesn't show an error if there are no roles
+  output=$(vault list -format=json openldap/roles || true) # "or true" so it doesn't show an error if there are no roles
 
   roles=$(echo "${output}" | jq -r .[])
   for role in ${roles}; do
-    vault delete "openldap/role/${role}" > /dev/null
+    vault delete "openldap/roles/${role}" > /dev/null
   done
 }
 
@@ -196,11 +196,11 @@ teardown() {
   max_ttl=10
 
   # Create role
-  run vault write openldap/role/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  run vault write openldap/roles/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
   [ ${status} -eq 0 ]
 
   # Read role and make sure it matches what we expect
-  run vault read openldap/role/testrole -format=json
+  run vault read openldap/roles/testrole -format=json
   [ ${status} -eq 0 ]
   expected='{
     "creation_ldif": "dn: cn={{.Username}},ou=users,dc=learn,dc=example\nobjectClass: person\nobjectClass: top\ncn: learn\nsn: learn-{{.Username | utf16le | base64}}\nmemberOf: cn=dev,ou=groups,dc=learn,dc=example\nuserPassword: {{.Password}}",
@@ -215,13 +215,13 @@ teardown() {
   [ "${output}" == "true" ]
 
   ## Delete the role and ensure that it and the creds endpoint isn't readable
-  run vault delete openldap/role/testrole
+  run vault delete openldap/roles/testrole
   [ ${status} -eq 0 ]
 
-  run vault read openldap/role/testrole
+  run vault read openldap/roles/testrole
   [ ${status} -ne 0 ]
 
-  run vault read openldap/cred/testrole
+  run vault read openldap/creds/testrole
   [ ${status} -ne 0 ]
 }
 
@@ -229,16 +229,16 @@ teardown() {
   # Create a bunch of roles with different prefixes
   for id in $(seq -f "%02g" 0 10); do
     rolename="testrole${id}"
-    run vault write "openldap/role/${rolename}" creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="5s" max_ttl="10s"
+    run vault write "openldap/roles/${rolename}" creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="5s" max_ttl="10s"
     [ ${status} -eq 0 ]
 
     rolename="roletest${id}"
-    run vault write "openldap/role/${rolename}" creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="5s" max_ttl="10s"
+    run vault write "openldap/roles/${rolename}" creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="5s" max_ttl="10s"
     [ ${status} -eq 0 ]
   done
 
   # Test list
-  run vault list -format=json openldap/role
+  run vault list -format=json openldap/roles
   [ ${status} -eq 0 ]
 
   expected='[
@@ -275,11 +275,11 @@ teardown() {
   max_ttl=20
 
   # Create role
-  run vault write openldap/role/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" rollback_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  run vault write openldap/roles/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" rollback_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
   [ ${status} -eq 0 ]
 
   # Get credentials
-  run vault read -format=json openldap/cred/testrole
+  run vault read -format=json openldap/creds/testrole
   [ ${status} -eq 0 ]
 
 
@@ -326,12 +326,12 @@ teardown() {
   max_ttl=20
 
   # Create role
-  run vault write openldap/role/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  run vault write openldap/roles/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
   [ ${status} -eq 0 ]
 
   # Get credentials
   log "Generating credentials..."
-  run vault read -format=json openldap/cred/testrole
+  run vault read -format=json openldap/creds/testrole
   [ ${status} -eq 0 ]
 
   lease_id=$(echo "${output}" | jq -r .lease_id)
@@ -418,11 +418,11 @@ memberOf: cn=dev,ou=groups,dc=learn,dc=example
 userPassword: {{.Password}}'
 
   # Create role
-  run vault write openldap/role/testrole creation_ldif="${bad_creation_ldif}" deletion_ldif="${deletion_ldif}" rollback_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  run vault write openldap/roles/testrole creation_ldif="${bad_creation_ldif}" deletion_ldif="${deletion_ldif}" rollback_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
   [ ${status} -eq 0 ]
 
   # Get credentials
-  run vault read -format=json openldap/cred/testrole
+  run vault read -format=json openldap/creds/testrole
   [ ${status} -ne 0 ]
   [[ "${output}" == *"failed to create user" ]]
 

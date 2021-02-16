@@ -275,7 +275,7 @@ teardown() {
   max_ttl=20
 
   # Create role
-  run vault write openldap/role/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  run vault write openldap/role/testrole creation_ldif="${creation_ldif}" deletion_ldif="${deletion_ldif}" rollback_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
   [ ${status} -eq 0 ]
 
   # Get credentials
@@ -401,6 +401,35 @@ teardown() {
     sleep 1
   done
 
+  run ldapsearch -b "${dn}" -D "${dn}" -w "${password}"
+  [ ${status} -ne 0 ]
+}
+
+@test "Dynamic Secrets - Useful error on creation failure" {
+  default_ttl=10
+  max_ttl=20
+
+  bad_creation_ldif='dn: cn={{.Username}},ou=thisgroupdoesnotexist,dc=learn,dc=example
+objectClass: person
+objectClass: top
+cn: learn
+sn: learn-{{.Username | utf16le | base64}}
+memberOf: cn=dev,ou=groups,dc=learn,dc=example
+userPassword: {{.Password}}'
+
+  # Create role
+  run vault write openldap/role/testrole creation_ldif="${bad_creation_ldif}" deletion_ldif="${deletion_ldif}" rollback_ldif="${deletion_ldif}" default_ttl="${default_ttl}s" max_ttl="${max_ttl}s"
+  [ ${status} -eq 0 ]
+
+  # Get credentials
+  run vault read -format=json openldap/cred/testrole
+  [ ${status} -ne 0 ]
+  [[ "${output}" == *"failed to create user" ]]
+
+  # Optional assertion that makes sure both errors are included but if this becomes flaky it isn't the important error and can be removed
+  [[ "${output}" == *"failed to roll back user" ]]
+
+  ## Assert the credentials do *not* work in OpenLDAP
   run ldapsearch -b "${dn}" -D "${dn}" -w "${password}"
   [ ${status} -ne 0 ]
 }

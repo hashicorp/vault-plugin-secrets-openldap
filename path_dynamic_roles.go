@@ -18,8 +18,8 @@ import (
 const (
 	secretCredsType = "creds"
 
-	dynamicRolePath = "role/"
-	dynamicCredPath = "cred/"
+	dynamicRolePath = "roles/"
+	dynamicCredPath = "creds/"
 )
 
 func (b *backend) pathDynamicRoles() []*framework.Path {

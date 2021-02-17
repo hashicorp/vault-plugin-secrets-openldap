@@ -18,7 +18,7 @@ import (
 const (
 	secretCredsType = "creds"
 
-	dynamicRolePath = "roles/"
+	dynamicRolePath = "role/"
 	dynamicCredPath = "creds/"
 )
 

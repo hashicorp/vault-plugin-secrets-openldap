@@ -475,8 +475,14 @@ func (b *backend) loadStaticWALs(ctx context.Context, s logical.Storage) (map[st
 			// only keep the entry corresponding the the newest rotation
 			if oldEntry.LastVaultRotation.Before(walEntry.LastVaultRotation) {
 				walMap[walEntry.RoleName] = walEntry
+				if err := framework.DeleteWAL(ctx, s, oldEntry.walID); err != nil {
+					b.Logger().Warn("unable to delete WAL", "error", err, "WAL ID", oldEntry.walID)
+				}
 			} else {
 				walMap[walEntry.RoleName] = oldEntry
+				if err := framework.DeleteWAL(ctx, s, walEntry.walID); err != nil {
+					b.Logger().Warn("unable to delete WAL", "error", err, "WAL ID", walEntry.walID)
+				}
 			}
 		} else {
 			walMap[walEntry.RoleName] = walEntry

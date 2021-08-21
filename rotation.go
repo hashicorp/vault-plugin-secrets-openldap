@@ -470,7 +470,17 @@ func (b *backend) loadStaticWALs(ctx context.Context, s logical.Storage) (map[st
 		}
 
 		walEntry.walID = walID
-		walMap[walEntry.RoleName] = walEntry
+		if oldEntry, ok := walMap[walEntry.RoleName]; ok {
+			b.Logger().Warn("found multiple wal entries for roleName:", walEntry.RoleName)
+			// only keep the entry corresponding the the newest rotation
+			if oldEntry.LastVaultRotation.Before(walEntry.LastVaultRotation) {
+				walMap[walEntry.RoleName] = walEntry
+			} else {
+				walMap[walEntry.RoleName] = oldEntry
+			}
+		} else {
+			walMap[walEntry.RoleName] = walEntry
+		}
 	}
 	return walMap, nil
 }

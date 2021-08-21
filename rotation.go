@@ -183,6 +183,21 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 		return false
 	}
 
+	nextRotate := role.StaticAccount.NextRotationTime()
+	if time.Now().Before(nextRotate) {
+		b.Logger().Warn(
+			"unexpected early rotation request being ignored",
+			"last static role rotation", role.StaticAccount.LastVaultRotation,
+			"queued priority", time.Unix(item.Priority, 0),
+		)
+
+		item.Priority = nextRotate.Unix()
+		if err := b.pushItem(item); err != nil {
+			b.Logger().Error("unable to push item on to queue", "error", err)
+		}
+		return true
+	}
+
 	input := &setStaticAccountInput{
 		RoleName: item.Key,
 		Role:     role,

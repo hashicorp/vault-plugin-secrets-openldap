@@ -70,6 +70,7 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 		if walEntry != nil {
 			// Check walEntry last vault time
 			if !walEntry.LastVaultRotation.IsZero() && walEntry.LastVaultRotation.Before(role.StaticAccount.LastVaultRotation) {
+				log.Debug("deleting outdated WAL", "WAL ID", walEntry.walID)
 				// WAL's last vault rotation record is older than the role's data, so
 				// delete and move on
 				if err := framework.DeleteWAL(ctx, s, walEntry.walID); err != nil {
@@ -79,6 +80,7 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 				log.Info("adjusting priority for Role")
 				item.Value = walEntry.walID
 				item.Priority = time.Now().Unix()
+				log.Debug("adjusted Role", "WAL ID", walEntry.walID, "priority", time.Unix(item.Priority,0))
 			}
 		}
 
@@ -183,11 +185,14 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 		return false
 	}
 
+	// Verify times against the role. Don't use.Before() for the comparison here
+	// since there is a slight gap between that and the integer comparison against item.priority.
 	nextRotate := role.StaticAccount.NextRotationTime()
-	if time.Now().Before(nextRotate) {
+	if time.Now().Unix() < nextRotate.Unix() {
 		b.Logger().Warn(
 			"unexpected early rotation request being ignored",
 			"last static role rotation", role.StaticAccount.LastVaultRotation,
+			"next scheduled role rotation", nextRotate,
 			"queued priority", time.Unix(item.Priority, 0),
 		)
 
@@ -483,6 +488,8 @@ func (b *backend) loadStaticWALs(ctx context.Context, s logical.Storage) (map[st
 			}
 			continue
 		}
+
+		b.Logger().Debug("loaded WAL", "WAL ID", walID)
 
 		walEntry.walID = walID
 		walMap[walEntry.RoleName] = walEntry

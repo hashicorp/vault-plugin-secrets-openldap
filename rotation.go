@@ -80,7 +80,7 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 				log.Info("adjusting priority for Role")
 				item.Value = walEntry.walID
 				item.Priority = time.Now().Unix()
-				log.Debug("adjusted Role", "WAL ID", walEntry.walID, "priority", time.Unix(item.Priority,0))
+				log.Debug("adjusted Role", "WAL ID", walEntry.walID, "priority", time.Unix(item.Priority, 0))
 			}
 		}
 

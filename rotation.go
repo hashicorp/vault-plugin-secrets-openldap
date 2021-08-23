@@ -200,7 +200,7 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 		if err := b.pushItem(item); err != nil {
 			b.Logger().Error("unable to push item on to queue", "error", err)
 		}
-		return true
+		return false
 	}
 
 	input := &setStaticAccountInput{

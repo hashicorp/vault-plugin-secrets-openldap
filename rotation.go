@@ -70,12 +70,12 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 		if walEntry != nil {
 			// Check walEntry last vault time
 			if !walEntry.LastVaultRotation.IsZero() && walEntry.LastVaultRotation.Before(role.StaticAccount.LastVaultRotation) {
-				log.Debug("deleting outdated WAL", "WAL ID", walEntry.walID)
 				// WAL's last vault rotation record is older than the role's data, so
 				// delete and move on
 				if err := framework.DeleteWAL(ctx, s, walEntry.walID); err != nil {
 					log.Warn("unable to delete WAL", "error", err, "WAL ID", walEntry.walID)
 				}
+				log.Debug("deleted outdated WAL", "WAL ID", walEntry.walID)
 			} else {
 				log.Info("adjusting priority for Role")
 				item.Value = walEntry.walID
@@ -489,6 +489,7 @@ func (b *backend) loadStaticWALs(ctx context.Context, s logical.Storage) (map[st
 			if err := framework.DeleteWAL(ctx, s, walEntry.walID); err != nil {
 				b.Logger().Warn("unable to delete WAL", "error", err, "WAL ID", walEntry.walID)
 			}
+			b.Logger().Debug("deleted WAL with nil role or static account", "WAL ID", walEntry.walID)
 			continue
 		}
 

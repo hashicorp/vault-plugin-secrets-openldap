@@ -363,6 +363,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		if err != nil {
 			return output, errwrap.Wrapf("error writing WAL entry: {{err}}", err)
 		}
+		b.Logger().Debug("writing WAL", "WAL ID", output.WALID)
 	}
 
 	// Update the password remotely.
@@ -399,9 +400,11 @@ to %s, configure a new binddn and bindpass to restore openldap function`, pwdSto
 
 	// Cleanup WAL after successfully rotating and pushing new item on to queue
 	if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+		b.Logger().Warn("error deleting WAL", "WAL ID", output.WALID, "error", err)
 		merr = multierror.Append(merr, err)
 		return output, merr
 	}
+	b.Logger().Debug("deleted WAL", "WAL ID", output.WALID)
 
 	// The WAL has been deleted, return new setStaticAccountOutput without it
 	return &setStaticAccountOutput{RotationTime: lvr}, merr

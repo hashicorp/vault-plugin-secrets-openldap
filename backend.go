@@ -18,8 +18,6 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 		return nil, err
 	}
 
-	b.Logger().Info("started openldap", "version", "v0.3.0-prem-rotation-guard")
-
 	return b, nil
 }
 

@@ -221,6 +221,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 
 	// Only call setStaticAccountPassword if we're creating the role for the
 	// first time
+	var item *queue.Item
 	switch req.Operation {
 	case logical.CreateOperation:
 		// setStaticAccountPassword calls Storage.Put and saves the role to storage
@@ -233,6 +234,9 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 		// guard against RotationTime not being set or zero-value
 		lvr = resp.RotationTime
+		item = &queue.Item{
+			Key: name,
+		}
 	case logical.UpdateOperation:
 		// store updated Role
 		entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
@@ -247,17 +251,18 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// the queue
 
 		//TODO: Add retry logic
-		_, err = b.popFromRotationQueueByKey(name)
+		// We could be tracking a WAL ID for this role, ensure we keep it when
+		// it's re-added to the queue.
+		item, err = b.popFromRotationQueueByKey(name)
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	item.Priority = lvr.Add(role.StaticAccount.RotationPeriod).Unix()
+
 	// Add their rotation to the queue
-	if err := b.pushItem(&queue.Item{
-		Key:      name,
-		Priority: lvr.Add(role.StaticAccount.RotationPeriod).Unix(),
-	}); err != nil {
+	if err := b.pushItem(item); err != nil {
 		return nil, err
 	}
 

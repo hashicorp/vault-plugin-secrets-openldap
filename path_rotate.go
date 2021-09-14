@@ -149,6 +149,8 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		}
 	} else {
 		item.Priority = resp.RotationTime.Add(role.StaticAccount.RotationPeriod).Unix()
+		// Clear any stored WAL ID as we must have successfully deleted our WAL to get here.
+		item.Value = ""
 	}
 
 	// Add their rotation to the queue. We use pushErr here to distinguish between
@@ -159,9 +161,16 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		return nil, pushErr
 	}
 
+	if err != nil {
+		return &logical.Response{
+			Warnings: []string{"unable to finish rotating credentials; retries will " +
+				"continue in the background but it is also safe to retry manually"},
+		}, err
+	}
+
 	// We're not returning creds here because we do not know if its been processed
 	// by the queue.
-	return nil, err
+	return nil, nil
 }
 
 // rollBackPassword uses naive exponential backoff to retry updating to an old password,

@@ -162,10 +162,8 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	}
 
 	if err != nil {
-		return &logical.Response{
-			Warnings: []string{"unable to finish rotating credentials; retries will " +
-				"continue in the background but it is also safe to retry manually"},
-		}, err
+		return nil, fmt.Errorf("unable to finish rotating credentials; retries will "+
+			"continue in the background but it is also safe to retry manually: %w", err)
 	}
 
 	// We're not returning creds here because we do not know if its been processed

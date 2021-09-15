@@ -303,10 +303,8 @@ type setStaticAccountOutput struct {
 // tasks must be handled outside of this method.
 func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storage, input *setStaticAccountInput) (*setStaticAccountOutput, error) {
 	var merr error
-	// Re-use WAL ID if present, otherwise PUT a new WAL
-	output := &setStaticAccountOutput{WALID: input.WALID}
 	if input == nil || input.Role == nil || input.RoleName == "" {
-		return output, errors.New("input was empty when attempting to set credentials for static account")
+		return nil, errors.New("input was empty when attempting to set credentials for static account")
 	}
 
 	if _, hasTimeout := ctx.Deadline(); !hasTimeout {
@@ -315,6 +313,12 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		defer cancel()
 	}
 
+	// Re-use WAL ID if present, otherwise PUT a new WAL
+	output := &setStaticAccountOutput{WALID: input.WALID}
+
+	b.Lock()
+	defer b.Unlock()
+
 	config, err := readConfig(ctx, s)
 	if err != nil {
 		return output, err
@@ -322,10 +326,6 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	if config == nil {
 		return output, errors.New("the config is currently unset")
 	}
-
-	// Take out the backend lock since we are swapping out the connection
-	b.Lock()
-	defer b.Unlock()
 
 	var newPassword string
 	if output.WALID != "" {

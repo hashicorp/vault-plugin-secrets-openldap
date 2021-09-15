@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/locksutil"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -146,6 +147,27 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 		return nil, err
 	}
 
+	walIDs, err := framework.ListWAL(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	}
+	for _, walID := range walIDs {
+		var merr *multierror.Error
+		wal, err := b.findStaticWAL(ctx, req.Storage, walID)
+		if err != nil {
+			merr = multierror.Append(merr, err)
+			continue
+		}
+		if wal != nil && name == wal.RoleName {
+			err = framework.DeleteWAL(ctx, req.Storage, walID)
+			if err != nil {
+				merr = multierror.Append(merr, err)
+			}
+		}
+
+		return nil, merr.ErrorOrNil()
+	}
+
 	return nil, nil
 }
 
@@ -230,6 +252,15 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			Role:     role,
 		})
 		if err != nil {
+			if resp != nil && resp.WALID != "" {
+				walDeleteErr := framework.DeleteWAL(ctx, req.Storage, resp.WALID)
+				if walDeleteErr != nil {
+					var merr *multierror.Error
+					merr = multierror.Append(merr, err)
+					merr = multierror.Append(merr, fmt.Errorf("failed to clean up WAL from failed role creation: %w", walDeleteErr))
+					err = merr.ErrorOrNil()
+				}
+			}
 			return nil, err
 		}
 		// guard against RotationTime not being set or zero-value
@@ -248,11 +279,9 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 
 		// In case this is an update, remove any previous version of the item from
-		// the queue
-
+		// the queue. The existing item could be tracking a WAL ID for this role,
+		// so it's important to keep the existing item rather than recreate it.
 		//TODO: Add retry logic
-		// We could be tracking a WAL ID for this role, ensure we keep it when
-		// it's re-added to the queue.
 		item, err = b.popFromRotationQueueByKey(name)
 		if err != nil {
 			return nil, err

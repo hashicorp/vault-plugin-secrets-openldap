@@ -24,12 +24,12 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			Fields:  map[string]*framework.FieldSchema{},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback:                    b.pathRotateCredentialsUpdate,
+					Callback:                    b.pathRotateRootCredentialsUpdate,
 					ForwardPerformanceStandby:   true,
 					ForwardPerformanceSecondary: true,
 				},
 				logical.CreateOperation: &framework.PathOperation{
-					Callback:                    b.pathRotateCredentialsUpdate,
+					Callback:                    b.pathRotateRootCredentialsUpdate,
 					ForwardPerformanceStandby:   true,
 					ForwardPerformanceSecondary: true,
 				},
@@ -64,7 +64,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 	}
 }
 
-func (b *backend) pathRotateCredentialsUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	if _, hasTimeout := ctx.Deadline(); !hasTimeout {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, defaultCtxTimeout)

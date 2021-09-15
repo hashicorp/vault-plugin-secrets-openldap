@@ -2,7 +2,6 @@ package openldap
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/logical"
@@ -578,19 +577,6 @@ func TestWALsDeletedOnRoleDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	walIDs, err := storage.List(context.Background(), "wal/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, walID := range walIDs {
-		fmt.Println(walID)
-		wal, err := storage.Get(ctx, "wal/"+walID)
-		if err != nil {
-			fmt.Println("error retrieving wal", walID, err)
-		}
-		fmt.Printf("%+v\n", string(wal.Value))
-	}
-
 	// 1 WAL should be cleared by the delete
 	requireWALs(t, storage, 1)
 }
@@ -642,5 +628,4 @@ func requireWALs(t *testing.T, storage logical.Storage, count int) {
 	if len(wals) != count {
 		t.Fatal("expected WALS", count, "got", len(wals))
 	}
-	fmt.Println(wals)
 }

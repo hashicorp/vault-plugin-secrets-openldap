@@ -598,34 +598,3 @@ func configureOpenLDAPMount(t *testing.T, b *backend, storage logical.Storage) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 }
-
-func generateWALFromFailedRotation(t *testing.T, b *backend, storage logical.Storage, roleName string) {
-	t.Helper()
-	// Fail to rotate the roles
-	ldapClient := b.client.(*fakeLdapClient)
-	originalValue := ldapClient.throwErrs
-	ldapClient.throwErrs = true
-	defer func() {
-		ldapClient.throwErrs = originalValue
-	}()
-
-	_, err := b.HandleRequest(context.Background(), &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "rotate-role/" + roleName,
-		Storage:   storage,
-	})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-func requireWALs(t *testing.T, storage logical.Storage, count int) {
-	t.Helper()
-	wals, err := storage.List(context.Background(), "wal/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(wals) != count {
-		t.Fatal("expected WALS", count, "got", len(wals))
-	}
-}

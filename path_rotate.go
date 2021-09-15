@@ -133,10 +133,14 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		}
 	}
 
-	resp, err := b.setStaticAccountPassword(ctx, req.Storage, &setStaticAccountInput{
+	input := &setStaticAccountInput{
 		RoleName: name,
 		Role:     role,
-	})
+	}
+	if walID, ok := item.Value.(string); ok {
+		input.WALID = walID
+	}
+	resp, err := b.setStaticAccountPassword(ctx, req.Storage, input)
 	if err != nil {
 		b.Logger().Warn("unable to rotate credentials in rotate-role", "error", err)
 		// Update the priority to re-try this rotation and re-add the item to

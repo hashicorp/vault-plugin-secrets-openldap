@@ -22,7 +22,7 @@ var (
 
 func getBackend(throwsErr bool) (*backend, logical.Storage) {
 	config := &logical.BackendConfig{
-		Logger: logging.NewVaultLogger(log.Error),
+		Logger: logging.NewVaultLogger(log.Debug),
 
 		System: &logical.StaticSystemView{
 			DefaultLeaseTTLVal: defaultLeaseTTLVal,

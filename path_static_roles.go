@@ -151,8 +151,8 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 	if err != nil {
 		return nil, err
 	}
+	var merr *multierror.Error
 	for _, walID := range walIDs {
-		var merr *multierror.Error
 		wal, err := b.findStaticWAL(ctx, req.Storage, walID)
 		if err != nil {
 			merr = multierror.Append(merr, err)
@@ -164,11 +164,9 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 				merr = multierror.Append(merr, err)
 			}
 		}
-
-		return nil, merr.ErrorOrNil()
 	}
 
-	return nil, nil
+	return nil, merr.ErrorOrNil()
 }
 
 func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {

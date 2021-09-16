@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/errwrap"
-	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/go-secure-stdlib/base62"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/consts"
@@ -300,7 +299,6 @@ type setStaticAccountOutput struct {
 // This method does not perform any operations on the priority queue. Those
 // tasks must be handled outside of this method.
 func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storage, input *setStaticAccountInput) (*setStaticAccountOutput, error) {
-	var merr error
 	if input == nil || input.Role == nil || input.RoleName == "" {
 		return nil, errors.New("input was empty when attempting to set credentials for static account")
 	}
@@ -391,14 +389,13 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 
 	// Cleanup WAL after successfully rotating and pushing new item on to queue
 	if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
-		merr = multierror.Append(merr, err)
 		b.Logger().Warn("error deleting WAL", "WAL ID", output.WALID, "error", err)
-		return output, merr
+		return output, err
 	}
 	b.Logger().Debug("deleted WAL", "WAL ID", output.WALID)
 
 	// The WAL has been deleted, return new setStaticAccountOutput without it
-	return &setStaticAccountOutput{RotationTime: lvr}, merr
+	return &setStaticAccountOutput{RotationTime: lvr}, nil
 }
 
 func (b *backend) GeneratePassword(ctx context.Context, cfg *config) (string, error) {

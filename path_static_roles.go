@@ -162,7 +162,7 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 			b.Logger().Debug("deleting WAL for deleted role", "WAL ID", walID, "role", name)
 			err = framework.DeleteWAL(ctx, req.Storage, walID)
 			if err != nil {
-				b.Logger().Debug("failed to delete WAL for deleted role", "WAL ID", walID)
+				b.Logger().Debug("failed to delete WAL for deleted role", "WAL ID", walID, "error", err)
 				merr = multierror.Append(merr, err)
 			}
 		}
@@ -256,7 +256,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 				b.Logger().Debug("deleting WAL for failed role creation", "WAL ID", resp.WALID, "role", name)
 				walDeleteErr := framework.DeleteWAL(ctx, req.Storage, resp.WALID)
 				if walDeleteErr != nil {
-					b.Logger().Debug("failed to delete WAL for failed role creation", "WAL ID", resp.WALID)
+					b.Logger().Debug("failed to delete WAL for failed role creation", "WAL ID", resp.WALID, "error", walDeleteErr)
 					var merr *multierror.Error
 					merr = multierror.Append(merr, err)
 					merr = multierror.Append(merr, fmt.Errorf("failed to clean up WAL from failed role creation: %w", walDeleteErr))

@@ -123,7 +123,6 @@ func (b *backend) runTicker(ctx context.Context, s logical.Storage) {
 // credential setting or rotation in the event of partial failure.
 type setCredentialsWAL struct {
 	NewPassword string `json:"new_password"`
-	OldPassword string `json:"old_password"`
 	RoleName    string `json:"role_name"`
 	Username    string `json:"username"`
 	DN          string `json:"dn"`
@@ -261,7 +260,6 @@ func (b *backend) findStaticWAL(ctx context.Context, s logical.Storage, id strin
 		walID:        id,
 		walCreatedAt: wal.CreatedAt,
 		NewPassword:  data["new_password"].(string),
-		OldPassword:  data["old_password"].(string),
 		RoleName:     data["role_name"].(string),
 		Username:     data["username"].(string),
 		DN:           data["dn"].(string),
@@ -363,7 +361,6 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 			Username:          input.Role.StaticAccount.Username,
 			DN:                input.Role.StaticAccount.DN,
 			NewPassword:       newPassword,
-			OldPassword:       input.Role.StaticAccount.Password,
 			LastVaultRotation: input.Role.StaticAccount.LastVaultRotation,
 		})
 		if err != nil {

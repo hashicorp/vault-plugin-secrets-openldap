@@ -115,6 +115,12 @@ func TestRollsPasswordForwards(t *testing.T) {
 	configureOpenLDAPMount(t, b, storage)
 	createRole(t, b, storage, "hashicorp")
 
+	role, err := b.staticRole(ctx, storage, "hashicorp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldPassword := role.StaticAccount.Password
+
 	generateWALFromFailedRotation(t, b, storage, "hashicorp")
 	walIDs, err := storage.List(context.Background(), "wal/")
 	if err != nil {
@@ -127,13 +133,13 @@ func TestRollsPasswordForwards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	role, err := b.staticRole(ctx, storage, "hashicorp")
+	role, err = b.staticRole(ctx, storage, "hashicorp")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Role's password should still be the WAL's old password
-	if role.StaticAccount.Password != wal.OldPassword {
-		t.Fatal(role.StaticAccount.Password, wal.OldPassword)
+	if role.StaticAccount.Password != oldPassword {
+		t.Fatal(role.StaticAccount.Password, oldPassword)
 	}
 
 	// Trigger a retry on the rotation, it should use WAL's new password

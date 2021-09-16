@@ -489,18 +489,18 @@ func (b *backend) loadStaticWALs(ctx context.Context, s logical.Storage) (map[st
 			if walEntry.walCreatedAt > existingWALEntry.walCreatedAt {
 				// If the existing WAL is older, delete it from storage and fall
 				// through to inserting our current WAL into the map.
-				b.Logger().Debug("deleting stale WAL", "WAL ID", existingWALEntry.walID)
+				b.Logger().Debug("deleting stale loaded WAL", "WAL ID", existingWALEntry.walID)
 				err = framework.DeleteWAL(ctx, s, existingWALEntry.walID)
 				if err != nil {
-					b.Logger().Warn("unable to delete WAL", "error", err, "WAL ID", existingWALEntry.walID)
+					b.Logger().Warn("unable to delete loaded WAL", "error", err, "WAL ID", existingWALEntry.walID)
 				}
 			} else {
 				// If we already have a more recent WAL entry in the map, delete
 				// this one and continue onto the next WAL.
-				b.Logger().Debug("deleting stale WAL", "WAL ID", walEntry.walID)
+				b.Logger().Debug("deleting stale candidate WAL", "WAL ID", walEntry.walID)
 				err = framework.DeleteWAL(ctx, s, walID)
 				if err != nil {
-					b.Logger().Warn("unable to delete WAL", "error", err, "WAL ID", walEntry.walID)
+					b.Logger().Warn("unable to delete candidate WAL", "error", err, "WAL ID", walEntry.walID)
 				}
 				continue
 			}

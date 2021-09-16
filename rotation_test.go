@@ -5,7 +5,11 @@ import (
 	"testing"
 	"time"
 
+	log "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/helper/logging"
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/hashicorp/vault/sdk/queue"
 )
 
 func TestAutoRotate(t *testing.T) {
@@ -109,21 +113,7 @@ func TestRollsPasswordForwards(t *testing.T) {
 	b, storage := getBackend(false)
 	defer b.Cleanup(ctx)
 	configureOpenLDAPMount(t, b, storage)
-
-	// Create the role
-	_, err := b.HandleRequest(ctx, &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      "static-role/hashicorp",
-		Storage:   storage,
-		Data: map[string]interface{}{
-			"username":        "hashicorp",
-			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-			"rotation_period": "86400s",
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	createRole(t, b, storage, "hashicorp")
 
 	generateWALFromFailedRotation(t, b, storage, "hashicorp")
 	walIDs, err := storage.List(context.Background(), "wal/")
@@ -165,6 +155,176 @@ func TestRollsPasswordForwards(t *testing.T) {
 	}
 	// WAL should be cleared by the successful rotate
 	requireWALs(t, storage, 0)
+}
+
+func TestStoredWALsCorrectlyProcessed(t *testing.T) {
+	const walNewPassword = "new-password-from-wal"
+	for _, tc := range []struct {
+		name         string
+		shouldRotate bool
+		wal          *setCredentialsWAL
+	}{
+		{
+			"WAL is kept and used for roll forward",
+			true,
+			&setCredentialsWAL{
+				RoleName:          "hashicorp",
+				Username:          "hashicorp",
+				DN:                "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+				NewPassword:       walNewPassword,
+				LastVaultRotation: time.Now().Add(time.Hour),
+			},
+		},
+		{
+			"zero-time WAL is discarded on load",
+			false,
+			&setCredentialsWAL{
+				RoleName:          "hashicorp",
+				Username:          "hashicorp",
+				DN:                "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+				NewPassword:       walNewPassword,
+				LastVaultRotation: time.Time{},
+			},
+		},
+		{
+			"empty-password WAL is kept but a new password is generated",
+			true,
+			&setCredentialsWAL{
+				RoleName:          "hashicorp",
+				Username:          "hashicorp",
+				DN:                "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+				NewPassword:       "",
+				LastVaultRotation: time.Now().Add(time.Hour),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			config := &logical.BackendConfig{
+				Logger: logging.NewVaultLogger(log.Debug),
+
+				System: &logical.StaticSystemView{
+					DefaultLeaseTTLVal: defaultLeaseTTLVal,
+					MaxLeaseTTLVal:     maxLeaseTTLVal,
+				},
+				StorageView: &logical.InmemStorage{},
+			}
+
+			b := Backend(&fakeLdapClient{throwErrs: false})
+			b.Setup(context.Background(), config)
+
+			b.credRotationQueue = queue.New()
+			initCtx := context.Background()
+			ictx, cancel := context.WithCancel(initCtx)
+			b.cancelQueue = cancel
+
+			defer b.Cleanup(ctx)
+			configureOpenLDAPMount(t, b, config.StorageView)
+			createRole(t, b, config.StorageView, "hashicorp")
+			role, err := b.staticRole(ctx, config.StorageView, "hashicorp")
+			if err != nil {
+				t.Fatal(err)
+			}
+			initialPassword := role.StaticAccount.Password
+
+			// Set up a WAL for our test case
+			framework.PutWAL(ctx, config.StorageView, staticWALKey, tc.wal)
+			requireWALs(t, config.StorageView, 1)
+			// Remove the role from the rotation queue to simulate startup memory state
+			_, err = b.popFromRotationQueueByKey("hashicorp")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Now finish the startup process by populating the queue, which should discard the WAL
+			b.initQueue(ictx, &logical.InitializationRequest{
+				Storage: config.StorageView,
+			})
+
+			if tc.shouldRotate {
+				requireWALs(t, config.StorageView, 1)
+			} else {
+				requireWALs(t, config.StorageView, 0)
+			}
+
+			// Run one tick
+			b.rotateCredentials(ctx, config.StorageView)
+			requireWALs(t, config.StorageView, 0)
+
+			role, err = b.staticRole(ctx, config.StorageView, "hashicorp")
+			if err != nil {
+				t.Fatal(err)
+			}
+			item, err := b.popFromRotationQueueByKey("hashicorp")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if tc.shouldRotate {
+				if tc.wal.NewPassword != "" {
+					// Should use WAL's new_password field
+					if role.StaticAccount.Password != walNewPassword {
+						t.Fatal()
+					}
+				} else {
+					// Should rotate but ignore WAL's new_password field
+					if role.StaticAccount.Password == initialPassword {
+						t.Fatal()
+					}
+					if role.StaticAccount.Password == walNewPassword {
+						t.Fatal()
+					}
+				}
+			} else {
+				// Ensure the role was not promoted for early rotation
+				if item.Priority < time.Now().Add(time.Hour).Unix() {
+					t.Fatal("priority should be for about a week away, but was", item.Priority)
+				}
+				if role.StaticAccount.Password != initialPassword {
+					t.Fatal("password should not have been rotated yet")
+				}
+			}
+		})
+	}
+}
+
+func TestDeletesOlderWALsOnLoad(t *testing.T) {
+	ctx := context.Background()
+	b, storage := getBackend(false)
+	defer b.Cleanup(ctx)
+	configureOpenLDAPMount(t, b, storage)
+	createRole(t, b, storage, "hashicorp")
+
+	// Create 4 WALs, with a clear winner for most recent.
+	wal := &setCredentialsWAL{
+		RoleName:          "hashicorp",
+		Username:          "hashicorp",
+		DN:                "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+		NewPassword:       "some-new-password",
+		LastVaultRotation: time.Now(),
+	}
+	for i := 0; i < 3; i++ {
+		_, err := framework.PutWAL(ctx, storage, staticWALKey, wal)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	time.Sleep(2 * time.Second)
+	// We expect this WAL to have the latest createdAt timestamp
+	walID, err := framework.PutWAL(ctx, storage, staticWALKey, wal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireWALs(t, storage, 4)
+
+	walMap, err := b.loadStaticWALs(ctx, storage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(walMap) != 1 || walMap["hashicorp"] == nil || walMap["hashicorp"].walID != walID {
+		t.Fatal()
+	}
+	requireWALs(t, storage, 1)
 }
 
 func generateWALFromFailedRotation(t *testing.T, b *backend, storage logical.Storage, roleName string) {

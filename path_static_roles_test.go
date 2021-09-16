@@ -76,15 +76,6 @@ func TestRoles(t *testing.T) {
 		if resp.Data["last_vault_rotation"] == nil {
 			t.Fatal("expected last_vault_rotation to not be empty")
 		}
-
-		// Assert that we cleared the WAL ID from the queue's data in the happy path.
-		item, err := b.credRotationQueue.PopByKey("hashicorp")
-		if err != nil {
-			t.Fatal()
-		}
-		if item.Value != "" {
-			t.Fatal()
-		}
 	})
 	t.Run("happy path with roles", func(t *testing.T) {
 		b, storage := getBackend(false)
@@ -468,31 +459,19 @@ func TestWALsStillTrackedAfterUpdate(t *testing.T) {
 	defer b.Cleanup(ctx)
 	configureOpenLDAPMount(t, b, storage)
 
-	_, err := b.HandleRequest(ctx, &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      staticRolePath + "hashicorp",
-		Storage:   storage,
-		Data: map[string]interface{}{
-			"username":        "hashicorp",
-			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-			"rotation_period": "5s",
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	createRole(t, b, storage, "hashicorp")
 
 	generateWALFromFailedRotation(t, b, storage, "hashicorp")
 	requireWALs(t, storage, 1)
 
-	_, err = b.HandleRequest(ctx, &logical.Request{
+	_, err := b.HandleRequest(ctx, &logical.Request{
 		Operation: logical.UpdateOperation,
 		Path:      staticRolePath + "hashicorp",
 		Storage:   storage,
 		Data: map[string]interface{}{
 			"username":        "hashicorp",
 			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-			"rotation_period": "60s",
+			"rotation_period": "600s",
 		},
 	})
 	if err != nil {
@@ -544,19 +523,7 @@ func TestWALsDeletedOnRoleDeletion(t *testing.T) {
 	// Create the roles
 	roleNames := []string{"hashicorp", "2"}
 	for _, roleName := range roleNames {
-		_, err := b.HandleRequest(ctx, &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      "static-role/" + roleName,
-			Storage:   storage,
-			Data: map[string]interface{}{
-				"username":        roleName,
-				"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-				"rotation_period": "5s",
-			},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+		createRole(t, b, storage, roleName)
 	}
 
 	// Fail to rotate the roles
@@ -596,5 +563,21 @@ func configureOpenLDAPMount(t *testing.T, b *backend, storage logical.Storage) {
 	})
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+}
+
+func createRole(t *testing.T, b *backend, storage logical.Storage, roleName string) {
+	_, err := b.HandleRequest(context.Background(), &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "static-role/" + roleName,
+		Storage:   storage,
+		Data: map[string]interface{}{
+			"username":        roleName,
+			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period": "86400s",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

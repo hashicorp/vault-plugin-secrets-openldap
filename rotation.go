@@ -367,6 +367,14 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		b.Logger().Debug("writing WAL", "role", input.RoleName, "WAL ID", output.WALID)
 	}
 
+	if newPassword == "" {
+		b.Logger().Error("newPassword was empty, re-generating based on the password policy")
+		newPassword, err = b.GeneratePassword(ctx, config)
+		if err != nil {
+			return output, err
+		}
+	}
+
 	// Update the password remotely.
 	if err := b.client.UpdatePassword(config.LDAP, input.Role.StaticAccount.DN, newPassword); err != nil {
 		return output, err

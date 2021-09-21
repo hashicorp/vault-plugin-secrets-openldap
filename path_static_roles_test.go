@@ -2,6 +2,7 @@ package openldap
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/logical"
@@ -477,16 +478,31 @@ func TestWALsStillTrackedAfterUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requireWALs(t, storage, 1)
+	walIDs := requireWALs(t, storage, 1)
 
-	// Check we've still got track of it in the queue as well
-	item, err := b.credRotationQueue.PopByKey("hashicorp")
+	// Now when we trigger a manual rotate, it should use the WAL's new password
+	// which will tell us that the in-memory structure still kept track of the
+	// WAL in addition to it still being in storage.
+	wal, err := b.findStaticWAL(ctx, storage, walIDs[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	if wal, ok := item.Value.(string); !ok || wal == "" {
-		t.Fatal("should have a WAL ID in the rotation queue")
+	_, err = b.HandleRequest(context.Background(), &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "rotate-role/hashicorp",
+		Storage:   storage,
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
+	role, err := b.staticRole(ctx, storage, "hashicorp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if role.StaticAccount.Password != wal.NewPassword {
+		t.Fatal()
+	}
+	requireWALs(t, storage, 0)
 }
 
 func TestWALsDeletedOnRoleCreationFailed(t *testing.T) {
@@ -496,7 +512,7 @@ func TestWALsDeletedOnRoleCreationFailed(t *testing.T) {
 	configureOpenLDAPMount(t, b, storage)
 
 	for i := 0; i < 3; i++ {
-		_, err := b.HandleRequest(ctx, &logical.Request{
+		resp, err := b.HandleRequest(ctx, &logical.Request{
 			Operation: logical.CreateOperation,
 			Path:      staticRolePath + "hashicorp",
 			Storage:   storage,
@@ -508,6 +524,9 @@ func TestWALsDeletedOnRoleCreationFailed(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatal("expected error from OpenLDAP")
+		}
+		if !strings.Contains(err.Error(), "forced error") {
+			t.Fatal("expected forced error message", resp, err)
 		}
 	}
 

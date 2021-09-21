@@ -108,7 +108,7 @@ func TestAutoRotate(t *testing.T) {
 	})
 }
 
-func TestRollsPasswordForwards(t *testing.T) {
+func TestRollsPasswordForwardsUsingWAL(t *testing.T) {
 	ctx := context.Background()
 	b, storage := getBackend(false)
 	defer b.Cleanup(ctx)
@@ -122,13 +122,7 @@ func TestRollsPasswordForwards(t *testing.T) {
 	oldPassword := role.StaticAccount.Password
 
 	generateWALFromFailedRotation(t, b, storage, "hashicorp")
-	walIDs, err := storage.List(context.Background(), "wal/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(walIDs) != 1 {
-		t.Fatal("expected 1 WAL, got", len(walIDs))
-	}
+	walIDs := requireWALs(t, storage, 1)
 	wal, err := b.findStaticWAL(ctx, storage, walIDs[0])
 	if err != nil {
 		t.Fatal(err)
@@ -236,11 +230,8 @@ func TestStoredWALsCorrectlyProcessed(t *testing.T) {
 			// Set up a WAL for our test case
 			framework.PutWAL(ctx, config.StorageView, staticWALKey, tc.wal)
 			requireWALs(t, config.StorageView, 1)
-			// Remove the role from the rotation queue to simulate startup memory state
-			_, err = b.popFromRotationQueueByKey("hashicorp")
-			if err != nil {
-				t.Fatal(err)
-			}
+			// Reset the rotation queue to simulate startup memory state
+			b.credRotationQueue = queue.New()
 
 			// Now finish the startup process by populating the queue, which should discard the WAL
 			b.initQueue(ictx, &logical.InitializationRequest{
@@ -353,7 +344,8 @@ func generateWALFromFailedRotation(t *testing.T, b *backend, storage logical.Sto
 	}
 }
 
-func requireWALs(t *testing.T, storage logical.Storage, expectedCount int) {
+// returns a slice of the WAL IDs in storage
+func requireWALs(t *testing.T, storage logical.Storage, expectedCount int) []string {
 	t.Helper()
 	wals, err := storage.List(context.Background(), "wal/")
 	if err != nil {
@@ -362,4 +354,6 @@ func requireWALs(t *testing.T, storage logical.Storage, expectedCount int) {
 	if len(wals) != expectedCount {
 		t.Fatal("expected WALs", expectedCount, "got", len(wals))
 	}
+
+	return wals
 }

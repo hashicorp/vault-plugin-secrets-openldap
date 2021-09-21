@@ -20,7 +20,7 @@ var (
 
 func getBackend(throwsErr bool) (*backend, logical.Storage) {
 	config := &logical.BackendConfig{
-		Logger: logging.NewVaultLogger(log.Error),
+		Logger: logging.NewVaultLogger(log.Debug),
 
 		System: &logical.StaticSystemView{
 			DefaultLeaseTTLVal: defaultLeaseTTLVal,
@@ -40,7 +40,9 @@ func getBackend(throwsErr bool) (*backend, logical.Storage) {
 	b.cancelQueue = cancel
 
 	// Load queue and kickoff new periodic ticker
-	go b.initQueue(ictx, &logical.InitializationRequest{config.StorageView})
+	b.initQueue(ictx, &logical.InitializationRequest{
+		Storage: config.StorageView,
+	})
 
 	return b, config.StorageView
 }
@@ -62,7 +64,7 @@ func (f *fakeLdapClient) Get(_ *client.Config, _ string) (*client.Entry, error) 
 	return client.NewEntry(entry), err
 }
 
-func (f *fakeLdapClient) UpdatePassword(conf *client.Config, dn string, newPassword string) error {
+func (f *fakeLdapClient) UpdatePassword(_ *client.Config, _ string, _ string) error {
 	var err error
 	if f.throwErrs {
 		err = errors.New("forced error")
@@ -70,7 +72,7 @@ func (f *fakeLdapClient) UpdatePassword(conf *client.Config, dn string, newPassw
 	return err
 }
 
-func (f *fakeLdapClient) UpdateRootPassword(conf *client.Config, newPassword string) error {
+func (f *fakeLdapClient) UpdateRootPassword(_ *client.Config, _ string) error {
 	var err error
 	if f.throwErrs {
 		err = errors.New("forced error")

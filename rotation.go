@@ -354,6 +354,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		if err != nil {
 			return output, err
 		}
+		b.Logger().Debug("writing WAL", "role", input.RoleName, "WAL ID", output.WALID)
 		output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, &setCredentialsWAL{
 			RoleName:          input.RoleName,
 			Username:          input.Role.StaticAccount.Username,
@@ -364,7 +365,6 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		if err != nil {
 			return output, errwrap.Wrapf("error writing WAL entry: {{err}}", err)
 		}
-		b.Logger().Debug("writing WAL", "role", input.RoleName, "WAL ID", output.WALID)
 	}
 
 	if newPassword == "" {

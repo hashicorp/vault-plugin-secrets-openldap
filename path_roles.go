@@ -173,6 +173,13 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	name := data.Get("name").(string)
 
+	// ns, err := namespace.FromContext(ctx)
+	// if err != nil {
+	// 	b.Logger().Error("error checking for namespace at entrance", "error", err)
+	// 	return nil, fmt.Errorf("no namespace at entrance: %w", err)
+	// }
+	// b.Logger().Info("namespace checked", "namespace", ns)
+
 	// Grab the exclusive lock as well potentially pop and re-push the queue item
 	// for this role
 	lock := locksutil.LockForKey(b.roleLocks, name)

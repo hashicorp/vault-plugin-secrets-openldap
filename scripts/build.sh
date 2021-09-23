@@ -60,8 +60,8 @@ vault write sys/plugins/catalog/$PLUGIN_CATALOG_NAME \
   sha_256="$SHASUM" \
   command="$PLUGIN_NAME"
 
-echo "    Mounting plugin"
-vault secrets enable openldap
+# echo "    Mounting plugin"
+# vault secrets enable openldap
 
 if [ -e scripts/custom.sh ]
 then

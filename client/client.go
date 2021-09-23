@@ -94,7 +94,8 @@ func (c *Client) UpdateEntry(cfg *Config, baseDN string, filters map[*Field][]st
 // This allows AD and OpenLDAP secret engines to use the same api without changes to
 // the interface.
 func (c *Client) UpdatePassword(cfg *Config, baseDN string, newValues map[*Field][]string, filters map[*Field][]string) error {
-	return c.UpdateEntry(cfg, baseDN, filters, newValues)
+	return nil
+	//return c.UpdateEntry(cfg, baseDN, filters, newValues)
 }
 
 // Ex. "(cn=Ellen Jones)"

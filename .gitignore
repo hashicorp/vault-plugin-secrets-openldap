@@ -79,7 +79,7 @@ ui/npm-debug.log
 ui/testem.log
 tmp/
 
-scripts/custom.sh
+#scripts/custom.sh
 
 # binary
 bin/vault-plugin-auth-openldap

@@ -303,6 +303,13 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		return nil, errors.New("input was empty when attempting to set credentials for static account")
 	}
 
+	// ns, err := namespace.FromContext(ctx)
+	// if err != nil {
+	// 	b.Logger().Error("error checking for namespace before deadline added for generate password request", "error", err)
+	// 	return nil, fmt.Errorf("no namespace before deadline added: %w", err)
+	// }
+	// b.Logger().Info("namespace checked", "namespace", ns)
+
 	if _, hasTimeout := ctx.Deadline(); !hasTimeout {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, defaultCtxTimeout)
@@ -332,6 +339,12 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	defer b.Unlock()
 
 	if output.WALID == "" {
+		// ns, err := namespace.FromContext(ctx)
+		// if err != nil {
+		// 	b.Logger().Error("error checking for namespace for generate password request", "error", err)
+		// 	return output, err
+		// }
+		// b.Logger().Info("namespace checked", "namespace", ns)
 		output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, &setCredentialsWAL{
 			RoleName:          input.RoleName,
 			Username:          input.Role.StaticAccount.Username,
@@ -343,6 +356,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		if err != nil {
 			return output, errwrap.Wrapf("error writing WAL entry: {{err}}", err)
 		}
+		b.Logger().Debug("wrote WAL", "role", input.RoleName, "WAL ID", output.WALID)
 	}
 
 	// Update the password remotely.

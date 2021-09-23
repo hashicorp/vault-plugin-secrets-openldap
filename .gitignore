@@ -42,7 +42,7 @@ website/build
 Vagrantfile
 
 # Configs
-*.hcl
+#*.hcl
 
 .DS_Store
 .idea

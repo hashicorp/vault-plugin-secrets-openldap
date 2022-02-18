@@ -12,7 +12,7 @@ import (
 )
 
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
-	ldapClient := NewClient(conf)
+	ldapClient := NewClient(conf.Logger)
 	b := Backend(ldapClient)
 	if err := b.Setup(ctx, conf); err != nil {
 		return nil, err

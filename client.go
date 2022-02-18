@@ -7,7 +7,6 @@ import (
 	"github.com/go-ldap/ldif"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
-	"github.com/hashicorp/vault/sdk/logical"
 )
 
 type ldapClient interface {
@@ -20,22 +19,10 @@ type ldapClient interface {
 	Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error)
 }
 
-func NewClient(conf *logical.BackendConfig) *Client {
-	client := &Client{
-		ldap: client.New(),
+func NewClient(logger hclog.Logger) *Client {
+	return &Client{
+		ldap: client.New(logger),
 	}
-
-	logger := conf.Logger
-
-	// This can only happen in a test where BackendConfig is created
-	// manually without a logger.
-	if logger == nil {
-		logger = hclog.NewNullLogger()
-	}
-
-	client.ldap.LDAP.Logger = logger
-
-	return client
 }
 
 var _ ldapClient = (*Client)(nil)

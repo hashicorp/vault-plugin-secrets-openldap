@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/go-ldap/ldif"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 )
@@ -20,16 +21,21 @@ type Config struct {
 	Schema                   string    `json:"schema"`
 }
 
-func New() Client {
+func New(logger hclog.Logger) Client {
+	if logger == nil {
+		logger = hclog.NewNullLogger()
+	}
+
 	return Client{
-		LDAP: &ldaputil.Client{
-			LDAP: ldaputil.NewLDAP(),
+		ldap: &ldaputil.Client{
+			LDAP:   ldaputil.NewLDAP(),
+			Logger: logger,
 		},
 	}
 }
 
 type Client struct {
-	LDAP *ldaputil.Client
+	ldap *ldaputil.Client
 }
 
 func (c *Client) Search(cfg *Config, baseDN string, filters map[*Field][]string) ([]*Entry, error) {
@@ -40,7 +46,7 @@ func (c *Client) Search(cfg *Config, baseDN string, filters map[*Field][]string)
 		SizeLimit: math.MaxInt32,
 	}
 
-	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +85,7 @@ func (c *Client) UpdateEntry(cfg *Config, baseDN string, filters map[*Field][]st
 		modifyReq.Replace(field.String(), vals)
 	}
 
-	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return err
 	}
@@ -153,7 +159,7 @@ func (c *Client) Add(cfg *Config, req *ldap.AddRequest) error {
 	if req.DN == "" {
 		return fmt.Errorf("invalid request: DN is empty")
 	}
-	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return err
 	}
@@ -177,7 +183,7 @@ func (c *Client) Del(cfg *Config, req *ldap.DelRequest) error {
 	if req.DN == "" {
 		return fmt.Errorf("invalid request: DN is empty")
 	}
-	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return err
 	}
@@ -195,7 +201,7 @@ func (c *Client) Execute(cfg *Config, entries []*ldif.Entry, continueOnFailure b
 		return nil
 	}
 
-	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return err
 	}

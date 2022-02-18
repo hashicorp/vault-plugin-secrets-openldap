@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/go-ldap/ldif"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -23,7 +24,13 @@ func NewClient(conf *logical.BackendConfig) *Client {
 	client := &Client{
 		ldap: client.New(),
 	}
-	client.ldap.LDAP.Logger = conf.Logger
+
+	logger := conf.Logger
+	if logger == nil {
+		logger = hclog.NewNullLogger()
+	}
+
+	client.ldap.LDAP.Logger = logger
 
 	return client
 }

@@ -20,14 +20,14 @@ type ldapClient interface {
 
 func NewClient() *Client {
 	return &Client{
-		ldap: client.New(),
+		LDAP: client.New(),
 	}
 }
 
 var _ ldapClient = (*Client)(nil)
 
 type Client struct {
-	ldap client.Client
+	LDAP client.Client
 }
 
 func (c *Client) Get(conf *client.Config, dn string) (*client.Entry, error) {
@@ -35,7 +35,7 @@ func (c *Client) Get(conf *client.Config, dn string) (*client.Entry, error) {
 		client.FieldRegistry.ObjectClass: {"*"},
 	}
 
-	entries, err := c.ldap.Search(conf, dn, filters)
+	entries, err := c.LDAP.Search(conf, dn, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *Client) UpdatePassword(conf *client.Config, dn string, newPassword stri
 		return fmt.Errorf("error updating password: %s", err)
 	}
 
-	return c.ldap.UpdatePassword(conf, dn, newValues, filters)
+	return c.LDAP.UpdatePassword(conf, dn, newValues, filters)
 }
 
 func (c *Client) UpdateRootPassword(conf *client.Config, newPassword string) error {
@@ -67,17 +67,17 @@ func (c *Client) UpdateRootPassword(conf *client.Config, newPassword string) err
 		return fmt.Errorf("error updating password: %s", err)
 	}
 
-	return c.ldap.UpdatePassword(conf, conf.BindDN, newValues, filters)
+	return c.LDAP.UpdatePassword(conf, conf.BindDN, newValues, filters)
 }
 
 func (c *Client) Add(conf *client.Config, req *ldap.AddRequest) error {
-	return c.ldap.Add(conf, req)
+	return c.LDAP.Add(conf, req)
 }
 
 func (c *Client) Del(conf *client.Config, req *ldap.DelRequest) error {
-	return c.ldap.Del(conf, req)
+	return c.LDAP.Del(conf, req)
 }
 
 func (c *Client) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {
-	return c.ldap.Execute(conf, entries, continueOnError)
+	return c.LDAP.Execute(conf, entries, continueOnError)
 }

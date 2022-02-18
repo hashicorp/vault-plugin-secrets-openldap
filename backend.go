@@ -23,6 +23,10 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 
 func Backend(client ldapClient) *backend {
 	var b backend
+
+	// Add backend logger to LDAP client
+	client.(*Client).LDAP.LDAP.Logger = b.Logger()
+
 	b.Backend = &framework.Backend{
 		Help: strings.TrimSpace(backendHelp),
 

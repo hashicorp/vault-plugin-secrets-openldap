@@ -22,14 +22,14 @@ type Config struct {
 
 func New() Client {
 	return Client{
-		ldap: &ldaputil.Client{
+		LDAP: &ldaputil.Client{
 			LDAP: ldaputil.NewLDAP(),
 		},
 	}
 }
 
 type Client struct {
-	ldap *ldaputil.Client
+	LDAP *ldaputil.Client
 }
 
 func (c *Client) Search(cfg *Config, baseDN string, filters map[*Field][]string) ([]*Entry, error) {
@@ -40,7 +40,7 @@ func (c *Client) Search(cfg *Config, baseDN string, filters map[*Field][]string)
 		SizeLimit: math.MaxInt32,
 	}
 
-	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (c *Client) UpdateEntry(cfg *Config, baseDN string, filters map[*Field][]st
 		modifyReq.Replace(field.String(), vals)
 	}
 
-	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (c *Client) Add(cfg *Config, req *ldap.AddRequest) error {
 	if req.DN == "" {
 		return fmt.Errorf("invalid request: DN is empty")
 	}
-	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (c *Client) Del(cfg *Config, req *ldap.DelRequest) error {
 	if req.DN == "" {
 		return fmt.Errorf("invalid request: DN is empty")
 	}
-	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (c *Client) Execute(cfg *Config, entries []*ldif.Entry, continueOnFailure b
 		return nil
 	}
 
-	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.LDAP.DialLDAP(cfg.ConfigEntry)
 	if err != nil {
 		return err
 	}

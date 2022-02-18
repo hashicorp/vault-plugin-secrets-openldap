@@ -24,9 +24,6 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 func Backend(client ldapClient) *backend {
 	var b backend
 
-	// Add backend logger to LDAP client
-	client.(*Client).LDAP.LDAP.Logger = b.Logger()
-
 	b.Backend = &framework.Backend{
 		Help: strings.TrimSpace(backendHelp),
 
@@ -56,9 +53,12 @@ func Backend(client ldapClient) *backend {
 		Clean:       b.clean,
 		BackendType: logical.TypeLogical,
 	}
-	b.client = client
 	b.roleLocks = locksutil.CreateLocks()
 	b.credRotationQueue = queue.New()
+
+	// Add backend logger to LDAP client
+	client.(*Client).LDAP.LDAP.Logger = b.Logger()
+	b.client = client
 
 	return &b
 }

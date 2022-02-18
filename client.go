@@ -26,6 +26,9 @@ func NewClient(conf *logical.BackendConfig) *Client {
 	}
 
 	logger := conf.Logger
+
+	// This can only happen in a test where BackendConfig is created
+	// manually without a logger.
 	if logger == nil {
 		logger = hclog.NewNullLogger()
 	}

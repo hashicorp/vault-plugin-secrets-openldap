@@ -22,7 +22,7 @@ func TestSearch(t *testing.T) {
 		LDAP:   &ldapifc.FakeLDAPClient{conn},
 	}
 
-	client := &Client{ldap: ldapClient}
+	client := &Client{LDAP: ldapClient}
 
 	filters := map[*Field][]string{
 		FieldRegistry.ObjectClass: {"*"},

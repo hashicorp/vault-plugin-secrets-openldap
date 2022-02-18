@@ -6,6 +6,7 @@ import (
 	"github.com/go-ldap/ldap/v3"
 	"github.com/go-ldap/ldif"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 type ldapClient interface {
@@ -18,10 +19,13 @@ type ldapClient interface {
 	Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error)
 }
 
-func NewClient() *Client {
-	return &Client{
+func NewClient(conf *logical.BackendConfig) *Client {
+	client := &Client{
 		ldap: client.New(),
 	}
+	client.ldap.LDAP.Logger = conf.Logger
+
+	return client
 }
 
 var _ ldapClient = (*Client)(nil)

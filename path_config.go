@@ -39,9 +39,9 @@ func (b *backend) pathConfig() []*framework.Path {
 					Callback: b.configDeleteOperation,
 				},
 			},
-			HelpSynopsis: "Configure the OpenLDAP secret engine plugin.",
-			HelpDescription: "This path configures the OpenLDAP secret engine plugin. See the documentation for the " +
-				"plugin specified for a full list of accepted connection details.",
+			HelpSynopsis: "Configure the LDAP secrets engine plugin.",
+			HelpDescription: "This path configures the LDAP secrets engine plugin. See the " +
+				"documentation for the plugin specified for a full list of accepted connection details.",
 		},
 	}
 }
@@ -59,7 +59,7 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 	fields["schema"] = &framework.FieldSchema{
 		Type:        framework.TypeString,
 		Default:     defaultSchema,
-		Description: "The desired OpenLDAP schema used when modifying user account passwords.",
+		Description: "The desired LDAP schema used when modifying user account passwords.",
 	}
 	fields["password_policy"] = &framework.FieldSchema{
 		Type:        framework.TypeString,
@@ -76,8 +76,22 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 }
 
 func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.Request, fieldData *framework.FieldData) (*logical.Response, error) {
+	conf, err := readConfig(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	}
+	if conf == nil {
+		conf = new(config)
+	}
+
+	// Use the existing ldap client config if it is set
+	var existing *ldaputil.ConfigEntry
+	if conf.LDAP != nil && conf.LDAP.ConfigEntry != nil {
+		existing = conf.LDAP.ConfigEntry
+	}
+
 	// Build and validate the ldap conf.
-	ldapConf, err := ldaputil.NewConfigEntry(nil, fieldData)
+	ldapConf, err := ldaputil.NewConfigEntry(existing, fieldData)
 	if err != nil {
 		return nil, err
 	}
@@ -91,11 +105,6 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 		rawPassLength = 0 // Don't set to the default but keep this as the zero value so we know it hasn't been set
 	}
 	passLength := rawPassLength.(int)
-	url := fieldData.Get("url").(string)
-
-	if url == "" {
-		return nil, errors.New("url is required")
-	}
 
 	schema := fieldData.Get("schema").(string)
 	if schema == "" {
@@ -103,33 +112,55 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	}
 
 	if !client.ValidSchema(schema) {
-		return nil, fmt.Errorf("the configured schema %s is not valid.  Supported schemas: %s",
+		return nil, fmt.Errorf("the configured schema %s is not valid. Supported schemas: %s",
 			schema, client.SupportedSchemas())
 	}
 
-	passPolicy := fieldData.Get("password_policy").(string)
+	// Set the userattr if given. Otherwise, set the default.
+	userAttr := fieldData.Get("userattr").(string)
+	if userAttr != "" {
+		ldapConf.UserAttr = userAttr
+	}
+	if ldapConf.UserAttr == "" {
+		ldapConf.UserAttr = defaultUserAttr(schema)
+	}
 
+	passPolicy := fieldData.Get("password_policy").(string)
 	if passPolicy != "" && hasPassLen {
 		// If both a password policy and a password length are set, we can't figure out what to do
 		return nil, fmt.Errorf("cannot set both 'password_policy' and 'length'")
 	}
 
-	config := config{
-		LDAP: &client.Config{
-			ConfigEntry: ldapConf,
-			Schema:      schema,
-		},
-		PasswordPolicy: passPolicy,
-		PasswordLength: passLength,
+	// Update config field values
+	conf.PasswordPolicy = passPolicy
+	conf.PasswordLength = passLength
+	conf.LDAP = &client.Config{
+		ConfigEntry: ldapConf,
+		Schema:      schema,
 	}
 
-	err = writeConfig(ctx, req.Storage, config)
+	err = writeConfig(ctx, req.Storage, *conf)
 	if err != nil {
 		return nil, err
 	}
 
 	// Respond with a 204.
 	return nil, nil
+}
+
+// defaultUserAttr returns the default user attribute for the given
+// schema or an empty string if the schema is unknown.
+func defaultUserAttr(schema string) string {
+	switch schema {
+	case "ad":
+		return "userPrincipalName"
+	case "racf":
+		return "racfid"
+	case "openldap":
+		return "cn"
+	default:
+		return ""
+	}
 }
 
 func readConfig(ctx context.Context, storage logical.Storage) (*config, error) {
@@ -169,13 +200,15 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	}
 
 	// "password" is intentionally not returned by this endpoint
-	configMap := config.LDAP.Map()
-	delete(configMap, "bindpass")
+	configMap := config.LDAP.PasswordlessMap()
 	if config.PasswordLength > 0 {
 		configMap["length"] = config.PasswordLength
 	}
 	if config.PasswordPolicy != "" {
 		configMap["password_policy"] = config.PasswordPolicy
+	}
+	if !config.LDAP.LastBindPasswordRotation.IsZero() {
+		configMap["last_bind_password_rotation"] = config.LDAP.LastBindPasswordRotation
 	}
 
 	resp := &logical.Response{

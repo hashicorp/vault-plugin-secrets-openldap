@@ -16,33 +16,40 @@ const (
 	staticRolePath = "static-role/"
 )
 
-func (b *backend) pathListStaticRoles() []*framework.Path {
-	return []*framework.Path{
-		{
-			Pattern: staticRolePath + "?$",
-			Operations: map[logical.Operation]framework.OperationHandler{
-				logical.ListOperation: &framework.PathOperation{
-					Callback: b.pathStaticRoleList,
-				},
-			},
-			HelpSynopsis:    staticRolesListHelpSynopsis,
-			HelpDescription: staticRolesListHelpDescription,
-		},
-	}
-}
-
 func (b *backend) pathStaticRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern:        staticRolePath + framework.GenericNameRegex("name"),
-			Fields:         fieldsForType(staticRolePath),
+			Pattern: staticRolePath + framework.GenericNameRegex("name"),
+			Fields: map[string]*framework.FieldSchema{
+				"name": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "Name of the role",
+				},
+				"username": {
+					Type:        framework.TypeString,
+					Description: "The username/logon name for the entry with which this role will be associated.",
+					Required:    true,
+				},
+				"dn": {
+					Type:        framework.TypeString,
+					Description: "The distinguished name of the entry to manage.",
+				},
+				"rotation_period": {
+					Type:        framework.TypeDurationSecond,
+					Description: "Period for automatic credential rotation of the given entry.",
+				},
+			},
 			ExistenceCheck: b.pathStaticRoleExistenceCheck,
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
-					Callback: b.pathStaticRoleCreateUpdate,
+					Callback:                    b.pathStaticRoleCreateUpdate,
+					ForwardPerformanceStandby:   true,
+					ForwardPerformanceSecondary: true,
 				},
 				logical.CreateOperation: &framework.PathOperation{
-					Callback: b.pathStaticRoleCreateUpdate,
+					Callback:                    b.pathStaticRoleCreateUpdate,
+					ForwardPerformanceStandby:   true,
+					ForwardPerformanceSecondary: true,
 				},
 				logical.ReadOperation: &framework.PathOperation{
 					Callback: b.pathStaticRoleRead,
@@ -56,58 +63,17 @@ func (b *backend) pathStaticRoles() []*framework.Path {
 			HelpSynopsis:    staticRoleHelpSynopsis,
 			HelpDescription: staticRoleHelpDescription,
 		},
-	}
-}
-
-// fieldsForType returns a map of string/FieldSchema items for the given role
-// type. The purpose is to keep the shared fields between dynamic and static
-// roles consistent, and allow for each type to override or provide their own
-// specific fields
-func fieldsForType(roleType string) map[string]*framework.FieldSchema {
-	fields := map[string]*framework.FieldSchema{
-		"name": {
-			Type:        framework.TypeLowerCaseString,
-			Description: "Name of the role",
-		},
-		"username": {
-			Type:        framework.TypeString,
-			Description: "The username/logon name for the entry with which this role will be associated.",
-		},
-		"dn": {
-			Type:        framework.TypeString,
-			Description: "The distinguished name of the entry to manage.",
-		},
-		"ttl": {
-			Type:        framework.TypeDurationSecond,
-			Description: "The time-to-live for the password.",
+		{
+			Pattern: staticRolePath + "?$",
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.ListOperation: &framework.PathOperation{
+					Callback: b.pathStaticRoleList,
+				},
+			},
+			HelpSynopsis:    staticRolesListHelpSynopsis,
+			HelpDescription: staticRolesListHelpDescription,
 		},
 	}
-
-	// Get the fields that are specific to the type of role, and add them to the
-	// common fields. In the future we can add additional for dynamic roles.
-	var typeFields map[string]*framework.FieldSchema
-	switch roleType {
-	case staticRolePath:
-		typeFields = staticFields()
-	}
-
-	for k, v := range typeFields {
-		fields[k] = v
-	}
-
-	return fields
-}
-
-// staticFields returns a map of key and field schema items that are specific
-// only to static roles
-func staticFields() map[string]*framework.FieldSchema {
-	fields := map[string]*framework.FieldSchema{
-		"rotation_period": {
-			Type:        framework.TypeDurationSecond,
-			Description: "Period for automatic credential rotation of the given entry.",
-		},
-	}
-	return fields
 }
 
 func (b *backend) pathStaticRoleExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
@@ -126,7 +92,7 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 	lock.Lock()
 	defer lock.Unlock()
 
-	//TODO: Add retry logic
+	// TODO: Add retry logic
 
 	// Remove the item from the queue
 	_, err := b.popFromRotationQueueByKey(name)
@@ -167,6 +133,8 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 			}
 		}
 	}
+
+	b.deleteManagedUsers(role.StaticAccount.Username)
 
 	return nil, merr.ErrorOrNil()
 }
@@ -213,17 +181,30 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 	}
 
-	dn := data.Get("dn").(string)
-	if dn == "" {
-		return logical.ErrorResponse("dn is a required field to manage a static account"), nil
-	}
-	role.StaticAccount.DN = dn
+	isCreate := req.Operation == logical.CreateOperation
+
+	b.managedUserLock.Lock()
+	defer b.managedUserLock.Unlock()
 
 	username := data.Get("username").(string)
-	if username == "" {
+	if isCreate && username == "" {
 		return logical.ErrorResponse("username is a required field to manage a static account"), nil
 	}
+	if isCreate && b.isManagedUser(username) {
+		return logical.ErrorResponse("%q is already managed by the secrets engine", username), nil
+	}
+	if !isCreate && username != role.StaticAccount.Username {
+		return logical.ErrorResponse("cannot update static account username"), nil
+	}
 	role.StaticAccount.Username = username
+
+	// DN is optional and cannot be modified after creation. If given, it will
+	// take precedence over username for LDAP search during password rotation.
+	dn := data.Get("dn").(string)
+	if !isCreate && dn != role.StaticAccount.DN {
+		return logical.ErrorResponse("cannot update static account distinguished name (dn)"), nil
+	}
+	role.StaticAccount.DN = dn
 
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
 	if !ok {
@@ -283,7 +264,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// In case this is an update, remove any previous version of the item from
 		// the queue. The existing item could be tracking a WAL ID for this role,
 		// so it's important to keep the existing item rather than recreate it.
-		//TODO: Add retry logic
+		// TODO: Add retry logic
 		item, err = b.popFromRotationQueueByKey(name)
 		if err != nil {
 			return nil, err
@@ -296,6 +277,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	if err := b.pushItem(item); err != nil {
 		return nil, err
 	}
+
+	b.setManagedUsers(username)
 
 	return nil, nil
 }
@@ -313,8 +296,12 @@ type staticAccount struct {
 
 	// Password is the current password for static accounts. As an input, this is
 	// used/required when trying to assume management of an existing static
-	// account. Return this on credential request if it exists.
+	// account. This is returned on credential requests if it exists.
 	Password string `json:"password"`
+
+	// LastPassword is the prior password after a rotation for static accounts.
+	// This is returned on credential requests if it exists.
+	LastPassword string `json:"last_password"`
 
 	// LastVaultRotation represents the last time Vault rotated the password
 	LastVaultRotation time.Time `json:"last_vault_rotation"`
@@ -382,16 +369,18 @@ This path lets you manage the static roles that can be created with this
 backend. Static Roles are associated with a single LDAP entry, and manage the
 password based on a rotation period, automatically rotating the password.
 
-The "dn" parameter is required and configures the domain name to use when managing 
-the existing entry.
-
 The "username" parameter is required and configures the username for the LDAP entry. 
-This is helpful to provide a usable name when domain name (DN) isn't used directly for 
-authentication.
+This is helpful to provide a usable name when distinguished name (DN) isn't used 
+directly for authentication. If DN not provided, "username" will be used for LDAP 
+subtree search, rooted at the "userdn" configuration value. The name attribute to use 
+when searching for the user can be configured with the "userattr" configuration value.
 
+The "dn" parameter is optional and configures the distinguished name to use 
+when managing the existing entry. If the "dn" parameter is set, it will take 
+precedence over the "username" when LDAP searches are performed.
 
-The "rotation_period' parameter is required and configures how often, in seconds, the credentials should be 
-automatically rotated by Vault.  The minimum is 5 seconds (5s).
+The "rotation_period' parameter is required and configures how often, in seconds, 
+the credentials should be automatically rotated by Vault.  The minimum is 5 seconds (5s).
 `
 
 const staticRolesListHelpDescription = `
@@ -399,5 +388,5 @@ List all the static roles being managed by Vault.
 `
 
 const staticRolesListHelpSynopsis = `
-This path lists all the static roles Vault is currently managing in OpenLDAP.
+This path lists all the static roles Vault is currently managing within the LDAP system.
 `

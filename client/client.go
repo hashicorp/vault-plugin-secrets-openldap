@@ -38,10 +38,10 @@ type Client struct {
 	ldap *ldaputil.Client
 }
 
-func (c *Client) Search(cfg *Config, baseDN string, filters map[*Field][]string) ([]*Entry, error) {
+func (c *Client) Search(cfg *Config, baseDN string, scope int, filters map[*Field][]string) ([]*Entry, error) {
 	req := &ldap.SearchRequest{
 		BaseDN:    baseDN,
-		Scope:     ldap.ScopeBaseObject,
+		Scope:     scope,
 		Filter:    toString(filters),
 		SizeLimit: math.MaxInt32,
 	}
@@ -68,8 +68,8 @@ func (c *Client) Search(cfg *Config, baseDN string, filters map[*Field][]string)
 	return entries, nil
 }
 
-func (c *Client) UpdateEntry(cfg *Config, baseDN string, filters map[*Field][]string, newValues map[*Field][]string) error {
-	entries, err := c.Search(cfg, baseDN, filters)
+func (c *Client) UpdateEntry(cfg *Config, baseDN string, scope int, filters map[*Field][]string, newValues map[*Field][]string) error {
+	entries, err := c.Search(cfg, baseDN, scope, filters)
 	if err != nil {
 		return err
 	}
@@ -98,14 +98,15 @@ func (c *Client) UpdateEntry(cfg *Config, baseDN string, filters map[*Field][]st
 	return conn.Modify(modifyReq)
 }
 
-// UpdatePassword uses a Modify call under the hood instead of LDAP change password function.
-// This allows AD and OpenLDAP secret engines to use the same api without changes to
-// the interface.
-func (c *Client) UpdatePassword(cfg *Config, baseDN string, newValues map[*Field][]string, filters map[*Field][]string) error {
-	return c.UpdateEntry(cfg, baseDN, filters, newValues)
+// UpdatePassword uses a Modify call under the hood instead of LDAP change
+// password function. This allows AD and OpenLDAP schemas to use the same
+// api without changes to the interface.
+func (c *Client) UpdatePassword(cfg *Config, baseDN string, scope int, newValues map[*Field][]string, filters map[*Field][]string) error {
+	return c.UpdateEntry(cfg, baseDN, scope, filters, newValues)
 }
 
-// Ex. "(cn=Ellen Jones)"
+// toString turns the following map of filters into LDAP search filter strings
+// For example: "(cn=Ellen Jones)"
 func toString(filters map[*Field][]string) string {
 	var fieldEquals []string
 	for f, values := range filters {
@@ -122,25 +123,41 @@ func bind(cfg *Config, conn ldaputil.Connection) error {
 		return errors.New("unable to bind due to lack of configured password")
 	}
 
-	if cfg.BindDN == "" {
-		return errors.New("must provide binddn")
-	}
-
-	origErr := conn.Bind(cfg.BindDN, cfg.BindPassword)
-	if origErr == nil {
+	if cfg.UPNDomain != "" {
+		origErr := conn.Bind(fmt.Sprintf("%s@%s", ldaputil.EscapeLDAPValue(cfg.BindDN), cfg.UPNDomain), cfg.BindPassword)
+		if origErr == nil {
+			return nil
+		}
+		if !shouldTryLastPwd(cfg.LastBindPassword, cfg.LastBindPasswordRotation) {
+			return origErr
+		}
+		if err := conn.Bind(fmt.Sprintf("%s@%s", ldaputil.EscapeLDAPValue(cfg.BindDN), cfg.UPNDomain), cfg.LastBindPassword); err != nil {
+			// Return the original error because it'll be more helpful for debugging.
+			return origErr
+		}
 		return nil
 	}
-	if !shouldTryLastPwd(cfg.LastBindPassword, cfg.LastBindPasswordRotation) {
-		return origErr
-	}
 
-	return conn.Bind(cfg.BindDN, cfg.LastBindPassword)
+	if cfg.BindDN != "" {
+		origErr := conn.Bind(cfg.BindDN, cfg.BindPassword)
+		if origErr == nil {
+			return nil
+		}
+		if !shouldTryLastPwd(cfg.LastBindPassword, cfg.LastBindPasswordRotation) {
+			return origErr
+		}
+		if err := conn.Bind(cfg.BindDN, cfg.LastBindPassword); err != nil {
+			// Return the original error because it'll be more helpful for debugging.
+			return origErr
+		}
+	}
+	return errors.New("must provide binddn or upndomain")
 }
 
 // shouldTryLastPwd determines if we should try a previous password.
 // LDAP can return a variety of errors when a password is invalid.
-// Rather than attempting to catalogue these errors across multiple versions of
-// OpenLDAP, we simply try the last password if it's been less than a set amount of
+// Rather than attempting to catalogue these errors across multiple implementations of
+// LDAP, we simply try the last password if it's been less than a set amount of
 // time since a rotation occurred.
 func shouldTryLastPwd(lastPwd string, lastBindPasswordRotation time.Time) bool {
 	if lastPwd == "" {
@@ -150,50 +167,6 @@ func shouldTryLastPwd(lastPwd string, lastBindPasswordRotation time.Time) bool {
 		return false
 	}
 	return lastBindPasswordRotation.Add(10 * time.Minute).After(time.Now())
-}
-
-func (c *Client) Add(cfg *Config, req *ldap.AddRequest) error {
-	if req == nil {
-		return fmt.Errorf("invalid request: request is nil")
-	}
-	if req.DN == "" {
-		return fmt.Errorf("invalid request: DN is empty")
-	}
-	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	if err := bind(cfg, conn); err != nil {
-		return err
-	}
-
-	err = conn.Add(req)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Client) Del(cfg *Config, req *ldap.DelRequest) error {
-	if req == nil {
-		return fmt.Errorf("invalid request: request is nil")
-	}
-	if req.DN == "" {
-		return fmt.Errorf("invalid request: DN is empty")
-	}
-	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	if err := bind(cfg, conn); err != nil {
-		return err
-	}
-
-	return conn.Del(req)
 }
 
 func (c *Client) Execute(cfg *Config, entries []*ldif.Entry, continueOnFailure bool) (err error) {

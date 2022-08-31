@@ -7,9 +7,9 @@ import (
 	"golang.org/x/text/encoding/unicode"
 )
 
-// SupportedSchemas returns a slice of different OpenLDAP schemas supported
-// by the plugin.  This is used to change the FieldRegistry when modifying
-// user passwords.
+// SupportedSchemas returns a slice of different LDAP schemas supported
+// by the plugin. This is used to change the FieldRegistry when modifying
+// user passwords and to set the default user attribute (userattr).
 func SupportedSchemas() []string {
 	return []string{"openldap", "racf", "ad"}
 }
@@ -20,7 +20,7 @@ func ValidSchema(schema string) bool {
 }
 
 // GetSchemaFieldRegistry type switches field registries depending on the configured schema.
-// For example, IBM RACF has a custom OpenLDAP schema so the password is stored in a different
+// For example, IBM RACF has a custom LDAP schema so the password is stored in a different
 // attribute.
 func GetSchemaFieldRegistry(schema string, newPassword string) (map[*Field][]string, error) {
 	switch schema {

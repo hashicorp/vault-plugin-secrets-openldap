@@ -34,9 +34,9 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 					ForwardPerformanceSecondary: true,
 				},
 			},
-			HelpSynopsis: "Request to rotate the root credentials Vault uses for the OpenLDAP administrator account.",
+			HelpSynopsis: "Request to rotate the root credentials Vault uses for the LDAP administrator account.",
 			HelpDescription: "This path attempts to rotate the root credentials of the administrator account " +
-				"(binddn) used by Vault to manage OpenLDAP.",
+				"(binddn) used by Vault to manage LDAP.",
 		},
 		{
 			Pattern: rotateRolePath + framework.GenericNameRegex("name"),
@@ -59,7 +59,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 				},
 			},
 			HelpSynopsis:    "Request to rotate the credentials for a static user account.",
-			HelpDescription: "This path attempts to rotate the credentials for the given OpenLDAP static user account.",
+			HelpDescription: "This path attempts to rotate the credentials for the given LDAP static user account.",
 		},
 	}
 }
@@ -90,19 +90,27 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 	defer b.Unlock()
 
 	// Update the password remotely.
-	if err := b.client.UpdateRootPassword(config.LDAP, newPassword); err != nil {
+	if err := b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, newPassword); err != nil {
 		return nil, err
 	}
 	config.LDAP.BindPassword = newPassword
+	config.LDAP.LastBindPassword = oldPassword
+	config.LDAP.LastBindPasswordRotation = time.Now()
 
 	// Update the password locally.
-	if pwdStoringErr := storePassword(ctx, req.Storage, config); pwdStoringErr != nil {
-		// We were unable to store the new password locally. We can't continue in this state because we won't be able
-		// to roll any passwords, including our own to get back into a state of working. So, we need to roll back to
-		// the last password we successfully got into storage.
+	entry, err := logical.StorageEntryJSON(configPath, config)
+	if err != nil {
+		return nil, err
+	}
+	if pwdStoringErr := req.Storage.Put(ctx, entry); pwdStoringErr != nil {
+		// We were unable to store the new password locally. We can't continue in
+		// this state because we won't be able to roll any passwords, including our
+		// own to get back into a state of working. So, we need to roll back to the
+		// last password we successfully got into storage.
 		if rollbackErr := b.rollBackPassword(ctx, config, oldPassword); rollbackErr != nil {
-			return nil, fmt.Errorf(`unable to store new password due to %s and unable to return to previous password
-due to %s, configure a new binddn and bindpass to restore openldap function`, pwdStoringErr, rollbackErr)
+			return nil, fmt.Errorf(`unable to store new password due to %s and unable to 
+			return to previous password due to %s, configure a new binddn and bindpass to 
+			restore ldap function`, pwdStoringErr, rollbackErr)
 		}
 		return nil, fmt.Errorf("unable to update password due to storage err: %s", pwdStoringErr)
 	}
@@ -110,6 +118,7 @@ due to %s, configure a new binddn and bindpass to restore openldap function`, pw
 	// Respond with a 204.
 	return nil, nil
 }
+
 func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	name := data.Get("name").(string)
 	if name == "" {
@@ -188,19 +197,11 @@ func (b *backend) rollBackPassword(ctx context.Context, config *config, oldPassw
 			// Outer environment is closing.
 			return fmt.Errorf("unable to roll back password because enclosing environment is shutting down")
 		}
-		if err = b.client.UpdateRootPassword(config.LDAP, oldPassword); err == nil {
+		if err = b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, oldPassword); err == nil {
 			// Success.
 			return nil
 		}
 	}
 	// Failure after looping.
 	return err
-}
-
-func storePassword(ctx context.Context, s logical.Storage, config *config) error {
-	entry, err := logical.StorageEntryJSON(configPath, config)
-	if err != nil {
-		return err
-	}
-	return s.Put(ctx, entry)
 }

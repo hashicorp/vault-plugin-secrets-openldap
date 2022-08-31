@@ -3,6 +3,7 @@ package openldap
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/go-ldap/ldif"
@@ -14,6 +15,30 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/text/encoding/unicode"
 )
+
+func (b *backend) pathDynamicCredsCreate() []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: path.Join(dynamicCredPath, framework.MatchAllRegex("name")),
+			Fields: map[string]*framework.FieldSchema{
+				"name": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "Name of the dynamic role.",
+				},
+			},
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.ReadOperation: &framework.PathOperation{
+					Callback: b.pathDynamicCredsRead,
+				},
+			},
+			HelpSynopsis: "Request LDAP credentials for a dynamic role. These credentials are " +
+				"created within the LDAP system when querying this endpoint.",
+			HelpDescription: "This path requests new LDAP credentials for a certain dynamic role. " +
+				"The credentials are created within the LDAP system based on the creation_ldif " +
+				"specified within the dynamic role configuration.",
+		},
+	}
+}
 
 func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("name").(string)
@@ -32,7 +57,7 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 		return nil, err
 	}
 	if config == nil {
-		return nil, fmt.Errorf("missing OpenLDAP configuration")
+		return nil, fmt.Errorf("missing LDAP configuration")
 	}
 
 	// Generate dynamic data
@@ -99,7 +124,6 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 // upon completion if any occurred.
 func (b *backend) executeLDIF(config *client.Config, ldifTemplate string, templateData dynamicTemplateData, continueOnError bool) (dns []string, err error) {
 	rawLDIF, err := applyTemplate(ldifTemplate, templateData)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply template: %w", err)
 	}
@@ -175,7 +199,7 @@ func (b *backend) secretCredsRevoke() framework.OperationFunc {
 			return nil, err
 		}
 		if config == nil {
-			return nil, fmt.Errorf("missing OpenLDAP configuration")
+			return nil, fmt.Errorf("missing LDAP configuration")
 		}
 
 		deletionTemplate, err := getString(req.Secret.InternalData, "deletion_ldif")
@@ -198,7 +222,7 @@ func (b *backend) secretCredsRevoke() framework.OperationFunc {
 				return nil, fmt.Errorf("unable to decode internal data: %w", err)
 			}
 		default:
-			return nil, fmt.Errorf("unable to revoke OpenLDAP dynamic credentials: unrecognized internal data type: %T", td)
+			return nil, fmt.Errorf("unable to revoke LDAP dynamic credentials: unrecognized internal data type: %T", td)
 		}
 
 		_, err = b.executeLDIF(config.LDAP, deletionTemplate, templateData, true)

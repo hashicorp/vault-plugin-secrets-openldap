@@ -9,7 +9,7 @@ import (
 )
 
 func TestRoles(t *testing.T) {
-	t.Run("happy path with roles", func(t *testing.T) {
+	t.Run("happy path with role using DN search", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
@@ -78,7 +78,7 @@ func TestRoles(t *testing.T) {
 			t.Fatal("expected last_vault_rotation to not be empty")
 		}
 	})
-	t.Run("happy path with roles", func(t *testing.T) {
+	t.Run("happy path with role using username search", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
@@ -87,6 +87,7 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
+			"userdn":      "ou=users,dc=hashicorp,dc=com",
 		}
 
 		req := &logical.Request{
@@ -103,7 +104,7 @@ func TestRoles(t *testing.T) {
 
 		data = map[string]interface{}{
 			"username":        "hashicorp",
-			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"dn":              "",
 			"rotation_period": "5s",
 		}
 
@@ -145,47 +146,6 @@ func TestRoles(t *testing.T) {
 
 		if resp.Data["last_vault_rotation"] == nil {
 			t.Fatal("expected last_vault_rotation to not be empty")
-		}
-	})
-
-	t.Run("missing dn", func(t *testing.T) {
-		b, storage := getBackend(false)
-		defer b.Cleanup(context.Background())
-
-		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
-			"username":        "hashicorp",
-			"rotation_period": "5s",
-		}
-
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if resp == nil || !resp.IsError() {
-			t.Fatal("expected error")
 		}
 	})
 
@@ -198,6 +158,7 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
+			"userdn":      "ou=users,dc=hashicorp,dc=com",
 		}
 
 		req := &logical.Request{

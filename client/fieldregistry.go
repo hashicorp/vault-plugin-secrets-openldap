@@ -27,7 +27,6 @@ func newFieldRegistry() *fieldRegistry {
 
 	registryFields := vOfReg.Elem()
 	for i := 0; i < registryFields.NumField(); i++ {
-
 		if registryFields.Field(i).Kind() == reflect.Ptr {
 
 			field := registryFields.Type().Field(i)
@@ -59,9 +58,12 @@ type fieldRegistry struct {
 	ObjectSID          *Field `ldap:"objectSid"`
 	OrganizationalUnit *Field `ldap:"ou"`
 	PasswordLastSet    *Field `ldap:"passwordLastSet"`
+	RACFID             *Field `ldap:"racfid"`
 	RACFPassword       *Field `ldap:"racfPassword"`
 	RACFAttributes     *Field `ldap:"racfAttributes"`
+	SAMAccountName     *Field `ldap:"sAMAccountName"`
 	UnicodePassword    *Field `ldap:"unicodePwd"`
+	UID                *Field `ldap:"uid"`
 	UserPassword       *Field `ldap:"userPassword"`
 	UserPrincipalName  *Field `ldap:"userPrincipalName"`
 

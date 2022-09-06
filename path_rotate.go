@@ -110,6 +110,7 @@ due to %s, configure a new binddn and bindpass to restore openldap function`, pw
 	// Respond with a 204.
 	return nil, nil
 }
+
 func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	name := data.Get("name").(string)
 	if name == "" {

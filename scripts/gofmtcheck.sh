@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-echo "==> Checking that code complies with gofumpt requirements..."
+echo "==> Checking that code complies with gofmt requirements..."
 
-gofmt_files=$(gofumpt -l `find . -name '*.go'`)
+gofmt_files=$(gofmt -l `find . -name '*.go' | grep -v vendor`)
 if [[ -n ${gofmt_files} ]]; then
-    echo 'gofumpt needs running on the following files:'
+    echo 'gofmt needs running on the following files:'
     echo "${gofmt_files}"
     echo "You can use the command: \`make fmt\` to reformat code."
     exit 1

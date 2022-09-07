@@ -82,6 +82,7 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	}
 	if conf == nil {
 		conf = new(config)
+		conf.LDAP = new(client.Config)
 	}
 
 	// Use the existing ldap client config if it is set
@@ -134,10 +135,8 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	// Update config field values
 	conf.PasswordPolicy = passPolicy
 	conf.PasswordLength = passLength
-	conf.LDAP = &client.Config{
-		ConfigEntry: ldapConf,
-		Schema:      schema,
-	}
+	conf.LDAP.ConfigEntry = ldapConf
+	conf.LDAP.Schema = schema
 
 	err = writeConfig(ctx, req.Storage, *conf)
 	if err != nil {
@@ -206,6 +205,9 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	}
 	if config.PasswordPolicy != "" {
 		configMap["password_policy"] = config.PasswordPolicy
+	}
+	if !config.LDAP.LastBindPasswordRotation.IsZero() {
+		configMap["last_bind_password_rotation"] = config.LDAP.LastBindPasswordRotation
 	}
 
 	resp := &logical.Response{

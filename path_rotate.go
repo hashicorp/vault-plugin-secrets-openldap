@@ -94,6 +94,8 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 		return nil, err
 	}
 	config.LDAP.BindPassword = newPassword
+	config.LDAP.LastBindPassword = oldPassword
+	config.LDAP.LastBindPasswordRotation = time.Now()
 
 	// Update the password locally.
 	entry, err := logical.StorageEntryJSON(configPath, config)

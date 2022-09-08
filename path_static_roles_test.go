@@ -9,7 +9,7 @@ import (
 )
 
 func TestRoles(t *testing.T) {
-	t.Run("happy path with role using DN search", func(t *testing.T) {
+	t.Run("happy path with roles", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
@@ -158,7 +158,6 @@ func TestRoles(t *testing.T) {
 			"bindpass":    "pa$$w0rd",
 			"url":         "ldap://138.91.247.105",
 			"certificate": validCertificate,
-			"userdn":      "ou=users,dc=hashicorp,dc=com",
 		}
 
 		req := &logical.Request{

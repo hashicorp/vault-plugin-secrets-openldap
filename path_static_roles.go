@@ -296,12 +296,8 @@ type staticAccount struct {
 
 	// Password is the current password for static accounts. As an input, this is
 	// used/required when trying to assume management of an existing static
-	// account. This is returned on credential requests if it exists.
+	// account. Return this on credential request if it exists.
 	Password string `json:"password"`
-
-	// LastPassword is the prior password after a rotation for static accounts.
-	// This is returned on credential requests if it exists.
-	LastPassword string `json:"last_password"`
 
 	// LastVaultRotation represents the last time Vault rotated the password
 	LastVaultRotation time.Time `json:"last_vault_rotation"`

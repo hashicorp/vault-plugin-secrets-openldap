@@ -9,7 +9,7 @@ import (
 )
 
 func TestRoles(t *testing.T) {
-	t.Run("happy path with roles", func(t *testing.T) {
+	t.Run("happy path with role using DN search", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 

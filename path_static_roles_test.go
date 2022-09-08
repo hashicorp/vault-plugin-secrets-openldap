@@ -79,6 +79,47 @@ func TestRoles(t *testing.T) {
 		}
 	})
 
+	t.Run("missing dn", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		data := map[string]interface{}{
+			"binddn":      "tester",
+			"bindpass":    "pa$$w0rd",
+			"url":         "ldap://138.91.247.105",
+			"certificate": validCertificate,
+		}
+
+		req := &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      configPath,
+			Storage:   storage,
+			Data:      data,
+		}
+
+		resp, err := b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		data = map[string]interface{}{
+			"username":        "hashicorp",
+			"rotation_period": "5s",
+		}
+
+		req = &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      staticRolePath + "hashicorp",
+			Storage:   storage,
+			Data:      data,
+		}
+
+		resp, err = b.HandleRequest(context.Background(), req)
+		if resp == nil || !resp.IsError() {
+			t.Fatal("expected error")
+		}
+	})
+
 	t.Run("missing username", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())

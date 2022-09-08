@@ -15,7 +15,7 @@ import (
 const (
 	configPath            = "config"
 	defaultPasswordLength = 64
-	defaultSchema         = "openldap"
+	defaultSchema         = client.SchemaOpenLDAP
 	defaultTLSVersion     = "tls12"
 	defaultCtxTimeout     = 1 * time.Minute
 )
@@ -151,11 +151,11 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 // schema or an empty string if the schema is unknown.
 func defaultUserAttr(schema string) string {
 	switch schema {
-	case "ad":
+	case client.SchemaAD:
 		return "userPrincipalName"
-	case "racf":
+	case client.SchemaRACF:
 		return "racfid"
-	case "openldap":
+	case client.SchemaOpenLDAP:
 		return "cn"
 	default:
 		return ""

@@ -15,7 +15,7 @@ import (
 const (
 	configPath            = "config"
 	defaultPasswordLength = 64
-	defaultSchema         = client.SchemaOpenLDAP
+	defaultSchema         = "openldap"
 	defaultTLSVersion     = "tls12"
 	defaultCtxTimeout     = 1 * time.Minute
 )
@@ -113,20 +113,12 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	}
 
 	if !client.ValidSchema(schema) {
-		return nil, fmt.Errorf("the configured schema %s is not valid. Supported schemas: %s",
+		return nil, fmt.Errorf("the configured schema %s is not valid.  Supported schemas: %s",
 			schema, client.SupportedSchemas())
 	}
 
-	// Set the userattr if given. Otherwise, set the default.
-	userAttr := fieldData.Get("userattr").(string)
-	if userAttr != "" {
-		ldapConf.UserAttr = userAttr
-	}
-	if ldapConf.UserAttr == "" {
-		ldapConf.UserAttr = defaultUserAttr(schema)
-	}
-
 	passPolicy := fieldData.Get("password_policy").(string)
+
 	if passPolicy != "" && hasPassLen {
 		// If both a password policy and a password length are set, we can't figure out what to do
 		return nil, fmt.Errorf("cannot set both 'password_policy' and 'length'")
@@ -145,21 +137,6 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 
 	// Respond with a 204.
 	return nil, nil
-}
-
-// defaultUserAttr returns the default user attribute for the given
-// schema or an empty string if the schema is unknown.
-func defaultUserAttr(schema string) string {
-	switch schema {
-	case client.SchemaAD:
-		return "userPrincipalName"
-	case client.SchemaRACF:
-		return "racfid"
-	case client.SchemaOpenLDAP:
-		return "cn"
-	default:
-		return ""
-	}
 }
 
 func readConfig(ctx context.Context, storage logical.Storage) (*config, error) {
@@ -199,7 +176,8 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	}
 
 	// "password" is intentionally not returned by this endpoint
-	configMap := config.LDAP.PasswordlessMap()
+	configMap := config.LDAP.Map()
+	delete(configMap, "bindpass")
 	if config.PasswordLength > 0 {
 		configMap["length"] = config.PasswordLength
 	}

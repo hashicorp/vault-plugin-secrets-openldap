@@ -64,9 +64,6 @@ func (c *Client) UpdateDNPassword(conf *client.Config, dn string, newPassword st
 // UpdateUserPassword updates the password for the object with the given username.
 func (c *Client) UpdateUserPassword(conf *client.Config, username string, newPassword string) error {
 	userAttr := conf.UserAttr
-	if userAttr == "" {
-		userAttr = defaultUserAttr(conf.Schema)
-	}
 
 	field := client.FieldRegistry.Parse(userAttr)
 	if field == nil {

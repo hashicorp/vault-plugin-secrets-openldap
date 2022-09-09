@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -404,40 +403,4 @@ func ldapResponseData(vals ...interface{}) map[string]interface{} {
 		m[ks] = v
 	}
 	return m
-}
-
-func Test_defaultUserAttr(t *testing.T) {
-	tests := []struct {
-		name   string
-		schema string
-		want   string
-	}{
-		{
-			name:   "default userattr for openldap schema",
-			schema: client.SchemaOpenLDAP,
-			want:   "cn",
-		},
-		{
-			name:   "default userattr for ad schema",
-			schema: client.SchemaAD,
-			want:   "userPrincipalName",
-		},
-		{
-			name:   "default userattr for racf schema",
-			schema: client.SchemaRACF,
-			want:   "racfid",
-		},
-		{
-			name:   "default userattr for unknown schema",
-			schema: "unknown",
-			want:   "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := defaultUserAttr(tt.schema); got != tt.want {
-				t.Errorf("defaultUserAttr() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }

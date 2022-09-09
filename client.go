@@ -10,9 +10,6 @@ import (
 )
 
 type ldapClient interface {
-	Add(conf *client.Config, req *ldap.AddRequest) error
-	Get(conf *client.Config, dn string) (*client.Entry, error)
-	Del(conf *client.Config, req *ldap.DelRequest) error
 	UpdateDNPassword(conf *client.Config, dn string, newPassword string) error
 	UpdateUserPassword(conf *client.Config, user, newPassword string) (err error)
 	Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error)
@@ -28,25 +25,6 @@ var _ ldapClient = (*Client)(nil)
 
 type Client struct {
 	ldap client.Client
-}
-
-func (c *Client) Get(conf *client.Config, dn string) (*client.Entry, error) {
-	filters := map[*client.Field][]string{
-		client.FieldRegistry.ObjectClass: {"*"},
-	}
-
-	entries, err := c.ldap.Search(conf, dn, ldap.ScopeBaseObject, filters)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(entries) == 0 {
-		return nil, fmt.Errorf("unable to find entry %s in openldap", dn)
-	}
-	if len(entries) > 1 {
-		return nil, fmt.Errorf("expected one matching entry, but received %d", len(entries))
-	}
-	return entries[0], nil
 }
 
 // UpdateDNPassword updates the password for the object with the given DN.
@@ -80,14 +58,6 @@ func (c *Client) UpdateUserPassword(conf *client.Config, username string, newPas
 	}
 
 	return c.ldap.UpdatePassword(conf, conf.UserDN, ldap.ScopeWholeSubtree, newValues, filters)
-}
-
-func (c *Client) Add(conf *client.Config, req *ldap.AddRequest) error {
-	return c.ldap.Add(conf, req)
-}
-
-func (c *Client) Del(conf *client.Config, req *ldap.DelRequest) error {
-	return c.ldap.Del(conf, req)
 }
 
 func (c *Client) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {

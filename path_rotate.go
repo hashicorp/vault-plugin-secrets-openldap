@@ -98,19 +98,13 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 	config.LDAP.LastBindPasswordRotation = time.Now()
 
 	// Update the password locally.
-	entry, err := logical.StorageEntryJSON(configPath, config)
-	if err != nil {
-		return nil, err
-	}
-	if pwdStoringErr := req.Storage.Put(ctx, entry); pwdStoringErr != nil {
-		// We were unable to store the new password locally. We can't continue in
-		// this state because we won't be able to roll any passwords, including our
-		// own to get back into a state of working. So, we need to roll back to the
-		// last password we successfully got into storage.
+	if pwdStoringErr := storePassword(ctx, req.Storage, config); pwdStoringErr != nil {
+		// We were unable to store the new password locally. We can't continue in this state because we won't be able
+		// to roll any passwords, including our own to get back into a state of working. So, we need to roll back to
+		// the last password we successfully got into storage.
 		if rollbackErr := b.rollBackPassword(ctx, config, oldPassword); rollbackErr != nil {
-			return nil, fmt.Errorf(`unable to store new password due to %s and unable to 
-			return to previous password due to %s, configure a new binddn and bindpass to 
-			restore ldap function`, pwdStoringErr, rollbackErr)
+			return nil, fmt.Errorf(`unable to store new password due to %s and unable to return to previous password
+due to %s, configure a new binddn and bindpass to restore ldap function`, pwdStoringErr, rollbackErr)
 		}
 		return nil, fmt.Errorf("unable to update password due to storage err: %s", pwdStoringErr)
 	}
@@ -204,4 +198,12 @@ func (b *backend) rollBackPassword(ctx context.Context, config *config, oldPassw
 	}
 	// Failure after looping.
 	return err
+}
+
+func storePassword(ctx context.Context, s logical.Storage, config *config) error {
+	entry, err := logical.StorageEntryJSON(configPath, config)
+	if err != nil {
+		return err
+	}
+	return s.Put(ctx, entry)
 }

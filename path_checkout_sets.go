@@ -361,6 +361,8 @@ func (b *backend) operationSetDelete(ctx context.Context, req *logical.Request, 
 		return nil, err
 	}
 
+	b.managedUserLock.Lock()
+	defer b.managedUserLock.Unlock()
 	b.deleteManagedUsers(set.ServiceAccountNames...)
 
 	return nil, nil

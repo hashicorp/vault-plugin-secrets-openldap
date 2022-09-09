@@ -147,6 +147,10 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 		return nil, err
 	}
 
+	b.managedUserLock.Lock()
+	defer b.managedUserLock.Unlock()
+	b.deleteManagedUsers(role.StaticAccount.Username)
+
 	walIDs, err := framework.ListWAL(ctx, req.Storage)
 	if err != nil {
 		return nil, err
@@ -167,8 +171,6 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 			}
 		}
 	}
-
-	b.deleteManagedUsers(role.StaticAccount.Username)
 
 	return nil, merr.ErrorOrNil()
 }

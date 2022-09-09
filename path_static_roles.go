@@ -16,29 +16,26 @@ const (
 	staticRolePath = "static-role/"
 )
 
+func (b *backend) pathListStaticRoles() []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: staticRolePath + "?$",
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.ListOperation: &framework.PathOperation{
+					Callback: b.pathStaticRoleList,
+				},
+			},
+			HelpSynopsis:    staticRolesListHelpSynopsis,
+			HelpDescription: staticRolesListHelpDescription,
+		},
+	}
+}
+
 func (b *backend) pathStaticRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: staticRolePath + framework.GenericNameRegex("name"),
-			Fields: map[string]*framework.FieldSchema{
-				"name": {
-					Type:        framework.TypeLowerCaseString,
-					Description: "Name of the role",
-				},
-				"username": {
-					Type:        framework.TypeString,
-					Description: "The username/logon name for the entry with which this role will be associated.",
-					Required:    true,
-				},
-				"dn": {
-					Type:        framework.TypeString,
-					Description: "The distinguished name of the entry to manage.",
-				},
-				"rotation_period": {
-					Type:        framework.TypeDurationSecond,
-					Description: "Period for automatic credential rotation of the given entry.",
-				},
-			},
+			Pattern:        staticRolePath + framework.GenericNameRegex("name"),
+			Fields:         fieldsForType(staticRolePath),
 			ExistenceCheck: b.pathStaticRoleExistenceCheck,
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
@@ -63,17 +60,54 @@ func (b *backend) pathStaticRoles() []*framework.Path {
 			HelpSynopsis:    staticRoleHelpSynopsis,
 			HelpDescription: staticRoleHelpDescription,
 		},
-		{
-			Pattern: staticRolePath + "?$",
-			Operations: map[logical.Operation]framework.OperationHandler{
-				logical.ListOperation: &framework.PathOperation{
-					Callback: b.pathStaticRoleList,
-				},
-			},
-			HelpSynopsis:    staticRolesListHelpSynopsis,
-			HelpDescription: staticRolesListHelpDescription,
+	}
+}
+
+// fieldsForType returns a map of string/FieldSchema items for the given role
+// type. The purpose is to keep the shared fields between dynamic and static
+// roles consistent, and allow for each type to override or provide their own
+// specific fields
+func fieldsForType(roleType string) map[string]*framework.FieldSchema {
+	fields := map[string]*framework.FieldSchema{
+		"name": {
+			Type:        framework.TypeLowerCaseString,
+			Description: "Name of the role",
+		},
+		"username": {
+			Type:        framework.TypeString,
+			Description: "The username/logon name for the entry with which this role will be associated.",
+		},
+		"dn": {
+			Type:        framework.TypeString,
+			Description: "The distinguished name of the entry to manage.",
 		},
 	}
+
+	// Get the fields that are specific to the type of role, and add them to the
+	// common fields. In the future we can add additional for dynamic roles.
+	var typeFields map[string]*framework.FieldSchema
+	switch roleType {
+	case staticRolePath:
+		typeFields = staticFields()
+	}
+
+	for k, v := range typeFields {
+		fields[k] = v
+	}
+
+	return fields
+}
+
+// staticFields returns a map of key and field schema items that are specific
+// only to static roles
+func staticFields() map[string]*framework.FieldSchema {
+	fields := map[string]*framework.FieldSchema{
+		"rotation_period": {
+			Type:        framework.TypeDurationSecond,
+			Description: "Period for automatic credential rotation of the given entry.",
+		},
+	}
+	return fields
 }
 
 func (b *backend) pathStaticRoleExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {

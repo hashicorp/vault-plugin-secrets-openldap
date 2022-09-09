@@ -11,38 +11,6 @@ import (
 	"github.com/hashicorp/vault/sdk/queue"
 )
 
-type backend struct {
-	*framework.Backend
-	sync.RWMutex
-	client ldapClient
-
-	// CredRotationQueue is an in-memory priority queue used to track Static Roles
-	// that require periodic rotation. Backends will have a PriorityQueue
-	// initialized on setup, but only backends that are mounted by a primary
-	// server or mounted as a local mount will perform the rotations.
-	//
-	// cancelQueue is used to remove the priority queue and terminate the
-	// background ticker.
-	credRotationQueue *queue.PriorityQueue
-	cancelQueue       context.CancelFunc
-
-	// managedUsers contains the set of LDAP usernames managed by the secrets engine
-	// static role and check-in/check-out systems. It is used to ensure that users
-	// are exclusively managed by one system and not both. Access to managedUsers is
-	// synchronized by the managedUserLock.
-	managedUsers    map[string]struct{}
-	managedUserLock sync.Mutex
-
-	// roleLocks is used to lock modifications to roles in the queue, to ensure
-	// concurrent requests are not modifying the same role and possibly causing
-	// issues with the priority queue.
-	roleLocks []*locksutil.LockEntry
-
-	// checkOutLocks are used for avoiding races when working with library sets
-	// in the check-in/check-out system.
-	checkOutLocks []*locksutil.LockEntry
-}
-
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
 	ldapClient := NewClient(conf.Logger)
 	b := Backend(ldapClient)
@@ -74,6 +42,7 @@ func Backend(client ldapClient) *backend {
 			},
 		},
 		Paths: framework.PathAppend(
+			b.pathListStaticRoles(),
 			b.pathConfig(),
 			b.pathDynamicRoles(),
 			b.pathDynamicCredsCreate(),
@@ -100,15 +69,15 @@ func Backend(client ldapClient) *backend {
 }
 
 func (b *backend) initialize(ctx context.Context, initRequest *logical.InitializationRequest) error {
-	// Create a context with a cancel method for processing any WAL entries and
-	// populating the queue
-	ictx, cancel := context.WithCancel(context.Background())
-	b.cancelQueue = cancel
-
 	// Load managed LDAP users into memory from storage
 	if err := b.loadManagedUsers(ctx, initRequest.Storage); err != nil {
 		return err
 	}
+
+	// Create a context with a cancel method for processing any WAL entries and
+	// populating the queue
+	ictx, cancel := context.WithCancel(context.Background())
+	b.cancelQueue = cancel
 
 	// Load static role queue and kickoff new periodic ticker
 	go b.initQueue(ictx, initRequest)
@@ -129,6 +98,37 @@ func (b *backend) invalidateQueue() {
 		b.cancelQueue()
 	}
 	b.credRotationQueue = nil
+}
+
+type backend struct {
+	*framework.Backend
+	sync.RWMutex
+	// CredRotationQueue is an in-memory priority queue used to track Static Roles
+	// that require periodic rotation. Backends will have a PriorityQueue
+	// initialized on setup, but only backends that are mounted by a primary
+	// server or mounted as a local mount will perform the rotations.
+	//
+	// cancelQueue is used to remove the priority queue and terminate the
+	// background ticker.
+	credRotationQueue *queue.PriorityQueue
+	cancelQueue       context.CancelFunc
+
+	// roleLocks is used to lock modifications to roles in the queue, to ensure
+	// concurrent requests are not modifying the same role and possibly causing
+	// issues with the priority queue.
+	roleLocks []*locksutil.LockEntry
+	client    ldapClient
+
+	// managedUsers contains the set of LDAP usernames managed by the secrets engine
+	// static role and check-in/check-out systems. It is used to ensure that users
+	// are exclusively managed by one system and not both. Access to managedUsers is
+	// synchronized by the managedUserLock.
+	managedUsers    map[string]struct{}
+	managedUserLock sync.Mutex
+
+	// checkOutLocks are used for avoiding races when working with library sets
+	// in the check-in/check-out system.
+	checkOutLocks []*locksutil.LockEntry
 }
 
 // loadManagedUsers loads users managed by the secrets engine from storage into

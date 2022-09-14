@@ -34,7 +34,8 @@ func (b *backend) pathDynamicCredsCreate() []*framework.Path {
 				"created within the LDAP system when querying this endpoint.",
 			HelpDescription: "This path requests new LDAP credentials for a certain dynamic role. " +
 				"The credentials are created within the LDAP system based on the creation_ldif " +
-				"specified within the dynamic role configuration.",
+				"specified within the dynamic role configuration. Depending on the LDAP implementation " +
+				"the credentials may not be immediately usable due to eventual consistency.",
 		},
 	}
 }

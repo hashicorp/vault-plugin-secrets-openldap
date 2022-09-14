@@ -124,7 +124,13 @@ func (b *backend) pathSets() []*framework.Path {
 }
 
 func (b *backend) operationSetExistenceCheck(ctx context.Context, req *logical.Request, fieldData *framework.FieldData) (bool, error) {
-	set, err := readSet(ctx, req.Storage, fieldData.Get("name").(string))
+	setName := fieldData.Get("name").(string)
+
+	lock := locksutil.LockForKey(b.checkOutLocks, setName)
+	lock.RLock()
+	defer lock.RUnlock()
+
+	set, err := readSet(ctx, req.Storage, setName)
 	if err != nil {
 		return false, err
 	}

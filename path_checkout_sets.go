@@ -180,7 +180,7 @@ func (b *backend) operationSetCreate(ctx context.Context, req *logical.Request, 
 		return nil, err
 	}
 
-	b.setManagedUsers(set.ServiceAccountNames...)
+	b.addManagedUsers(set.ServiceAccountNames...)
 
 	return nil, nil
 }
@@ -295,7 +295,7 @@ func (b *backend) operationSetUpdate(ctx context.Context, req *logical.Request, 
 	}
 
 	b.deleteManagedUsers(beingDeleted...)
-	b.setManagedUsers(beingAdded...)
+	b.addManagedUsers(beingAdded...)
 
 	return nil, nil
 }

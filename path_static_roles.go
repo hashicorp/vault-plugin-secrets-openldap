@@ -314,7 +314,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		return nil, err
 	}
 
-	b.setManagedUsers(username)
+	b.addManagedUsers(username)
 
 	return nil, nil
 }

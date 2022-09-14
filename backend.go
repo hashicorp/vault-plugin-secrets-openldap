@@ -162,7 +162,7 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 			continue
 		}
 
-		b.setManagedUsers(staticRole.StaticAccount.Username)
+		b.addManagedUsers(staticRole.StaticAccount.Username)
 	}
 
 	// Load users managed under library sets
@@ -184,28 +184,28 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 			continue
 		}
 
-		b.setManagedUsers(set.ServiceAccountNames...)
+		b.addManagedUsers(set.ServiceAccountNames...)
 	}
 
 	return nil
 }
 
-// isManagedUser returns true if any of the given users are already managed
-// by the secrets engine. Must be called with the managedUserLock held.
+// isManagedUser returns true if the given user is in the set of managed users.
+// Must be called with the managedUserLock held.
 func (b *backend) isManagedUser(user string) bool {
 	_, exists := b.managedUsers[user]
 	return exists
 }
 
-// setManagedUsers sets the given users as managed by the secrets engine.
+// addManagedUsers adds the given users to the set of managed users.
 // Must be called with the managedUserLock held.
-func (b *backend) setManagedUsers(users ...string) {
+func (b *backend) addManagedUsers(users ...string) {
 	for _, user := range users {
 		b.managedUsers[user] = struct{}{}
 	}
 }
 
-// deleteManagedUsers sets the user as unmanaged by the secrets engine.
+// deleteManagedUsers removes the given users from the set of managed users.
 // Must be called with the managedUserLock held.
 func (b *backend) deleteManagedUsers(users ...string) {
 	for _, user := range users {

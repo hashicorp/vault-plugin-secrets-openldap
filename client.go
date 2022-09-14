@@ -11,8 +11,8 @@ import (
 
 type ldapClient interface {
 	UpdateDNPassword(conf *client.Config, dn string, newPassword string) error
-	UpdateUserPassword(conf *client.Config, user, newPassword string) (err error)
-	Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error)
+	UpdateUserPassword(conf *client.Config, user, newPassword string) error
+	Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) error
 }
 
 func NewClient(logger hclog.Logger) *Client {

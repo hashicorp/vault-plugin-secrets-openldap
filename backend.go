@@ -85,7 +85,7 @@ func (b *backend) initialize(ctx context.Context, initRequest *logical.Initializ
 	return nil
 }
 
-func (b *backend) clean(ctx context.Context) {
+func (b *backend) clean(_ context.Context) {
 	b.invalidateQueue()
 }
 

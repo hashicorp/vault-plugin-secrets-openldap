@@ -49,7 +49,7 @@ func (b *backend) pathListSets() []*framework.Path {
 	}
 }
 
-func (b *backend) setListOperation(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
+func (b *backend) listSetsOperation(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 	keys, err := req.Storage.List(ctx, libraryPrefix)
 	if err != nil {
 		return nil, err

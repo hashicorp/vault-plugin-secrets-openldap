@@ -40,7 +40,7 @@ func (b *backend) pathListSets() []*framework.Path {
 			Pattern: libraryPrefix + "?$",
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ListOperation: &framework.PathOperation{
-					Callback: b.setListOperation,
+					Callback: b.listSetsOperation,
 				},
 			},
 			HelpSynopsis:    pathListSetsHelpSyn,

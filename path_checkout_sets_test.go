@@ -577,3 +577,54 @@ func ForceCheckIn(b logical.Backend, s logical.Storage) func(t *testing.T) {
 		}
 	}
 }
+
+func Test_librarySet_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		set     *librarySet
+		wantErr bool
+	}{
+		{
+			name: "valid library set",
+			set: &librarySet{
+				ServiceAccountNames: []string{"name1"},
+				TTL:                 time.Minute,
+				MaxTTL:              2 * time.Minute,
+			},
+		},
+		{
+			name: "invalid library set with empty list of service account names",
+			set: &librarySet{
+				ServiceAccountNames: []string{},
+				TTL:                 time.Minute,
+				MaxTTL:              2 * time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid library set with empty service account name",
+			set: &librarySet{
+				ServiceAccountNames: []string{""},
+				TTL:                 time.Minute,
+				MaxTTL:              2 * time.Minute,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid library set with max TTL less than TTL",
+			set: &librarySet{
+				ServiceAccountNames: []string{"name1", "name2"},
+				TTL:                 2 * time.Minute,
+				MaxTTL:              time.Minute,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.set.Validate(); (err != nil) != tt.wantErr {
+				t.Errorf("Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

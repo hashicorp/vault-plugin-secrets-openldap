@@ -24,11 +24,16 @@ type librarySet struct {
 // a way that makes sense, and that there's at least one service account.
 func (l *librarySet) Validate() error {
 	if len(l.ServiceAccountNames) < 1 {
-		return fmt.Errorf(`at least one service account must be configured`)
+		return fmt.Errorf("at least one service account must be configured")
+	}
+	for _, name := range l.ServiceAccountNames {
+		if name == "" {
+			return fmt.Errorf("service account name must not be empty")
+		}
 	}
 	if l.MaxTTL > 0 {
 		if l.MaxTTL < l.TTL {
-			return fmt.Errorf(`max_ttl (%d seconds) may not be less than ttl (%d seconds)`, l.MaxTTL, l.TTL)
+			return fmt.Errorf("max_ttl (%d seconds) may not be less than ttl (%d seconds)", l.MaxTTL, l.TTL)
 		}
 	}
 	return nil

@@ -42,7 +42,7 @@ func (b *backend) pathConfig() []*framework.Path {
 			ExistenceCheck: b.pathConfigExistenceCheck,
 			HelpSynopsis:   "Configure the LDAP secrets engine plugin.",
 			HelpDescription: "This path configures the LDAP secrets engine plugin. See the " +
-				"documentation for the plugin specified for a full list of accepted connection details.",
+				"documentation for the plugin for a full list of accepted parameters.",
 		},
 	}
 }

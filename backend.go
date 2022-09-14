@@ -154,6 +154,11 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 			return err
 		}
 		if staticRole == nil {
+			// This indicates that a static role returned from the list operation was
+			// deleted before the read operation in this loop. This shouldn't happen
+			// at this point in the plugin lifecycle, so we'll log if it does.
+			b.Logger().Debug("unexpected nil static role found while loading managed users",
+				"name", roleName)
 			continue
 		}
 
@@ -171,6 +176,11 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 			return err
 		}
 		if set == nil {
+			// This indicates that a library set returned from the list operation was
+			// deleted before the read operation in this loop. This shouldn't happen
+			// at this point in the plugin lifecycle, so we'll log if it does.
+			b.Logger().Debug("unexpected nil library set found while loading managed users",
+				"name", setName)
 			continue
 		}
 

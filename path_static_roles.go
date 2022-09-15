@@ -222,38 +222,51 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	b.managedUserLock.Lock()
 	defer b.managedUserLock.Unlock()
 
-	username := data.Get("username").(string)
-	if isCreate && username == "" {
+	usernameRaw, ok := data.GetOk("username")
+	if !ok && isCreate {
 		return logical.ErrorResponse("username is a required field to manage a static account"), nil
 	}
-	if isCreate && b.isManagedUser(username) {
-		return logical.ErrorResponse("%q is already managed by the secrets engine", username), nil
-	}
-	if !isCreate && username != role.StaticAccount.Username {
-		return logical.ErrorResponse("cannot update static account username"), nil
-	}
-	role.StaticAccount.Username = username
+	if ok {
+		username := usernameRaw.(string)
+		if username == "" {
+			return logical.ErrorResponse("username must not be empty"), nil
+		}
+		if isCreate && b.isManagedUser(username) {
+			return logical.ErrorResponse("%q is already managed by the secrets engine", username), nil
+		}
+		if !isCreate && username != role.StaticAccount.Username {
+			return logical.ErrorResponse("cannot update static account username"), nil
+		}
 
-	// DN is optional and cannot be modified after creation. If given, it will
-	// take precedence over username for LDAP search during password rotation.
-	dn := data.Get("dn").(string)
-	if !isCreate && dn != role.StaticAccount.DN {
-		return logical.ErrorResponse("cannot update static account distinguished name (dn)"), nil
+		role.StaticAccount.Username = username
 	}
-	role.StaticAccount.DN = dn
+
+	// DN is optional. Unless it is unset via providing the empty string, it
+	// cannot be modified after creation. If given, it will take precedence
+	// over username for LDAP search during password rotation.
+	if dnRaw, ok := data.GetOk("dn"); ok {
+		dn := dnRaw.(string)
+		if !isCreate && dn != "" && dn != role.StaticAccount.DN {
+			return logical.ErrorResponse("cannot update static account distinguished name (dn)"), nil
+		}
+
+		role.StaticAccount.DN = dn
+	}
 
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
-	if !ok {
-		return logical.ErrorResponse("rotation_period is required for static accounts"), nil
+	if !ok && isCreate {
+		return logical.ErrorResponse("rotation_period is required to create static accounts"), nil
 	}
-	rotationPeriodSeconds := rotationPeriodSecondsRaw.(int)
-	if rotationPeriodSeconds < queueTickSeconds {
-		// If rotation frequency is specified the value
-		// must be at least that of the constant queueTickSeconds (5 seconds at
-		// time of writing), otherwise we wont be able to rotate in time
-		return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil
+	if ok {
+		rotationPeriodSeconds := rotationPeriodSecondsRaw.(int)
+		if rotationPeriodSeconds < queueTickSeconds {
+			// If rotation frequency is specified the value must be at least
+			// that of the constant queueTickSeconds (5 seconds at time of writing),
+			// otherwise we won't be able to rotate in time
+			return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil
+		}
+		role.StaticAccount.RotationPeriod = time.Duration(rotationPeriodSeconds) * time.Second
 	}
-	role.StaticAccount.RotationPeriod = time.Duration(rotationPeriodSeconds) * time.Second
 
 	// lvr represents the role's LastVaultRotation
 	lvr := role.StaticAccount.LastVaultRotation
@@ -314,7 +327,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		return nil, err
 	}
 
-	b.addManagedUsers(username)
+	b.addManagedUsers(role.StaticAccount.Username)
 
 	return nil, nil
 }

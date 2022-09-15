@@ -153,7 +153,7 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 		if err != nil {
 			return err
 		}
-		if staticRole == nil {
+		if staticRole == nil || staticRole.StaticAccount == nil {
 			// This indicates that a static role returned from the list operation was
 			// deleted before the read operation in this loop. This shouldn't happen
 			// at this point in the plugin lifecycle, so we'll log if it does.
@@ -162,7 +162,8 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 			continue
 		}
 
-		b.addManagedUsers(staticRole.StaticAccount.Username)
+		// Add the static role user to the managed user set
+		b.managedUsers[staticRole.StaticAccount.Username] = struct{}{}
 	}
 
 	// Load users managed under library sets
@@ -184,33 +185,13 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 			continue
 		}
 
-		b.addManagedUsers(set.ServiceAccountNames...)
+		// Add the service account names to the managed user set
+		for _, name := range set.ServiceAccountNames {
+			b.managedUsers[name] = struct{}{}
+		}
 	}
 
 	return nil
-}
-
-// isManagedUser returns true if the given user is in the set of managed users.
-// Must be called with the managedUserLock held.
-func (b *backend) isManagedUser(user string) bool {
-	_, exists := b.managedUsers[user]
-	return exists
-}
-
-// addManagedUsers adds the given users to the set of managed users.
-// Must be called with the managedUserLock held.
-func (b *backend) addManagedUsers(users ...string) {
-	for _, user := range users {
-		b.managedUsers[user] = struct{}{}
-	}
-}
-
-// deleteManagedUsers removes the given users from the set of managed users.
-// Must be called with the managedUserLock held.
-func (b *backend) deleteManagedUsers(users ...string) {
-	for _, user := range users {
-		delete(b.managedUsers, user)
-	}
 }
 
 const backendHelp = `

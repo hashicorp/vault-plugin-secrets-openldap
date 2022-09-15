@@ -149,7 +149,7 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 
 	b.managedUserLock.Lock()
 	defer b.managedUserLock.Unlock()
-	b.deleteManagedUsers(role.StaticAccount.Username)
+	delete(b.managedUsers, role.StaticAccount.Username)
 
 	walIDs, err := framework.ListWAL(ctx, req.Storage)
 	if err != nil {
@@ -231,7 +231,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		if username == "" {
 			return logical.ErrorResponse("username must not be empty"), nil
 		}
-		if isCreate && b.isManagedUser(username) {
+		if _, exists := b.managedUsers[username]; exists && isCreate {
 			return logical.ErrorResponse("%q is already managed by the secrets engine", username), nil
 		}
 		if !isCreate && username != role.StaticAccount.Username {
@@ -327,7 +327,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		return nil, err
 	}
 
-	b.addManagedUsers(role.StaticAccount.Username)
+	b.managedUsers[role.StaticAccount.Username] = struct{}{}
 
 	return nil, nil
 }

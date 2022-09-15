@@ -167,7 +167,7 @@ func (b *backend) operationSetCreate(ctx context.Context, req *logical.Request, 
 	// Ensure the given service accounts aren't already managed by
 	// another library set or static role.
 	for _, serviceAccountName := range serviceAccountNames {
-		if b.isManagedUser(serviceAccountName) {
+		if _, exists := b.managedUsers[serviceAccountName]; exists {
 			return logical.ErrorResponse("%q is already managed by the secrets engine",
 				serviceAccountName), nil
 		}
@@ -191,7 +191,10 @@ func (b *backend) operationSetCreate(ctx context.Context, req *logical.Request, 
 		return nil, err
 	}
 
-	b.addManagedUsers(set.ServiceAccountNames...)
+	// Add the service account names to the managed user set
+	for _, name := range set.ServiceAccountNames {
+		b.managedUsers[name] = struct{}{}
+	}
 
 	return nil, nil
 }
@@ -252,7 +255,7 @@ func (b *backend) operationSetUpdate(ctx context.Context, req *logical.Request, 
 		// For new service accounts we receive, before we check them in, ensure they're not in another set.
 		beingAdded = strutil.Difference(newServiceAccountNames, set.ServiceAccountNames, true)
 		for _, newServiceAccountName := range beingAdded {
-			if b.isManagedUser(newServiceAccountName) {
+			if _, exists := b.managedUsers[newServiceAccountName]; exists {
 				return logical.ErrorResponse("%q is already managed by the secrets engine",
 					newServiceAccountName), nil
 			}
@@ -305,8 +308,15 @@ func (b *backend) operationSetUpdate(ctx context.Context, req *logical.Request, 
 		return nil, err
 	}
 
-	b.deleteManagedUsers(beingDeleted...)
-	b.addManagedUsers(beingAdded...)
+	// Delete the prior service account names from the managed user set
+	for _, name := range beingDeleted {
+		delete(b.managedUsers, name)
+	}
+
+	// Add the new service account names to the managed user set
+	for _, name := range beingAdded {
+		b.managedUsers[name] = struct{}{}
+	}
 
 	return nil, nil
 }
@@ -349,6 +359,7 @@ func (b *backend) operationSetDelete(ctx context.Context, req *logical.Request, 
 	if set == nil {
 		return nil, nil
 	}
+
 	// We need to remove all the items we'd stored for these service accounts.
 	for _, serviceAccountName := range set.ServiceAccountNames {
 		checkOut, err := b.LoadCheckOut(ctx, req.Storage, serviceAccountName)
@@ -372,9 +383,12 @@ func (b *backend) operationSetDelete(ctx context.Context, req *logical.Request, 
 		return nil, err
 	}
 
+	// Delete the service account names from the managed user set
 	b.managedUserLock.Lock()
 	defer b.managedUserLock.Unlock()
-	b.deleteManagedUsers(set.ServiceAccountNames...)
+	for _, name := range set.ServiceAccountNames {
+		delete(b.managedUsers, name)
+	}
 
 	return nil, nil
 }

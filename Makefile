@@ -32,7 +32,7 @@ bootstrap:
 
 .PHONY: test
 test: fmtcheck
-	CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
+	CGO_ENABLED=0 go test -v ./... $(TESTARGS) -timeout=20m
 
 .PHONY: fmtcheck
 fmtcheck:

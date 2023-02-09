@@ -1,5 +1,13 @@
 ## Unreleased
 
+## v0.10.0
+
+IMPROVEMENTS:
+
+* Update golang.org/x/text to v0.3.8 [[GH-48]](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/48)
+
+## v0.9.0
+
 FEATURES:
 
 - Adds service account check-out functionality for `ad`, `openldap`, and `racf` schemas.

@@ -140,7 +140,7 @@ func TestPasswordPolicyModificationInvalidatesWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	if role.StaticAccount.Password != testPasswordFromPolicy1 {
-		t.Fatal(role.StaticAccount.Password, testPasswordFromPolicy1)
+		t.Fatalf("expected %v, got %v", testPasswordFromPolicy1, role.StaticAccount.Password)
 	}
 
 	// Update the password policy on the configuration
@@ -164,10 +164,10 @@ func TestPasswordPolicyModificationInvalidatesWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	if role.StaticAccount.Password != testPasswordFromPolicy2 {
-		t.Fatal(role.StaticAccount.Password, testPasswordFromPolicy2)
+		t.Fatalf("expected %v, got %v", testPasswordFromPolicy2, role.StaticAccount.Password)
 	}
 	if role.StaticAccount.LastPassword != testPasswordFromPolicy1 {
-		t.Fatal(role.StaticAccount.Password, testPasswordFromPolicy1)
+		t.Fatalf("expected %v, got %v", testPasswordFromPolicy1, role.StaticAccount.LastPassword)
 	}
 
 	// The WAL entry should be deleted after the successful rotation

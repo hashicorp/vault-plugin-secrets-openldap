@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/locksutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/queue"
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -123,12 +124,12 @@ func (b *backend) runTicker(ctx context.Context, s logical.Storage) {
 // setCredentialsWAL is used to store information in a WAL that can retry a
 // credential setting or rotation in the event of partial failure.
 type setCredentialsWAL struct {
-	NewPassword string `json:"new_password"`
-	RoleName    string `json:"role_name"`
-	Username    string `json:"username"`
-	DN          string `json:"dn"`
-
-	LastVaultRotation time.Time `json:"last_vault_rotation"`
+	NewPassword       string    `json:"new_password" mapstructure:"new_password"`
+	RoleName          string    `json:"role_name" mapstructure:"role_name"`
+	Username          string    `json:"username" mapstructure:"username"`
+	DN                string    `json:"dn" mapstructure:"dn"`
+	PasswordPolicy    string    `json:"password_policy" mapstructure:"password_policy"`
+	LastVaultRotation time.Time `json:"last_vault_rotation" mapstructure:"last_vault_rotation"`
 
 	// Private fields which will not be included in json.Marshal/Unmarshal.
 	walID        string
@@ -256,20 +257,21 @@ func (b *backend) findStaticWAL(ctx context.Context, s logical.Storage, id strin
 		return nil, nil
 	}
 
-	data := wal.Data.(map[string]interface{})
 	walEntry := setCredentialsWAL{
 		walID:        id,
 		walCreatedAt: wal.CreatedAt,
-		NewPassword:  data["new_password"].(string),
-		RoleName:     data["role_name"].(string),
-		Username:     data["username"].(string),
-		DN:           data["dn"].(string),
 	}
-	lvr, err := time.Parse(time.RFC3339, data["last_vault_rotation"].(string))
+	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: mapstructure.StringToTimeHookFunc(time.RFC3339),
+		Result:     &walEntry,
+	})
 	if err != nil {
 		return nil, err
 	}
-	walEntry.LastVaultRotation = lvr
+	err = d.Decode(wal.Data)
+	if err != nil {
+		return nil, err
+	}
 
 	return &walEntry, nil
 }
@@ -333,21 +335,22 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		}
 
 		switch {
-		case wal != nil && wal.NewPassword != "":
-			newPassword = wal.NewPassword
-		default:
-			if wal == nil {
-				b.Logger().Error("expected role to have WAL, but WAL not found in storage", "role", input.RoleName, "WAL ID", output.WALID)
-			} else {
-				b.Logger().Error("expected WAL to have a new password set, but empty", "role", input.RoleName, "WAL ID", output.WALID)
-				err = framework.DeleteWAL(ctx, s, output.WALID)
-				if err != nil {
-					b.Logger().Warn("failed to delete WAL with no new password", "error", err, "WAL ID", output.WALID)
-				}
-			}
-			// If there's anything wrong with the WAL in storage, we'll need
-			// to generate a fresh WAL and password
+		case wal == nil:
+			b.Logger().Error("expected role to have WAL, but WAL not found in storage", "role", input.RoleName, "WAL ID", output.WALID)
+
+			// Generate a new WAL entry and credential
 			output.WALID = ""
+		case wal.NewPassword != "" && wal.PasswordPolicy != config.PasswordPolicy:
+			b.Logger().Debug("password policy changed, generating new password", "role", input.RoleName, "WAL ID", output.WALID)
+			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
+			}
+
+			// Generate a new WAL entry and credential
+			output.WALID = ""
+		default:
+			// Reuse the password from the existing WAL entry
+			newPassword = wal.NewPassword
 		}
 	}
 
@@ -362,6 +365,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 			DN:                input.Role.StaticAccount.DN,
 			NewPassword:       newPassword,
 			LastVaultRotation: input.Role.StaticAccount.LastVaultRotation,
+			PasswordPolicy:    config.PasswordPolicy,
 		})
 		b.Logger().Debug("wrote WAL", "role", input.RoleName, "WAL ID", output.WALID)
 		if err != nil {

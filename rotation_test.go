@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/logging"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/queue"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAutoRotate(t *testing.T) {
@@ -115,6 +116,63 @@ func TestAutoRotate(t *testing.T) {
 			t.Fatal("expected last_password to be equal to old password after auto rotation")
 		}
 	})
+}
+
+// TestPasswordPolicyModificationInvalidatesWAL tests that modification of the
+// password policy set on the config invalidates pre-generated passwords in WAL
+// entries. WAL entries are used to roll forward during partial failure, but
+// a password policy change should cause the WAL to be discarded and a new
+// password to be generated using the updated policy.
+func TestPasswordPolicyModificationInvalidatesWAL(t *testing.T) {
+	ctx := context.Background()
+	b, storage := getBackend(false)
+	defer b.Cleanup(ctx)
+
+	configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy1)
+	createRole(t, b, storage, "hashicorp")
+
+	// Create a WAL entry from a partial failure to rotate
+	generateWALFromFailedRotation(t, b, storage, "hashicorp")
+	requireWALs(t, storage, 1)
+
+	// The role password should still be the password generated from policy 1
+	role, err := b.staticRole(ctx, storage, "hashicorp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if role.StaticAccount.Password != testPasswordFromPolicy1 {
+		t.Fatalf("expected %v, got %v", testPasswordFromPolicy1, role.StaticAccount.Password)
+	}
+
+	// Update the password policy on the configuration
+	configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy2)
+
+	// Manually rotate the role. It should not use the password from the WAL entry
+	// created earlier. Instead, it should result in generation of a new password
+	// using the updated policy 2.
+	_, err = b.HandleRequest(ctx, &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "rotate-role/hashicorp",
+		Storage:   storage,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The role password should be the password generated from policy 2
+	role, err = b.staticRole(ctx, storage, "hashicorp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if role.StaticAccount.Password != testPasswordFromPolicy2 {
+		t.Fatalf("expected %v, got %v", testPasswordFromPolicy2, role.StaticAccount.Password)
+	}
+	if role.StaticAccount.LastPassword != testPasswordFromPolicy1 {
+		t.Fatalf("expected %v, got %v", testPasswordFromPolicy1, role.StaticAccount.LastPassword)
+	}
+
+	// The WAL entry should be deleted after the successful rotation
+	requireWALs(t, storage, 0)
 }
 
 func TestRollsPasswordForwardsUsingWAL(t *testing.T) {
@@ -365,4 +423,49 @@ func requireWALs(t *testing.T, storage logical.Storage, expectedCount int) []str
 	}
 
 	return wals
+}
+
+// Test_backend_findStaticWAL_DecodeWALMissingField tests that WAL decoding in
+// findStaticWAL can handle the case where WAL entries have missing fields. This
+// can happen when a WAL entry exists prior to a plugin upgrade that changes the
+// data in the WAL. The decoding should not panic and set zero values for any
+// missing fields.
+func Test_backend_findStaticWAL_DecodeWALMissingField(t *testing.T) {
+	ctx := context.Background()
+	b, storage := getBackend(false)
+	defer b.Cleanup(ctx)
+
+	// Intentionally missing the PasswordPolicy field
+	type priorSetCredentialsWAL struct {
+		NewPassword       string    `json:"new_password" mapstructure:"new_password"`
+		RoleName          string    `json:"role_name" mapstructure:"role_name"`
+		Username          string    `json:"username" mapstructure:"username"`
+		DN                string    `json:"dn" mapstructure:"dn"`
+		LastVaultRotation time.Time `json:"last_vault_rotation" mapstructure:"last_vault_rotation"`
+	}
+
+	// Write a WAL entry to storage
+	walEntry := priorSetCredentialsWAL{
+		NewPassword:       "Str0ngPassw0rd",
+		RoleName:          "test",
+		Username:          "static_user",
+		DN:                "cn=static_user,ou=users,dc=hashicorp,dc=com",
+		LastVaultRotation: time.Now(),
+	}
+	id, err := framework.PutWAL(ctx, storage, staticWALKey, walEntry)
+	require.NoError(t, err)
+	require.NotEmpty(t, id)
+
+	// Assert that the decoded WAL entry data matches the original input
+	got, err := b.findStaticWAL(ctx, storage, id)
+	require.NoError(t, err)
+	require.Equal(t, walEntry.NewPassword, got.NewPassword)
+	require.Equal(t, walEntry.RoleName, got.RoleName)
+	require.Equal(t, walEntry.Username, got.Username)
+	require.Equal(t, walEntry.DN, got.DN)
+	require.True(t, walEntry.LastVaultRotation.Equal(got.LastVaultRotation))
+	require.Equal(t, id, got.walID)
+
+	// Assert that any missing fields take the zero value after decoding
+	require.Equal(t, "", got.PasswordPolicy)
 }

@@ -23,7 +23,7 @@ func (b *backend) pathDynamicCredsCreate() []*framework.Path {
 		{
 			Pattern: dynamicCredPath + framework.GenericNameRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "request",
 				OperationSuffix: "dynamic-role-credentials",
 			},

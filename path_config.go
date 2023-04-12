@@ -28,7 +28,7 @@ func (b *backend) pathConfig() []*framework.Path {
 		{
 			Pattern: configPath,
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 			},
 			Fields: b.configFields(),
 			Operations: map[logical.Operation]framework.OperationHandler{

@@ -17,7 +17,7 @@ func (b *backend) pathStaticCredsCreate() []*framework.Path {
 		{
 			Pattern: staticCredPath + framework.GenericNameRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "request",
 				OperationSuffix: "static-role-credentials",
 			},

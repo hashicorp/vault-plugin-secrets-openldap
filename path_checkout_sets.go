@@ -47,7 +47,7 @@ func (b *backend) pathListSets() []*framework.Path {
 		{
 			Pattern: libraryPrefix + "?$",
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap-library",
+				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "list",
 			},
 			Operations: map[logical.Operation]framework.OperationHandler{
@@ -74,7 +74,7 @@ func (b *backend) pathSets() []*framework.Path {
 		{
 			Pattern: libraryPrefix + framework.GenericNameRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap-library",
+				OperationPrefix: operationPrefixLDAPLibrary,
 			},
 			Fields: map[string]*framework.FieldSchema{
 				"name": {

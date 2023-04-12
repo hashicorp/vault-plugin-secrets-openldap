@@ -21,7 +21,7 @@ func (b *backend) pathSetCheckOut() []*framework.Path {
 		{
 			Pattern: libraryPrefix + framework.GenericNameRegex("name") + "/check-out$",
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap-library",
+				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "check-out",
 			},
 			Fields: map[string]*framework.FieldSchema{
@@ -185,7 +185,7 @@ func (b *backend) pathSetCheckIn() []*framework.Path {
 		{
 			Pattern: libraryPrefix + framework.GenericNameRegex("name") + "/check-in$",
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap-library",
+				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "check-in",
 			},
 			Fields: map[string]*framework.FieldSchema{
@@ -215,7 +215,7 @@ func (b *backend) pathSetManageCheckIn() []*framework.Path {
 		{
 			Pattern: libraryPrefix + "manage/" + framework.GenericNameRegex("name") + "/check-in$",
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap-library",
+				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "force-check-in",
 			},
 			Fields: map[string]*framework.FieldSchema{
@@ -330,7 +330,7 @@ func (b *backend) pathSetStatus() []*framework.Path {
 		{
 			Pattern: libraryPrefix + framework.GenericNameRegex("name") + "/status$",
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap-library",
+				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "check-status",
 			},
 			Fields: map[string]*framework.FieldSchema{

@@ -29,7 +29,7 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 		{
 			Pattern: path.Join(dynamicRolePath, framework.GenericNameRegex("name")),
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 				OperationSuffix: "dynamic-role",
 			},
 			Fields: map[string]*framework.FieldSchema{
@@ -86,7 +86,7 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 		{
 			Pattern: dynamicRolePath + "?$",
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "list",
 				OperationSuffix: "dynamic-roles",
 			},

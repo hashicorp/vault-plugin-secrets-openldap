@@ -24,7 +24,7 @@ func (b *backend) pathListStaticRoles() []*framework.Path {
 		{
 			Pattern: staticRolePath + "?$",
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "list",
 				OperationSuffix: "static-roles",
 			},
@@ -44,7 +44,7 @@ func (b *backend) pathStaticRoles() []*framework.Path {
 		{
 			Pattern: staticRolePath + framework.GenericNameRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 				OperationSuffix: "static-role",
 			},
 			Fields:         fieldsForType(staticRolePath),

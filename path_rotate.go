@@ -25,7 +25,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 		{
 			Pattern: rotateRootPath,
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "rotate",
 				OperationSuffix: "root-credentials",
 			},
@@ -44,7 +44,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 		{
 			Pattern: rotateRolePath + framework.GenericNameRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
-				OperationPrefix: "ldap",
+				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "rotate",
 				OperationSuffix: "static-role",
 			},

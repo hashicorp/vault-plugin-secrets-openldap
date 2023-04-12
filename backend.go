@@ -15,10 +15,8 @@ import (
 )
 
 const (
-	// operationPrefixLDAP is used as a prefix for OpenAPI operation id's.
-	operationPrefixLDAP = "ldap"
-
-	// operationPrefixLDAPLibrary is used as a prefix for OpenAPI operation id's.
+	// operationPrefixLDAP/LDAPLibrary are used as prefixes for OpenAPI operation id's.
+	operationPrefixLDAP        = "ldap"
 	operationPrefixLDAPLibrary = "ldap-library"
 )
 

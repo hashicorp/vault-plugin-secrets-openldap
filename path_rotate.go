@@ -27,7 +27,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: "ldap",
 				OperationVerb:   "rotate",
-				OperationSuffix: "root",
+				OperationSuffix: "root-credentials",
 			},
 			Fields: map[string]*framework.FieldSchema{},
 			Operations: map[logical.Operation]framework.OperationHandler{

@@ -119,6 +119,16 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 		existing = conf.LDAP.ConfigEntry
 	}
 
+	var existingPasswordPolicy string
+	if conf.PasswordPolicy != "" {
+		existingPasswordPolicy = conf.PasswordPolicy
+	}
+
+	var existingSchema string
+	if conf.LDAP != nil && conf.LDAP.Schema != "" {
+		existingSchema = conf.LDAP.Schema
+	}
+
 	// Build and validate the ldap conf.
 	ldapConf, err := ldaputil.NewConfigEntry(existing, fieldData)
 	if err != nil {
@@ -135,9 +145,16 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	}
 	passLength := rawPassLength.(int)
 
-	schema := fieldData.Get("schema").(string)
+	s := "schema"
+	schema := fieldData.Get(s).(string)
+	defaultSchema := fieldData.Schema[s].DefaultOrZero()
+
 	if schema == "" {
 		return nil, errors.New("schema is required")
+	}
+
+	if schema == defaultSchema && existingSchema != "" {
+		schema = existingSchema
 	}
 
 	if !client.ValidSchema(schema) {
@@ -156,6 +173,9 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	if passPolicy != "" && hasPassLen {
 		// If both a password policy and a password length are set, we can't figure out what to do
 		return nil, fmt.Errorf("cannot set both 'password_policy' and 'length'")
+	}
+	if passPolicy == "" && existingPasswordPolicy != "" {
+		passPolicy = existingPasswordPolicy
 	}
 
 	// Update config field values

@@ -5,7 +5,6 @@
 ### IMPROVEMENTS:
 
 * update dependencies [GH-XXX](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/XXX)
-  * github.com/go-ldap/ldap/v3 v3.4.5
   * github.com/hashicorp/go-metrics v0.5.1
   * github.com/hashicorp/vault/api v1.9.2
   * github.com/hashicorp/vault/sdk v0.9.2

@@ -1,5 +1,8 @@
 ## Unreleased
 
+### IMPROVEMENTS:
+* add rotate-root support for when using userattr=userPrincipalName
+ 
 ## v0.11.1
 
 ### IMPROVEMENTS:

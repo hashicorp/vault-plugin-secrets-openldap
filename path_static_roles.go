@@ -5,6 +5,7 @@ package openldap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -117,6 +118,10 @@ func staticFields() map[string]*framework.FieldSchema {
 		"rotation_period": {
 			Type:        framework.TypeDurationSecond,
 			Description: "Period for automatic credential rotation of the given entry.",
+		},
+		"skip_import_rotation": {
+			Type:        framework.TypeBool,
+			Description: "Skip the initial pasword rotation on import (has no effect on updates)",
 		},
 	}
 	return fields
@@ -283,13 +288,33 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	// lvr represents the role's LastVaultRotation
 	lvr := role.StaticAccount.LastVaultRotation
 
-	// Only call setStaticAccountPassword if we're creating the role for the
-	// first time
+	// Only call setStaticAccount if we're creating the role for the first time
 	var item *queue.Item
 	switch req.Operation {
 	case logical.CreateOperation:
-		// setStaticAccountPassword calls Storage.Put and saves the role to storage
-		resp, err := b.setStaticAccountPassword(ctx, req.Storage, &setStaticAccountInput{
+		rs, ok := data.GetOk("skip_import_rotation")
+		skipRotation := rs.(bool)
+		if !ok {
+			// override with the configured default rotate setting
+			c, err := readConfig(ctx, req.Storage)
+			if err != nil {
+				return nil, errors.New("couldn't find configuration for this create operation's endpoint")
+			}
+			skipRotation = c.SkipStaticRoleImportRotation
+		}
+		// if we were asked to not rotate, just add the entry
+		if skipRotation {
+			entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
+			if err != nil {
+				return nil, err
+			}
+			if err := req.Storage.Put(ctx, entry); err != nil {
+				return nil, err
+			}
+			break
+		}
+		// setStaticAccount calls Storage.Put and saves the role to storage
+		resp, err := b.setStaticAccount(ctx, req.Storage, &setStaticAccountInput{
 			RoleName: name,
 			Role:     role,
 		})

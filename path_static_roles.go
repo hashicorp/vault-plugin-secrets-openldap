@@ -292,8 +292,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	var item *queue.Item
 	switch req.Operation {
 	case logical.CreateOperation:
+		skipRotation := false
 		rs, ok := data.GetOk("skip_import_rotation")
-		skipRotation := rs.(bool)
+		if ok {
+			skipRotation = rs.(bool)
+		}
 		if !ok {
 			// override with the configured default rotate setting
 			c, err := readConfig(ctx, req.Storage)
@@ -302,7 +305,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			}
 			skipRotation = c.SkipStaticRoleImportRotation
 		}
-		// if we were asked to not rotate, just add the entry
+		// if we were asked to not rotate, just add the entry - this essentially becomes an update operation, except
+		// the item is new
 		if skipRotation {
 			entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
 			if err != nil {
@@ -311,6 +315,12 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			if err := req.Storage.Put(ctx, entry); err != nil {
 				return nil, err
 			}
+
+			// set the item
+			item = &queue.Item{
+				Key: name,
+			}
+			b.Logger().Info("break")
 			break
 		}
 		// setStaticAccountPassword calls Storage.Put and saves the role to storage
@@ -357,7 +367,14 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 	}
 
-	item.Priority = lvr.Add(role.StaticAccount.RotationPeriod).Unix()
+	var nextRotation int64
+	if lvr.IsZero() {
+		nextRotation = time.Now().Add(role.StaticAccount.RotationPeriod).Unix()
+	} else {
+		nextRotation = lvr.Add(role.StaticAccount.RotationPeriod).Unix()
+	}
+
+	item.Priority = nextRotation
 
 	// Add their rotation to the queue
 	if err := b.pushItem(item); err != nil {

@@ -320,7 +320,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			item = &queue.Item{
 				Key: name,
 			}
-			b.Logger().Info("break")
 			break
 		}
 		// setStaticAccountPassword calls Storage.Put and saves the role to storage

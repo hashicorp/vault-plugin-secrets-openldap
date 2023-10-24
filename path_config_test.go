@@ -182,6 +182,23 @@ func TestConfig_Create(t *testing.T) {
 				),
 			},
 		},
+		"skip initial static rotation set": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":                           "tester",
+				"bindpass":                         "pa$$w0rd",
+				"url":                              "ldap://138.91.247.105",
+				"skip_static_role_import_rotation": true,
+			}),
+			createExpectErr: false,
+			expectedReadResp: &logical.Response{
+				Data: ldapResponseData(
+					"binddn", "tester",
+					"url", "ldap://138.91.247.105",
+					"skip_static_role_import_rotation", true,
+					"request_timeout", 90,
+				),
+			},
+		},
 		"both password policy and password length": {
 			createData: fieldData(map[string]interface{}{
 				"binddn":          "tester",

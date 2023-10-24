@@ -146,7 +146,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	if walID, ok := item.Value.(string); ok {
 		input.WALID = walID
 	}
-	resp, err := b.setStaticAccount(ctx, req.Storage, input)
+	resp, err := b.setStaticAccountPassword(ctx, req.Storage, input)
 	if err != nil {
 		b.Logger().Warn("unable to rotate credentials in rotate-role", "error", err)
 		// Update the priority to re-try this rotation and re-add the item to
@@ -164,7 +164,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	}
 
 	// Add their rotation to the queue. We use pushErr here to distinguish between
-	// the error returned from setStaticAccount. They are scoped differently but
+	// the error returned from setStaticAccountPassword. They are scoped differently but
 	// it's more clear to developers that err above can still be non nil, and not
 	// overwritten or reused here.
 	if pushErr := b.pushItem(item); pushErr != nil {

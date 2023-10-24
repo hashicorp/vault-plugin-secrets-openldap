@@ -288,7 +288,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	// lvr represents the role's LastVaultRotation
 	lvr := role.StaticAccount.LastVaultRotation
 
-	// Only call setStaticAccount if we're creating the role for the first time
+	// Only call setStaticAccountPassword if we're creating the role for the first time
 	var item *queue.Item
 	switch req.Operation {
 	case logical.CreateOperation:
@@ -313,8 +313,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			}
 			break
 		}
-		// setStaticAccount calls Storage.Put and saves the role to storage
-		resp, err := b.setStaticAccount(ctx, req.Storage, &setStaticAccountInput{
+		// setStaticAccountPassword calls Storage.Put and saves the role to storage
+		resp, err := b.setStaticAccountPassword(ctx, req.Storage, &setStaticAccountInput{
 			RoleName: name,
 			Role:     role,
 		})

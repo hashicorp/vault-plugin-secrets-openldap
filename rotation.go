@@ -210,7 +210,7 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 		input.WALID = walID
 	}
 
-	resp, err := b.setStaticAccount(ctx, s, input)
+	resp, err := b.setStaticAccountPassword(ctx, s, input)
 	if err != nil {
 		b.Logger().Error("unable to rotate credentials in periodic function", "error", err)
 		// Increment the priority enough so that the next call to this method
@@ -289,7 +289,7 @@ type setStaticAccountOutput struct {
 	WALID string
 }
 
-// setStaticAccount sets the password for a static account associated with a
+// setStaticAccountPassword sets the password for a static account associated with a
 // Role. This method does many things:
 // - verifies role exists and is in the allowed roles list
 // - loads an existing WAL entry if WALID input is given, otherwise creates a
@@ -302,7 +302,7 @@ type setStaticAccountOutput struct {
 //
 // This method does not perform any operations on the priority queue. Those
 // tasks must be handled outside of this method.
-func (b *backend) setStaticAccount(ctx context.Context, s logical.Storage, input *setStaticAccountInput) (*setStaticAccountOutput, error) {
+func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storage, input *setStaticAccountInput) (*setStaticAccountOutput, error) {
 	if input == nil || input.Role == nil || input.RoleName == "" {
 		return nil, errors.New("input was empty when attempting to set credentials for static account")
 	}

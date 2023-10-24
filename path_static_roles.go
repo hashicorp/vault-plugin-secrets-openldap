@@ -285,6 +285,23 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		role.StaticAccount.RotationPeriod = time.Duration(rotationPeriodSeconds) * time.Second
 	}
 
+	skipRotation := false
+	skipRotationRaw, ok := data.GetOk("skip_import_rotation")
+	if ok {
+		// if skip rotation was set, use it (or validation error on an update)
+		if !isCreate {
+			return logical.ErrorResponse("skip_import_rotation has no effect on updates"), nil
+		}
+		skipRotation = skipRotationRaw.(bool)
+	} else if isCreate {
+		// otherwise, go get it if this is a create request.
+		c, err := readConfig(ctx, req.Storage)
+		if err != nil {
+			return nil, errors.New("couldn't find configuration for this create operation's endpoint")
+		}
+		skipRotation = c.SkipStaticRoleImportRotation
+	}
+
 	// lvr represents the role's LastVaultRotation
 	lvr := role.StaticAccount.LastVaultRotation
 
@@ -292,19 +309,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	var item *queue.Item
 	switch req.Operation {
 	case logical.CreateOperation:
-		skipRotation := false
-		rs, ok := data.GetOk("skip_import_rotation")
-		if ok {
-			skipRotation = rs.(bool)
-		}
-		if !ok {
-			// override with the configured default rotate setting
-			c, err := readConfig(ctx, req.Storage)
-			if err != nil {
-				return nil, errors.New("couldn't find configuration for this create operation's endpoint")
-			}
-			skipRotation = c.SkipStaticRoleImportRotation
-		}
 		// if we were asked to not rotate, just add the entry - this essentially becomes an update operation, except
 		// the item is new
 		if skipRotation {
@@ -320,6 +324,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			item = &queue.Item{
 				Key: name,
 			}
+			// synthetically set lvr to now, so that it gets queued correctly
+			lvr = time.Now()
 			break
 		}
 		// setStaticAccountPassword calls Storage.Put and saves the role to storage
@@ -366,14 +372,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 	}
 
-	var nextRotation int64
-	if lvr.IsZero() {
-		nextRotation = time.Now().Add(role.StaticAccount.RotationPeriod).Unix()
-	} else {
-		nextRotation = lvr.Add(role.StaticAccount.RotationPeriod).Unix()
-	}
-
-	item.Priority = nextRotation
+	item.Priority = lvr.Add(role.StaticAccount.RotationPeriod).Unix()
 
 	// Add their rotation to the queue
 	if err := b.pushItem(item); err != nil {

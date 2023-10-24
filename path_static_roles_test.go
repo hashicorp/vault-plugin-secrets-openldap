@@ -82,6 +82,18 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 			wantUpdateErr: true,
 		},
 		{
+			name: "including skip_import_rotation is an update error",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"rotation_period": float64(5),
+			},
+			updateData: map[string]interface{}{
+				"username":             "bob",
+				"skip_import_rotation": false,
+			},
+			wantUpdateErr: true,
+		},
+		{
 			name: "modified dn results in update error",
 			createData: map[string]interface{}{
 				"username":        "bob",

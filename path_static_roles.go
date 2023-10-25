@@ -327,30 +327,31 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			// synthetically set lvr to now, so that it gets queued correctly
 			lvr = time.Now()
 			break
-		}
-		// setStaticAccountPassword calls Storage.Put and saves the role to storage
-		resp, err := b.setStaticAccountPassword(ctx, req.Storage, &setStaticAccountInput{
-			RoleName: name,
-			Role:     role,
-		})
-		if err != nil {
-			if resp != nil && resp.WALID != "" {
-				b.Logger().Debug("deleting WAL for failed role creation", "WAL ID", resp.WALID, "role", name)
-				walDeleteErr := framework.DeleteWAL(ctx, req.Storage, resp.WALID)
-				if walDeleteErr != nil {
-					b.Logger().Debug("failed to delete WAL for failed role creation", "WAL ID", resp.WALID, "error", walDeleteErr)
-					var merr *multierror.Error
-					merr = multierror.Append(merr, err)
-					merr = multierror.Append(merr, fmt.Errorf("failed to clean up WAL from failed role creation: %w", walDeleteErr))
-					err = merr.ErrorOrNil()
+		} else {
+			// setStaticAccountPassword calls Storage.Put and saves the role to storage
+			resp, err := b.setStaticAccountPassword(ctx, req.Storage, &setStaticAccountInput{
+				RoleName: name,
+				Role:     role,
+			})
+			if err != nil {
+				if resp != nil && resp.WALID != "" {
+					b.Logger().Debug("deleting WAL for failed role creation", "WAL ID", resp.WALID, "role", name)
+					walDeleteErr := framework.DeleteWAL(ctx, req.Storage, resp.WALID)
+					if walDeleteErr != nil {
+						b.Logger().Debug("failed to delete WAL for failed role creation", "WAL ID", resp.WALID, "error", walDeleteErr)
+						var merr *multierror.Error
+						merr = multierror.Append(merr, err)
+						merr = multierror.Append(merr, fmt.Errorf("failed to clean up WAL from failed role creation: %w", walDeleteErr))
+						err = merr.ErrorOrNil()
+					}
 				}
+				return nil, err
 			}
-			return nil, err
-		}
-		// guard against RotationTime not being set or zero-value
-		lvr = resp.RotationTime
-		item = &queue.Item{
-			Key: name,
+			// guard against RotationTime not being set or zero-value
+			lvr = resp.RotationTime
+			item = &queue.Item{
+				Key: name,
+			}
 		}
 	case logical.UpdateOperation:
 		// store updated Role

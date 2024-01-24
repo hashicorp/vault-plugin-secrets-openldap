@@ -1,5 +1,12 @@
 ## Unreleased
 
+## v0.11.3
+
+### BUG FIXES:
+* Revert back to armon/go-metrics [GH-88](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/88)
+
+## v0.11.2
+
 ### IMPROVEMENTS:
 * add rotate-root support when using userattr=userPrincipalName
 * add `skip_static_role_import_rotation` and `skip_import_rotation` to allow users to retain the existing role password

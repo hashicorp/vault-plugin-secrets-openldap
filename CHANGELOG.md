@@ -1,5 +1,14 @@
 ## Unreleased
 
+## v0.12.0
+
+* update dependencies [GH-90](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/90)
+  * Bump golang.org/x/crypto from 0.7.0 to 0.17.0 (#87)
+  * Bump github.com/go-jose/go-jose/v3 from 3.0.0 to 3.0.1 (#86)
+  * Bump google.golang.org/grpc from 1.53.0 to 1.56.3 (#84)
+  * Bump golang.org/x/net from 0.8.0 to 0.17.0 (#81)
+
+
 ## v0.11.3
 
 ### BUG FIXES:

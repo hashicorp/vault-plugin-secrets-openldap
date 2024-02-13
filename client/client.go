@@ -71,7 +71,7 @@ func (c *Client) Search(cfg *Config, baseDN string, scope int, filters map[*Fiel
 
 	result, err := conn.Search(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to search ldap server: %w", err)
 	}
 
 	entries := make([]*Entry, len(result.Entries))

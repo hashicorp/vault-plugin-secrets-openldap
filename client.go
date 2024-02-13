@@ -48,7 +48,7 @@ func (c *Client) UpdateDNPassword(conf *client.Config, dn string, newPassword st
 		return fmt.Errorf("unsupported userattr %q", userAttr)
 	}
 
-	if field == client.FieldRegistry.UserPrincipalName {
+	if field == client.FieldRegistry.UserPrincipalName && conf.UPNDomain != "" {
 		scope = ldap.ScopeWholeSubtree
 		bindUser := fmt.Sprintf("%s@%s", ldaputil.EscapeLDAPValue(dn), conf.UPNDomain)
 		filters[field] = []string{bindUser}

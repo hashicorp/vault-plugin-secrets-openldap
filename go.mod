@@ -30,7 +30,7 @@ require (
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/cli v20.10.17+incompatible // indirect
-	github.com/docker/docker v23.0.4+incompatible // indirect
+	github.com/docker/docker v23.0.8+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect

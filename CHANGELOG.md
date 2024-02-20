@@ -1,5 +1,10 @@
 ## Unreleased
 
+## v0.12.1
+
+### BUG FIXES:
+* Fix inability to rotate-root when using `userattr=userPrincipalName` and `upndomain` is not set [GH-91](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/91)
+
 ## v0.12.0
 
 * update dependencies [GH-90](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/90)

@@ -13,20 +13,19 @@
   * Bump google.golang.org/grpc from 1.53.0 to 1.56.3 (#84)
   * Bump golang.org/x/net from 0.8.0 to 0.17.0 (#81)
 
-
 ## v0.11.3
+
+### FEATURES:
+* add `skip_static_role_import_rotation` and `skip_import_rotation` to allow users to retain the existing role password
+on import (note: Vault will not know the role password until it is rotated) [GH-83](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/83)
 
 ### BUG FIXES:
 * Revert back to armon/go-metrics [GH-88](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/88)
 
-## v0.11.2
-
 ### IMPROVEMENTS:
 * add rotate-root support when using userattr=userPrincipalName
-* add `skip_static_role_import_rotation` and `skip_import_rotation` to allow users to retain the existing role password
-on import (note: Vault will not know the role password until it is rotated)
- 
-## v0.11.1
+
+## v0.11.2
 
 ### IMPROVEMENTS:
 
@@ -36,6 +35,10 @@ on import (note: Vault will not know the role password until it is rotated)
   * github.com/hashicorp/vault/sdk v0.9.2
   * github.com/stretchr/testify v1.8.4
   * golang.org/x/text v0.12.0
+
+## v0.11.1
+
+prevent overwriting of schema and password_policy values on update of config [GH-75](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/75)
 
 ## v0.11.0
 

@@ -38,7 +38,8 @@ on import (note: Vault will not know the role password until it is rotated) [GH-
 
 ## v0.11.1
 
-prevent overwriting of schema and password_policy values on update of config [GH-75](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/75)
+### IMPROVEMENTS:
+* prevent overwriting of schema and password_policy values on update of config [GH-75](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/75)
 
 ## v0.11.0
 

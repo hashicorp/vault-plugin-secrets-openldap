@@ -230,7 +230,7 @@ func (f *failingRollbackClient) Execute(conf *client.Config, entries []*ldif.Ent
 
 var _ ldapClient = (*failingRollbackClient)(nil)
 
-func TestRollback(t *testing.T) {
+func TestRollbackPassword(t *testing.T) {
 	oldRollbackAttempts, oldMinRollbackDuration, oldMaxRollbackDuration := rollbackAttempts, minRollbackDuration, maxRollbackDuration
 	t.Cleanup(func() {
 		rollbackAttempts = oldRollbackAttempts
@@ -240,52 +240,51 @@ func TestRollback(t *testing.T) {
 	rollbackAttempts = 5
 	minRollbackDuration = 1 * time.Millisecond
 	maxRollbackDuration = 10 * time.Millisecond
+	oldPassword := "old"
+	newPassword := "new"
 
-	fclient := &failingRollbackClient{}
-	b := &backend{
-		client: fclient,
+	testCases := []struct {
+		name                  string
+		cancelContext         bool
+		rollbackSucceedsAfter int
+		expectedRollbackCalls int
+		expectedPassword      string
+		expectErr             bool
+	}{
+		{"works if client always succeeds", false, 0, 1, oldPassword, false},
+		{"work if client eventually succeeds", false, 3, 3, oldPassword, false},
+		{"fails if the client errors too many times", false, 20, 5, newPassword, true},
+		{"fails if context is canceled", true, 0, 0, newPassword, true},
 	}
-	cfg := &config{
-		LDAP: &client.Config{
-			ConfigEntry: &ldaputil.ConfigEntry{
-				BindDN: "",
-			},
-		},
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctx := context.Background()
+			if testCase.cancelContext {
+				canceledCtx, cancelFunc := context.WithCancel(ctx)
+				cancelFunc()
+				ctx = canceledCtx
+			}
+			fclient := &failingRollbackClient{}
+			b := &backend{
+				client: fclient,
+			}
+			cfg := &config{
+				LDAP: &client.Config{
+					ConfigEntry: &ldaputil.ConfigEntry{},
+				},
+			}
+			fclient.maxCount = testCase.rollbackSucceedsAfter
+			fclient.password = newPassword
+			err := b.rollbackPassword(ctx, cfg, oldPassword)
+			if testCase.expectErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+			assert.Equal(t, testCase.expectedPassword, fclient.password)
+			assert.Equal(t, testCase.expectedRollbackCalls, fclient.count)
+
+		})
 	}
-
-	ctx := context.Background()
-
-	// works if the client always succeeds
-	fclient.count = 0
-	fclient.maxCount = 0
-	fclient.password = "password"
-	err := b.rollBackPassword(ctx, cfg, "old")
-	assert.Nil(t, err)
-	assert.Equal(t, "old", fclient.password)
-
-	// works if the client eventually succeeds
-	fclient.count = 0
-	fclient.maxCount = 3
-	fclient.password = "password"
-	err = b.rollBackPassword(ctx, cfg, "old")
-	assert.Nil(t, err)
-	assert.Equal(t, "old", fclient.password)
-
-	// fails if the client errors too many times
-	fclient.count = 0
-	fclient.maxCount = 20
-	fclient.password = "password"
-	err = b.rollBackPassword(ctx, cfg, "old")
-	assert.NotNil(t, err)
-	assert.Equal(t, "password", fclient.password)
-
-	// if the context is canceled, we don't rotate the password
-	ctx, cancelFunc := context.WithCancel(ctx)
-	cancelFunc()
-	fclient.count = 0
-	fclient.maxCount = 0
-	fclient.password = "password"
-	err = b.rollBackPassword(ctx, cfg, "old")
-	assert.NotNil(t, err)
-	assert.Equal(t, "password", fclient.password)
 }

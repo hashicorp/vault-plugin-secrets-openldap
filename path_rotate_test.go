@@ -5,9 +5,15 @@ package openldap
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/go-ldap/ldif"
+	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
+	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestManualRotate(t *testing.T) {
@@ -197,4 +203,89 @@ func TestManualRotate(t *testing.T) {
 			t.Fatal("expected error")
 		}
 	})
+}
+
+type failingRollbackClient struct {
+	count    int
+	maxCount int
+	password string
+}
+
+func (f *failingRollbackClient) UpdateDNPassword(conf *client.Config, dn string, newPassword string) error {
+	f.count += 1
+	if f.count >= f.maxCount {
+		f.password = newPassword
+		return nil
+	}
+	return fmt.Errorf("some error")
+}
+
+func (f *failingRollbackClient) UpdateUserPassword(conf *client.Config, user, newPassword string) error {
+	panic("nope")
+}
+
+func (f *failingRollbackClient) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) error {
+	panic("nope")
+}
+
+var _ ldapClient = (*failingRollbackClient)(nil)
+
+func TestRollback(t *testing.T) {
+	oldRollbackAttempts, oldMinRollbackDuration, oldMaxRollbackDuration := rollbackAttempts, minRollbackDuration, maxRollbackDuration
+	t.Cleanup(func() {
+		rollbackAttempts = oldRollbackAttempts
+		minRollbackDuration = oldMinRollbackDuration
+		maxRollbackDuration = oldMaxRollbackDuration
+	})
+	rollbackAttempts = 5
+	minRollbackDuration = 1 * time.Millisecond
+	maxRollbackDuration = 10 * time.Millisecond
+
+	fclient := &failingRollbackClient{}
+	b := &backend{
+		client: fclient,
+	}
+	cfg := &config{
+		LDAP: &client.Config{
+			ConfigEntry: &ldaputil.ConfigEntry{
+				BindDN: "",
+			},
+		},
+	}
+
+	ctx := context.Background()
+
+	// works if the client always succeeds
+	fclient.count = 0
+	fclient.maxCount = 0
+	fclient.password = "password"
+	err := b.rollBackPassword(ctx, cfg, "old")
+	assert.Nil(t, err)
+	assert.Equal(t, "old", fclient.password)
+
+	// works if the client eventually succeeds
+	fclient.count = 0
+	fclient.maxCount = 3
+	fclient.password = "password"
+	err = b.rollBackPassword(ctx, cfg, "old")
+	assert.Nil(t, err)
+	assert.Equal(t, "old", fclient.password)
+
+	// fails if the client errors too many times
+	fclient.count = 0
+	fclient.maxCount = 20
+	fclient.password = "password"
+	err = b.rollBackPassword(ctx, cfg, "old")
+	assert.NotNil(t, err)
+	assert.Equal(t, "password", fclient.password)
+
+	// if the context is canceled, we don't rotate the password
+	ctx, cancelFunc := context.WithCancel(ctx)
+	cancelFunc()
+	fclient.count = 0
+	fclient.maxCount = 0
+	fclient.password = "password"
+	err = b.rollBackPassword(ctx, cfg, "old")
+	assert.NotNil(t, err)
+	assert.Equal(t, "password", fclient.password)
 }

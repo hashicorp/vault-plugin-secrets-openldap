@@ -7,12 +7,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/helper/backoff"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/queue"
+)
+
+var (
+	rollbackAttempts    = 10
+	minRollbackDuration = 1 * time.Second
+	maxRollbackDuration = 100 * time.Second
 )
 
 const (
@@ -181,26 +187,32 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	return nil, nil
 }
 
-// rollBackPassword uses naive exponential backoff to retry updating to an old password,
+// rollBackPassword uses exponential backoff to retry updating to an old password,
 // because LDAP may still be propagating the previous password change.
 func (b *backend) rollBackPassword(ctx context.Context, config *config, oldPassword string) error {
+	expbackoff := backoff.NewBackoff(rollbackAttempts, minRollbackDuration, maxRollbackDuration)
 	var err error
-	for i := 0; i < 10; i++ {
-		waitSeconds := math.Pow(float64(i), 2)
-		timer := time.NewTimer(time.Duration(waitSeconds) * time.Second)
+	for {
+		nextsleep, terr := expbackoff.Next()
+		if terr != nil {
+			// exponential backoff has failed every attempt; return last error
+			return err
+		}
+		timer := time.NewTimer(nextsleep)
 		select {
 		case <-timer.C:
 		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C // drain the channel so that it will be garbage collected
+			}
 			// Outer environment is closing.
 			return fmt.Errorf("unable to roll back password because enclosing environment is shutting down")
 		}
-		if err = b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, oldPassword); err == nil {
-			// Success.
+		err = b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, oldPassword)
+		if err == nil {
 			return nil
 		}
 	}
-	// Failure after looping.
-	return err
 }
 
 func storePassword(ctx context.Context, s logical.Storage, config *config) error {

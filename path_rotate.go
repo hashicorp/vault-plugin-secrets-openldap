@@ -206,8 +206,7 @@ func (b *backend) rollBackPassword(ctx context.Context, config *config, oldPassw
 				<-timer.C // drain the channel so that it will be garbage collected
 			}
 			// Outer environment is closing.
-			return fmt.Errorf("unable to roll back password because enclosing environment is shutting down")
-		}
+			return fmt.Errorf("unable to rollback password because enclosing environment is shutting down")
 		err = b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, oldPassword)
 		if err == nil {
 			return nil

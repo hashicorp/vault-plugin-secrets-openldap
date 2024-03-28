@@ -7,12 +7,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/helper/backoff"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/queue"
+)
+
+var (
+	rollbackAttempts    = 10
+	minRollbackDuration = 1 * time.Second
+	maxRollbackDuration = 100 * time.Second
 )
 
 const (
@@ -105,7 +111,7 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 		// We were unable to store the new password locally. We can't continue in this state because we won't be able
 		// to roll any passwords, including our own to get back into a state of working. So, we need to roll back to
 		// the last password we successfully got into storage.
-		if rollbackErr := b.rollBackPassword(ctx, config, oldPassword); rollbackErr != nil {
+		if rollbackErr := b.rollbackPassword(ctx, config, oldPassword); rollbackErr != nil {
 			return nil, fmt.Errorf(`unable to store new password due to %s and unable to return to previous password
 due to %s, configure a new binddn and bindpass to restore ldap function`, pwdStoringErr, rollbackErr)
 		}
@@ -181,26 +187,32 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	return nil, nil
 }
 
-// rollBackPassword uses naive exponential backoff to retry updating to an old password,
+// rollbackPassword uses exponential backoff to retry updating to an old password,
 // because LDAP may still be propagating the previous password change.
-func (b *backend) rollBackPassword(ctx context.Context, config *config, oldPassword string) error {
+func (b *backend) rollbackPassword(ctx context.Context, config *config, oldPassword string) error {
+	expbackoff := backoff.NewBackoff(rollbackAttempts, minRollbackDuration, maxRollbackDuration)
 	var err error
-	for i := 0; i < 10; i++ {
-		waitSeconds := math.Pow(float64(i), 2)
-		timer := time.NewTimer(time.Duration(waitSeconds) * time.Second)
+	for {
+		nextsleep, terr := expbackoff.Next()
+		if terr != nil {
+			// exponential backoff has failed every attempt; return last error
+			return err
+		}
+		timer := time.NewTimer(nextsleep)
 		select {
 		case <-timer.C:
 		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C // drain the channel so that it will be garbage collected
+			}
 			// Outer environment is closing.
-			return fmt.Errorf("unable to roll back password because enclosing environment is shutting down")
+			return fmt.Errorf("unable to rollback password because enclosing environment is shutting down")
 		}
-		if err = b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, oldPassword); err == nil {
-			// Success.
+		err = b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, oldPassword)
+		if err == nil {
 			return nil
 		}
 	}
-	// Failure after looping.
-	return err
 }
 
 func storePassword(ctx context.Context, s logical.Storage, config *config) error {

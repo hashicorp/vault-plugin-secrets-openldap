@@ -5,9 +5,15 @@ package openldap
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/go-ldap/ldif"
+	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
+	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestManualRotate(t *testing.T) {
@@ -197,4 +203,88 @@ func TestManualRotate(t *testing.T) {
 			t.Fatal("expected error")
 		}
 	})
+}
+
+type failingRollbackClient struct {
+	count    int
+	maxCount int
+	password string
+}
+
+func (f *failingRollbackClient) UpdateDNPassword(conf *client.Config, dn string, newPassword string) error {
+	f.count += 1
+	if f.count >= f.maxCount {
+		f.password = newPassword
+		return nil
+	}
+	return fmt.Errorf("some error")
+}
+
+func (f *failingRollbackClient) UpdateUserPassword(conf *client.Config, user, newPassword string) error {
+	panic("nope")
+}
+
+func (f *failingRollbackClient) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) error {
+	panic("nope")
+}
+
+var _ ldapClient = (*failingRollbackClient)(nil)
+
+func TestRollbackPassword(t *testing.T) {
+	oldRollbackAttempts, oldMinRollbackDuration, oldMaxRollbackDuration := rollbackAttempts, minRollbackDuration, maxRollbackDuration
+	t.Cleanup(func() {
+		rollbackAttempts = oldRollbackAttempts
+		minRollbackDuration = oldMinRollbackDuration
+		maxRollbackDuration = oldMaxRollbackDuration
+	})
+	rollbackAttempts = 5
+	minRollbackDuration = 1 * time.Millisecond
+	maxRollbackDuration = 10 * time.Millisecond
+	oldPassword := "old"
+	newPassword := "new"
+
+	testCases := []struct {
+		name                  string
+		cancelContext         bool
+		rollbackSucceedsAfter int
+		expectedRollbackCalls int
+		expectedPassword      string
+		expectErr             bool
+	}{
+		{"works if client always succeeds", false, 0, 1, oldPassword, false},
+		{"work if client eventually succeeds", false, 3, 3, oldPassword, false},
+		{"fails if the client errors too many times", false, 20, 5, newPassword, true},
+		{"fails if context is canceled", true, 0, 0, newPassword, true},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctx := context.Background()
+			if testCase.cancelContext {
+				canceledCtx, cancelFunc := context.WithCancel(ctx)
+				cancelFunc()
+				ctx = canceledCtx
+			}
+			fclient := &failingRollbackClient{}
+			b := &backend{
+				client: fclient,
+			}
+			cfg := &config{
+				LDAP: &client.Config{
+					ConfigEntry: &ldaputil.ConfigEntry{},
+				},
+			}
+			fclient.maxCount = testCase.rollbackSucceedsAfter
+			fclient.password = newPassword
+			err := b.rollbackPassword(ctx, cfg, oldPassword)
+			if testCase.expectErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+			assert.Equal(t, testCase.expectedPassword, fclient.password)
+			assert.Equal(t, testCase.expectedRollbackCalls, fclient.count)
+
+		})
+	}
 }

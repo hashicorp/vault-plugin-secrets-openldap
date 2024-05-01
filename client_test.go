@@ -193,7 +193,6 @@ func Test_UpdateDNPassword(t *testing.T) {
 	newPassword := "newpassword"
 	err := c.UpdateDNPassword(config, "cn=user1,dc=example,dc=org", newPassword)
 	assert.NoError(t, err)
-
 }
 
 func Test_UpdateUserPassword(t *testing.T) {
@@ -225,7 +224,7 @@ func setupDockerLDAP(t *testing.T) string {
 	require.NoError(t, err)
 
 	customLdifFile := path.Join(tempDir, "custom.ldif")
-	err = os.WriteFile(customLdifFile, []byte(customldif), 0644)
+	err = os.WriteFile(customLdifFile, []byte(customldif), 0o644)
 	require.NoError(t, err)
 
 	opts := dockertest.RunOptions{

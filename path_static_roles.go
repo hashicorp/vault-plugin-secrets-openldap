@@ -21,23 +21,23 @@ const (
 	staticRolePath = "static-role/"
 )
 
-// RolePathRegex is a regex which requires a role name. The role name
-// can include any number of characters separated by forward slashes.
-func RolePathRegex(name string) string {
-	return fmt.Sprintf("(/(?P<%s>.+))", name)
+// GenericNameWithForwardSlashRegex is a regex which requires a role name. The role name can
+// include any number of alphanumberic characters separated by forward slashes.
+func GenericNameWithForwardSlashRegex(name string) string {
+	return fmt.Sprintf("(/(?P<%s>\\w(([\\w-./]+)?\\w)?))", name)
 }
 
-// RoleListRegex is a regex for optionally including a role path in
-// list options. The role path can be used to list nested roles at
+// OptionalGenericNameWithForwardSlashListRegex is a regex for optionally including a
+// role path in list options. The role path can be used to list nested roles at
 // arbitrary depth.
-func RoleListRegex(name string) string {
+func OptionalGenericNameWithForwardSlashListRegex(name string) string {
 	return fmt.Sprintf("/?(/(?P<%s>.+/))?", name)
 }
 
 func (b *backend) pathListStaticRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: strings.TrimSuffix(staticRolePath, "/") + RoleListRegex("path"),
+			Pattern: strings.TrimSuffix(staticRolePath, "/") + OptionalGenericNameWithForwardSlashListRegex("path"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "list",
@@ -63,7 +63,7 @@ func (b *backend) pathListStaticRoles() []*framework.Path {
 func (b *backend) pathStaticRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: strings.TrimSuffix(staticRolePath, "/") + RolePathRegex("name"),
+			Pattern: strings.TrimSuffix(staticRolePath, "/") + GenericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationSuffix: "static-role",

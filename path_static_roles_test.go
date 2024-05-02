@@ -214,50 +214,55 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 }
 
 func TestRoles(t *testing.T) {
+	t.Run("happy path with hierarchical role path", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		configureOpenLDAPMount(t, b, storage)
+
+		roles := []string{"org/secure", "org/platform/dev", "org/platform/support"}
+		getData := func(name string) map[string]interface{} {
+			return map[string]interface{}{
+				"username":        name,
+				"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+			}
+		}
+
+		// create all the roles
+		for _, role := range roles {
+			data := getData(role)
+			resp, err := createStaticRoleWithData(t, b, storage, role, data)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
+		}
+
+		// read all the roles
+		for _, role := range roles {
+			data := getData(role)
+			assertReadStaticRole(t, b, storage, role, data)
+		}
+	})
 	t.Run("happy path with role using DN search", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
 		configureOpenLDAPMount(t, b, storage)
 
+		roleName := "hashicorp"
 		data := map[string]interface{}{
-			"username":        "hashicorp",
+			"username":        roleName,
 			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-			"rotation_period": "5s",
+			"rotation_period": float64(5),
 		}
 
-		resp, err := createStaticRoleWithData(t, b, storage, "hashicorp", data)
+		resp, err := createStaticRoleWithData(t, b, storage, roleName, data)
 		if err != nil || (resp != nil && resp.IsError()) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 
-		req := &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      nil,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		if resp.Data["dn"] != data["dn"] {
-			t.Fatalf("expected dn to be %s but got %s", data["dn"], resp.Data["dn"])
-		}
-
-		if resp.Data["username"] != data["username"] {
-			t.Fatalf("expected username to be %s but got %s", data["username"], resp.Data["username"])
-		}
-
-		if resp.Data["rotation_period"] != float64(5) {
-			t.Fatalf("expected rotation_period to be %d but got %s", 5, resp.Data["rotation_period"])
-		}
-
-		if resp.Data["last_vault_rotation"] == nil {
-			t.Fatal("expected last_vault_rotation to not be empty")
-		}
+		assertReadStaticRole(t, b, storage, roleName, data)
 	})
 	t.Run("happy path with role using username search", func(t *testing.T) {
 		b, storage := getBackend(false)
@@ -283,44 +288,19 @@ func TestRoles(t *testing.T) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 
+		roleName := "hashicorp"
 		data = map[string]interface{}{
-			"username":        "hashicorp",
+			"username":        roleName,
 			"dn":              "",
-			"rotation_period": "5s",
+			"rotation_period": float64(5),
 		}
 
-		resp, err = createStaticRoleWithData(t, b, storage, "hashicorp", data)
+		resp, err = createStaticRoleWithData(t, b, storage, roleName, data)
 		if err != nil || (resp != nil && resp.IsError()) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      nil,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		if resp.Data["dn"] != data["dn"] {
-			t.Fatalf("expected dn to be %s but got %s", data["dn"], resp.Data["dn"])
-		}
-
-		if resp.Data["username"] != data["username"] {
-			t.Fatalf("expected username to be %s but got %s", data["username"], resp.Data["username"])
-		}
-
-		if resp.Data["rotation_period"] != float64(5) {
-			t.Fatalf("expected rotation_period to be %d but got %s", 5, resp.Data["rotation_period"])
-		}
-
-		if resp.Data["last_vault_rotation"] == nil {
-			t.Fatal("expected last_vault_rotation to not be empty")
-		}
+		assertReadStaticRole(t, b, storage, roleName, data)
 	})
 
 	t.Run("happy path with skip_rotate set", func(t *testing.T) {
@@ -506,6 +486,54 @@ func TestListRoles(t *testing.T) {
 			t.Fatalf("expected list with %d keys, got %d", 2, len(resp.Data["keys"].([]string)))
 		}
 	})
+
+	t.Run("list roles with hierarchical role path", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		configureOpenLDAPMount(t, b, storage)
+
+		roles := []string{"org/secure", "org/platform/dev", "org/platform/support"}
+		getData := func(name string) map[string]interface{} {
+			return map[string]interface{}{
+				"username":        name,
+				"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+			}
+		}
+
+		// create all the roles
+		for _, role := range roles {
+			data := getData(role)
+			resp, err := createStaticRoleWithData(t, b, storage, role, data)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
+		}
+
+		// TODO(JM): List regex should support optional trailing slash
+		// rolePaths := []string{"org", "org/", "org/platform", "org/platform/"}
+		rolePaths := []string{"org/", "org/platform/"}
+		for _, rolePath := range rolePaths {
+			req := &logical.Request{
+				Operation: logical.ListOperation,
+				Path:      staticRolePath + "/" + rolePath,
+				Storage:   storage,
+				Data:      nil,
+			}
+			resp, err := b.HandleRequest(context.Background(), req)
+
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("path: %s, err:%s resp:%#v\n", rolePath, err, resp)
+			}
+
+			keys := resp.Data["keys"].([]string)
+			t.Logf("keys: %#+v", keys)
+			if len(keys) != 2 {
+				t.Fatalf("expected list with %d keys, got %d", 2, len(keys))
+			}
+		}
+	})
 }
 
 func TestWALsStillTrackedAfterUpdate(t *testing.T) {
@@ -671,4 +699,40 @@ func createStaticRoleWithData(t *testing.T, b *backend, s logical.Storage, name 
 	}
 
 	return b.HandleRequest(context.Background(), req)
+}
+
+func readStaticRole(t *testing.T, b *backend, storage logical.Storage, roleName string) (*logical.Response, error) {
+	req := &logical.Request{
+		Operation: logical.ReadOperation,
+		Path:      staticRolePath + roleName,
+		Storage:   storage,
+		Data:      nil,
+	}
+
+	return b.HandleRequest(context.Background(), req)
+}
+
+func assertReadStaticRole(t *testing.T, b *backend, storage logical.Storage, roleName string, data map[string]interface{}) {
+	t.Helper()
+	resp, err := readStaticRole(t, b, storage, roleName)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if resp.Data["dn"] != data["dn"] {
+		t.Fatalf("expected dn to be %s but got %s", data["dn"], resp.Data["dn"])
+	}
+
+	if resp.Data["username"] != data["username"] {
+		t.Fatalf("expected username to be %s but got %s", data["username"], resp.Data["username"])
+	}
+
+	expected := data["rotation_period"].(float64)
+	if resp.Data["rotation_period"] != expected {
+		t.Fatalf("expected rotation_period to be %f but got %s", expected, resp.Data["rotation_period"])
+	}
+
+	if resp.Data["last_vault_rotation"] == nil {
+		t.Fatal("expected last_vault_rotation to not be empty")
+	}
 }

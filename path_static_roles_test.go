@@ -16,20 +16,7 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 	b, storage := getBackend(false)
 	defer b.Cleanup(context.Background())
 	ctx := context.Background()
-
-	req := &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      configPath,
-		Storage:   storage,
-		Data: map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		},
-	}
-	_, err := b.HandleRequest(ctx, req)
-	require.NoError(t, err)
+	configureOpenLDAPMount(t, b, storage)
 
 	tests := []struct {
 		name          string
@@ -157,13 +144,7 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// create the static role
-			req = &logical.Request{
-				Operation: logical.CreateOperation,
-				Path:      staticRolePath + "hashicorp",
-				Storage:   storage,
-				Data:      tt.createData,
-			}
-			resp, err := b.HandleRequest(ctx, req)
+			resp, err := createStaticRoleWithData(t, b, storage, "hashicorp", tt.createData)
 			if tt.wantCreateErr {
 				isErr := err != nil || (resp != nil && resp.IsError())
 				require.True(t, isErr)
@@ -201,7 +182,7 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 			require.NotEmpty(t, resp.Data["last_vault_rotation"])
 
 			// update the static role
-			req = &logical.Request{
+			req := &logical.Request{
 				Operation: logical.UpdateOperation,
 				Path:      staticRolePath + "hashicorp",
 				Storage:   storage,
@@ -237,44 +218,20 @@ func TestRoles(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
+		configureOpenLDAPMount(t, b, storage)
+
 		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
 			"username":        "hashicorp",
 			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 			"rotation_period": "5s",
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		resp, err := createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if err != nil || (resp != nil && resp.IsError()) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 
-		req = &logical.Request{
+		req := &logical.Request{
 			Operation: logical.ReadOperation,
 			Path:      staticRolePath + "hashicorp",
 			Storage:   storage,
@@ -332,14 +289,7 @@ func TestRoles(t *testing.T) {
 			"rotation_period": "5s",
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		resp, err = createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if err != nil || (resp != nil && resp.IsError()) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
@@ -377,45 +327,21 @@ func TestRoles(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
+		configureOpenLDAPMount(t, b, storage)
+
 		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
 			"username":             "hashicorp",
 			"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 			"rotation_period":      "10m",
 			"skip_import_rotation": true,
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		resp, err := createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if err != nil || (resp != nil && resp.IsError()) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 
-		req = &logical.Request{
+		req := &logical.Request{
 			Operation: logical.ReadOperation,
 			Path:      staticRolePath + "hashicorp",
 			Storage:   storage,
@@ -448,38 +374,14 @@ func TestRoles(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
+		configureOpenLDAPMount(t, b, storage)
+
 		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
 			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 			"rotation_period": "5s",
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		resp, _ := createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if resp == nil || !resp.IsError() {
 			t.Fatal("expected error")
 		}
@@ -489,38 +391,14 @@ func TestRoles(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
+		configureOpenLDAPMount(t, b, storage)
+
 		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
 			"username": "hashicorp",
 			"dn":       "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		resp, _ := createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if resp == nil || !resp.IsError() {
 			t.Fatal("expected error")
 		}
@@ -530,39 +408,15 @@ func TestRoles(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
+		configureOpenLDAPMount(t, b, storage)
+
 		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
 			"username":        "hashicorp",
 			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 			"rotation_period": "4s",
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		resp, _ := createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if resp == nil || !resp.IsError() {
 			t.Fatal("expected error")
 		}
@@ -572,39 +426,15 @@ func TestRoles(t *testing.T) {
 		b, storage := getBackend(true)
 		defer b.Cleanup(context.Background())
 
+		configureOpenLDAPMount(t, b, storage)
+
 		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
 			"username":        "hashicorp",
 			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 			"rotation_period": "5s",
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		_, err := createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if err == nil {
 			t.Fatal("expected error, got none")
 		}
@@ -636,39 +466,15 @@ func TestListRoles(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
+		configureOpenLDAPMount(t, b, storage)
+
 		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
-		}
-
-		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err := b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
 			"username":        "hashicorp",
 			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 			"rotation_period": "5s",
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		resp, err := createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if err != nil || (resp != nil && resp.IsError()) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
@@ -679,19 +485,12 @@ func TestListRoles(t *testing.T) {
 			"rotation_period": "5s",
 		}
 
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "vault",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
+		resp, err = createStaticRoleWithData(t, b, storage, "vault", data)
 		if err != nil || (resp != nil && resp.IsError()) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 
-		req = &logical.Request{
+		req := &logical.Request{
 			Operation: logical.ListOperation,
 			Path:      staticRolePath,
 			Storage:   storage,
@@ -767,16 +566,12 @@ func TestWALsDeletedOnRoleCreationFailed(t *testing.T) {
 	configureOpenLDAPMount(t, b, storage)
 
 	for i := 0; i < 3; i++ {
-		resp, err := b.HandleRequest(ctx, &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data: map[string]interface{}{
-				"username":        "hashicorp",
-				"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-				"rotation_period": "5s",
-			},
-		})
+		data := map[string]interface{}{
+			"username":        "hashicorp",
+			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period": "5s",
+		}
+		resp, err := createStaticRoleWithData(t, b, storage, "hashicorp", data)
 		if err == nil {
 			t.Fatal("expected error from OpenLDAP")
 		}
@@ -854,17 +649,26 @@ func configureOpenLDAPMountWithPasswordPolicy(t *testing.T, b *backend, storage 
 }
 
 func createRole(t *testing.T, b *backend, storage logical.Storage, roleName string) {
-	_, err := b.HandleRequest(context.Background(), &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      "static-role/" + roleName,
-		Storage:   storage,
-		Data: map[string]interface{}{
-			"username":        roleName,
-			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-			"rotation_period": "86400s",
-		},
-	})
+	t.Helper()
+	data := map[string]interface{}{
+		"username":        roleName,
+		"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+		"rotation_period": "86400s",
+	}
+	_, err := createStaticRoleWithData(t, b, storage, roleName, data)
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func createStaticRoleWithData(t *testing.T, b *backend, s logical.Storage, name string, d map[string]interface{}) (*logical.Response, error) {
+	t.Helper()
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      staticRolePath + name,
+		Storage:   s,
+		Data:      d,
+	}
+
+	return b.HandleRequest(context.Background(), req)
 }

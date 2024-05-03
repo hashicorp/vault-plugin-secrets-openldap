@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/vault/sdk/framework"
@@ -48,7 +49,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 				"(binddn) used by Vault to manage LDAP.",
 		},
 		{
-			Pattern: rotateRolePath + framework.GenericNameRegex("name"),
+			Pattern: strings.TrimSuffix(rotateRolePath, "/") + GenericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "rotate",

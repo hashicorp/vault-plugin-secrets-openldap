@@ -221,17 +221,10 @@ func TestRoles(t *testing.T) {
 		configureOpenLDAPMount(t, b, storage)
 
 		roles := []string{"org/secure", "org/platform/dev", "org/platform/support"}
-		getData := func(name string) map[string]interface{} {
-			return map[string]interface{}{
-				"username":        name,
-				"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-				"rotation_period": float64(5),
-			}
-		}
 
 		// create all the roles
 		for _, role := range roles {
-			data := getData(role)
+			data := getTestStaticRoleConfig(role)
 			resp, err := createStaticRoleWithData(t, b, storage, role, data)
 			if err != nil || (resp != nil && resp.IsError()) {
 				t.Fatalf("err:%s resp:%#v\n", err, resp)
@@ -240,7 +233,7 @@ func TestRoles(t *testing.T) {
 
 		// read all the roles
 		for _, role := range roles {
-			data := getData(role)
+			data := getTestStaticRoleConfig(role)
 			assertReadStaticRole(t, b, storage, role, data)
 		}
 	})
@@ -494,17 +487,10 @@ func TestListRoles(t *testing.T) {
 		configureOpenLDAPMount(t, b, storage)
 
 		roles := []string{"org/secure", "org/platform/dev", "org/platform/support"}
-		getData := func(name string) map[string]interface{} {
-			return map[string]interface{}{
-				"username":        name,
-				"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-				"rotation_period": float64(5),
-			}
-		}
 
 		// create all the roles
 		for _, role := range roles {
-			data := getData(role)
+			data := getTestStaticRoleConfig(role)
 			resp, err := createStaticRoleWithData(t, b, storage, role, data)
 			if err != nil || (resp != nil && resp.IsError()) {
 				t.Fatalf("err:%s resp:%#v\n", err, resp)
@@ -734,5 +720,13 @@ func assertReadStaticRole(t *testing.T, b *backend, storage logical.Storage, rol
 
 	if resp.Data["last_vault_rotation"] == nil {
 		t.Fatal("expected last_vault_rotation to not be empty")
+	}
+}
+
+func getTestStaticRoleConfig(name string) map[string]interface{} {
+	return map[string]interface{}{
+		"username":        name,
+		"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+		"rotation_period": float64(5),
 	}
 }

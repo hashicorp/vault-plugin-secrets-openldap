@@ -5,6 +5,7 @@ package openldap
 
 import (
 	"context"
+	"strings"
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -15,7 +16,7 @@ const staticCredPath = "static-cred/"
 func (b *backend) pathStaticCredsCreate() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: staticCredPath + framework.GenericNameRegex("name"),
+			Pattern: strings.TrimSuffix(staticCredPath, "/") + GenericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "request",

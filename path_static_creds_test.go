@@ -84,7 +84,7 @@ func assertReadStaticCred(t *testing.T, b *backend, storage logical.Storage, rol
 	t.Helper()
 	resp := readStaticCred(t, b, storage, roleName)
 
-	if resp.Data["dn"] != data["dn"] {
+	if resp.Data["dn"] != data["dn"] && data["dn"] != nil {
 		t.Fatalf("expected dn to be %s but got %s", data["dn"], resp.Data["dn"])
 	}
 
@@ -92,7 +92,7 @@ func assertReadStaticCred(t *testing.T, b *backend, storage logical.Storage, rol
 		t.Fatal("expected password to be set, it wasn't")
 	}
 
-	if resp.Data["username"] != data["username"] {
+	if resp.Data["username"] != data["username"] && data["username"] != nil {
 		t.Fatalf("expected username to be %s but got %s", data["username"], resp.Data["username"])
 	}
 

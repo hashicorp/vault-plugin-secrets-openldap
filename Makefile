@@ -49,7 +49,7 @@ fmt:
 	gofumpt -l -w .
 
 configure: dev
-	@./bootstrap/configure.sh \
+	./bootstrap/configure.sh \
 	$(PLUGIN_DIR) \
 	$(PLUGIN_NAME) \
 	$(PLUGIN_PATH)

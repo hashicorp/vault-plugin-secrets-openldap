@@ -21,16 +21,16 @@ const (
 	staticRolePath = "static-role/"
 )
 
-// GenericNameWithForwardSlashRegex is a regex which requires a role name. The role name can
-// include any number of alphanumberic characters separated by forward slashes.
-func GenericNameWithForwardSlashRegex(name string) string {
-	return fmt.Sprintf("(/(?P<%s>\\w(([\\w-./]+)?\\w)?))", name)
+// genericNameWithForwardSlashRegex is a regex which requires a role name. The role name can
+// include any number of alphanumeric characters separated by forward slashes.
+func genericNameWithForwardSlashRegex(name string) string {
+	return fmt.Sprintf(`(/(?P<%s>\w(([\w-./]+)?\w)?))`, name)
 }
 
-// OptionalGenericNameWithForwardSlashListRegex is a regex for optionally including a
+// optionalGenericNameWithForwardSlashListRegex is a regex for optionally including a
 // role path in list options. The role path can be used to list nested roles at
 // arbitrary depth.
-func OptionalGenericNameWithForwardSlashListRegex(name string) string {
+func optionalGenericNameWithForwardSlashListRegex(name string) string {
 	// TODO(JM): List regex should support optional trailing slash
 	return fmt.Sprintf("/?(/(?P<%s>.+/))?", name)
 }
@@ -38,7 +38,7 @@ func OptionalGenericNameWithForwardSlashListRegex(name string) string {
 func (b *backend) pathListStaticRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: strings.TrimSuffix(staticRolePath, "/") + OptionalGenericNameWithForwardSlashListRegex("path"),
+			Pattern: strings.TrimSuffix(staticRolePath, "/") + optionalGenericNameWithForwardSlashListRegex("path"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "list",
@@ -64,7 +64,7 @@ func (b *backend) pathListStaticRoles() []*framework.Path {
 func (b *backend) pathStaticRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: strings.TrimSuffix(staticRolePath, "/") + GenericNameWithForwardSlashRegex("name"),
+			Pattern: strings.TrimSuffix(staticRolePath, "/") + genericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationSuffix: "static-role",

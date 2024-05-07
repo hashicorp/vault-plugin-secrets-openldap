@@ -95,7 +95,7 @@ func TestManualRotateRole(t *testing.T) {
 		configureOpenLDAPMount(t, b, storage)
 		createRole(t, b, storage, roleName)
 
-		resp, _ := readStaticCred(t, b, storage, roleName)
+		resp := readStaticCred(t, b, storage, roleName)
 
 		if resp.Data["password"] == "" {
 			t.Fatal("expected password to be set, it wasn't")
@@ -114,7 +114,7 @@ func TestManualRotateRole(t *testing.T) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 
-		resp, _ = readStaticCred(t, b, storage, roleName)
+		resp = readStaticCred(t, b, storage, roleName)
 
 		if resp.Data["password"] == "" {
 			t.Fatal("expected password to be set after rotate, it wasn't")
@@ -142,7 +142,7 @@ func TestManualRotateRole(t *testing.T) {
 		passwords := make([]string, 0)
 		// rotate all the creds
 		for _, role := range roles {
-			resp, _ := readStaticCred(t, b, storage, role)
+			resp := readStaticCred(t, b, storage, role)
 
 			if resp.Data["password"] == "" {
 				t.Fatal("expected password to be set, it wasn't")
@@ -161,7 +161,7 @@ func TestManualRotateRole(t *testing.T) {
 				t.Fatalf("err:%s resp:%#v\n", err, resp)
 			}
 
-			resp, _ = readStaticCred(t, b, storage, role)
+			resp = readStaticCred(t, b, storage, role)
 
 			newPassword := resp.Data["password"]
 			if newPassword == "" {

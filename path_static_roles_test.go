@@ -214,29 +214,6 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 }
 
 func TestRoles(t *testing.T) {
-	t.Run("happy path with hierarchical role path", func(t *testing.T) {
-		b, storage := getBackend(false)
-		defer b.Cleanup(context.Background())
-
-		configureOpenLDAPMount(t, b, storage)
-
-		roles := []string{"org/secure", "org/platform/dev", "org/platform/support"}
-
-		// create all the roles
-		for _, role := range roles {
-			data := getTestStaticRoleConfig(role)
-			resp, err := createStaticRoleWithData(t, b, storage, role, data)
-			if err != nil || (resp != nil && resp.IsError()) {
-				t.Fatalf("err:%s resp:%#v\n", err, resp)
-			}
-		}
-
-		// read all the roles
-		for _, role := range roles {
-			data := getTestStaticRoleConfig(role)
-			assertReadStaticRole(t, b, storage, role, data)
-		}
-	})
 	t.Run("happy path with role using DN search", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
@@ -430,6 +407,30 @@ func TestRoles(t *testing.T) {
 		}
 		if resp != nil {
 			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("happy path with hierarchical role path", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		configureOpenLDAPMount(t, b, storage)
+
+		roles := []string{"org/secure", "org/platform/dev", "org/platform/support"}
+
+		// create all the roles
+		for _, role := range roles {
+			data := getTestStaticRoleConfig(role)
+			resp, err := createStaticRoleWithData(t, b, storage, role, data)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
+		}
+
+		// read all the roles
+		for _, role := range roles {
+			data := getTestStaticRoleConfig(role)
+			assertReadStaticRole(t, b, storage, role, data)
 		}
 	})
 }

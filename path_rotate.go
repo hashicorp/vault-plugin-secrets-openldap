@@ -49,7 +49,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 				"(binddn) used by Vault to manage LDAP.",
 		},
 		{
-			Pattern: strings.TrimSuffix(rotateRolePath, "/") + GenericNameWithForwardSlashRegex("name"),
+			Pattern: strings.TrimSuffix(rotateRolePath, "/") + genericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "rotate",

@@ -16,13 +16,8 @@ func TestCreds(t *testing.T) {
 		defer b.Cleanup(context.Background())
 		configureOpenLDAPMount(t, b, storage)
 
-		data := map[string]interface{}{
-			"username":        "hashicorp",
-			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-			"rotation_period": float64(60),
-		}
-
 		roleName := "hashicorp"
+		data := getTestStaticRoleConfig(roleName)
 		createStaticRoleWithData(t, b, storage, roleName, data)
 		assertReadStaticCred(t, b, storage, roleName, data)
 	})
@@ -54,7 +49,13 @@ func TestCreds(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
-		resp, err := readStaticCred(t, b, storage, "hashicorp")
+		req := &logical.Request{
+			Operation: logical.ReadOperation,
+			Path:      staticCredPath + "hashicorp",
+			Storage:   storage,
+		}
+
+		resp, err := b.HandleRequest(context.Background(), req)
 		if err != nil {
 			t.Fatalf("error reading cred: %s", err)
 		}
@@ -64,23 +65,24 @@ func TestCreds(t *testing.T) {
 	})
 }
 
-func readStaticCred(t *testing.T, b *backend, storage logical.Storage, roleName string) (*logical.Response, error) {
+func readStaticCred(t *testing.T, b *backend, storage logical.Storage, roleName string) *logical.Response {
+	t.Helper()
 	req := &logical.Request{
 		Operation: logical.ReadOperation,
 		Path:      staticCredPath + roleName,
 		Storage:   storage,
-		Data:      nil,
 	}
 
-	return b.HandleRequest(context.Background(), req)
+	resp, err := b.HandleRequest(context.Background(), req)
+	if resp == nil || err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+	return resp
 }
 
 func assertReadStaticCred(t *testing.T, b *backend, storage logical.Storage, roleName string, data map[string]interface{}) {
 	t.Helper()
-	resp, err := readStaticCred(t, b, storage, roleName)
-	if err != nil || (resp != nil && resp.IsError()) {
-		t.Fatalf("err:%s resp:%#v\n", err, resp)
-	}
+	resp := readStaticCred(t, b, storage, roleName)
 
 	if resp.Data["dn"] != data["dn"] {
 		t.Fatalf("expected dn to be %s but got %s", data["dn"], resp.Data["dn"])
@@ -98,9 +100,8 @@ func assertReadStaticCred(t *testing.T, b *backend, storage logical.Storage, rol
 		t.Fatal("expected last_vault_rotation to be set, it wasn't")
 	}
 
-	expected := data["rotation_period"].(float64)
-	if resp.Data["rotation_period"] != expected {
-		t.Fatalf("expected rotation_period to be %f but got %s", expected, resp.Data["rotation_period"])
+	if resp.Data["rotation_period"] != float64(5) {
+		t.Fatalf("expected rotation_period to be %f but got %s", float64(5), resp.Data["rotation_period"])
 	}
 
 	if resp.Data["ttl"] == nil {

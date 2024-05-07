@@ -3,6 +3,10 @@
 REPO_DIR := $(shell basename $(CURDIR))
 
 PLUGIN_NAME := $(shell command ls cmd/)
+ifndef $(GOPATH)
+    GOPATH=$(shell go env GOPATH)
+    export GOPATH
+endif
 PLUGIN_DIR ?= $$GOPATH/vault-plugins
 PLUGIN_PATH ?= local-secrets-ldap
 

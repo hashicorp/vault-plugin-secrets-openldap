@@ -10,14 +10,15 @@ import (
 	"time"
 
 	"github.com/go-ldap/ldif"
+	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestManualRotate(t *testing.T) {
-	t.Run("rotate root", func(t *testing.T) {
+func TestManualRotateRoot(t *testing.T) {
+	t.Run("happy path rotate root", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
@@ -83,23 +84,29 @@ func TestManualRotate(t *testing.T) {
 			t.Fatal("should have got error, didn't")
 		}
 	})
+}
 
-	t.Run("rotate role", func(t *testing.T) {
+func TestManualRotateRole(t *testing.T) {
+	t.Run("happy path rotate role", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 
-		data := map[string]interface{}{
-			"binddn":      "tester",
-			"bindpass":    "pa$$w0rd",
-			"url":         "ldap://138.91.247.105",
-			"certificate": validCertificate,
+		roleName := "hashicorp"
+		configureOpenLDAPMount(t, b, storage)
+		createRole(t, b, storage, roleName)
+
+		resp := readStaticCred(t, b, storage, roleName)
+
+		if resp.Data["password"] == "" {
+			t.Fatal("expected password to be set, it wasn't")
 		}
+		oldPassword := resp.Data["password"]
 
 		req := &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      configPath,
+			Operation: logical.UpdateOperation,
+			Path:      rotateRolePath + roleName,
 			Storage:   storage,
-			Data:      data,
+			Data:      nil,
 		}
 
 		resp, err := b.HandleRequest(context.Background(), req)
@@ -107,76 +114,7 @@ func TestManualRotate(t *testing.T) {
 			t.Fatalf("err:%s resp:%#v\n", err, resp)
 		}
 
-		req = &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      rotateRootPath,
-			Storage:   storage,
-			Data:      nil,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		data = map[string]interface{}{
-			"username":        "hashicorp",
-			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
-			"rotation_period": "60s",
-		}
-
-		req = &logical.Request{
-			Operation: logical.CreateOperation,
-			Path:      staticRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      data,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      staticCredPath + "hashicorp",
-			Storage:   storage,
-			Data:      nil,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		if resp.Data["password"] == "" {
-			t.Fatal("expected password to be set, it wasn't")
-		}
-		oldPassword := resp.Data["password"]
-
-		req = &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      rotateRolePath + "hashicorp",
-			Storage:   storage,
-			Data:      nil,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
-
-		req = &logical.Request{
-			Operation: logical.ReadOperation,
-			Path:      staticCredPath + "hashicorp",
-			Storage:   storage,
-			Data:      nil,
-		}
-
-		resp, err = b.HandleRequest(context.Background(), req)
-		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatalf("err:%s resp:%#v\n", err, resp)
-		}
+		resp = readStaticCred(t, b, storage, roleName)
 
 		if resp.Data["password"] == "" {
 			t.Fatal("expected password to be set after rotate, it wasn't")
@@ -184,6 +122,61 @@ func TestManualRotate(t *testing.T) {
 
 		if oldPassword == resp.Data["password"] {
 			t.Fatal("expected passwords to be different after rotation, they weren't")
+		}
+	})
+
+	t.Run("happy path rotate role with hierarchical path", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		configureOpenLDAPMount(t, b, storage)
+
+		roles := []string{"org/secure", "org/platform/dev", "org/platform/support"}
+
+		// create all the roles
+		for _, role := range roles {
+			data := getTestStaticRoleConfig(role)
+			createStaticRoleWithData(t, b, storage, role, data)
+		}
+
+		passwords := make([]string, 0)
+		// rotate all the creds
+		for _, role := range roles {
+			resp := readStaticCred(t, b, storage, role)
+
+			if resp.Data["password"] == "" {
+				t.Fatal("expected password to be set, it wasn't")
+			}
+			oldPassword := resp.Data["password"]
+
+			req := &logical.Request{
+				Operation: logical.UpdateOperation,
+				Path:      rotateRolePath + role,
+				Storage:   storage,
+				Data:      nil,
+			}
+
+			resp, err := b.HandleRequest(context.Background(), req)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
+
+			resp = readStaticCred(t, b, storage, role)
+
+			newPassword := resp.Data["password"]
+			if newPassword == "" {
+				t.Fatal("expected password to be set after rotate, it wasn't")
+			}
+
+			if oldPassword == newPassword {
+				t.Fatal("expected passwords to be different after rotation, they weren't")
+			}
+			passwords = append(passwords, newPassword.(string))
+		}
+
+		// extra pendantic check that the hierarchical paths don't return the same data
+		if len(passwords) != len(strutil.RemoveDuplicates(passwords, false)) {
+			t.Fatal("expected unique static-role paths to return unique passwords")
 		}
 	})
 
@@ -284,7 +277,6 @@ func TestRollbackPassword(t *testing.T) {
 			}
 			assert.Equal(t, testCase.expectedPassword, fclient.password)
 			assert.Equal(t, testCase.expectedRollbackCalls, fclient.count)
-
 		})
 	}
 }

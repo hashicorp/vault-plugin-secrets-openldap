@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -20,10 +21,24 @@ const (
 	staticRolePath = "static-role/"
 )
 
+// genericNameWithForwardSlashRegex is a regex which requires a role name. The role name can
+// include any number of alphanumeric characters separated by forward slashes.
+func genericNameWithForwardSlashRegex(name string) string {
+	return fmt.Sprintf(`(/(?P<%s>\w(([\w-./]+)?\w)?))`, name)
+}
+
+// optionalGenericNameWithForwardSlashListRegex is a regex for optionally including a
+// role path in list options. The role path can be used to list nested roles at
+// arbitrary depth.
+func optionalGenericNameWithForwardSlashListRegex(name string) string {
+	// TODO(JM): List regex should support optional trailing slash
+	return fmt.Sprintf("/?(/(?P<%s>.+/))?", name)
+}
+
 func (b *backend) pathListStaticRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: staticRolePath + "?$",
+			Pattern: strings.TrimSuffix(staticRolePath, "/") + optionalGenericNameWithForwardSlashListRegex("path"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "list",
@@ -32,6 +47,12 @@ func (b *backend) pathListStaticRoles() []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ListOperation: &framework.PathOperation{
 					Callback: b.pathStaticRoleList,
+				},
+			},
+			Fields: map[string]*framework.FieldSchema{
+				"path": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "Path of roles to list",
 				},
 			},
 			HelpSynopsis:    staticRolesListHelpSynopsis,
@@ -43,7 +64,7 @@ func (b *backend) pathListStaticRoles() []*framework.Path {
 func (b *backend) pathStaticRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: staticRolePath + framework.GenericNameRegex("name"),
+			Pattern: strings.TrimSuffix(staticRolePath, "/") + genericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationSuffix: "static-role",
@@ -438,7 +459,8 @@ func (s *staticAccount) PasswordTTL() time.Duration {
 }
 
 func (b *backend) pathStaticRoleList(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roles, err := req.Storage.List(ctx, staticRolePath)
+	rolePath := data.Get("path").(string)
+	roles, err := req.Storage.List(ctx, staticRolePath+rolePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list roles: %w", err)
 	}

@@ -27,7 +27,7 @@ const (
 func (b *backend) pathDynamicRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: strings.TrimSuffix(dynamicRolePath, "/") + GenericNameWithForwardSlashRegex("name"),
+			Pattern: strings.TrimSuffix(dynamicRolePath, "/") + genericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationSuffix: "dynamic-role",
@@ -84,7 +84,7 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 			HelpDescription: staticRoleHelpDescription,
 		},
 		{
-			Pattern: strings.TrimSuffix(dynamicRolePath, "/") + OptionalGenericNameWithForwardSlashListRegex("path"),
+			Pattern: strings.TrimSuffix(dynamicRolePath, "/") + optionalGenericNameWithForwardSlashListRegex("path"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "list",

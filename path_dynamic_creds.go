@@ -22,7 +22,7 @@ import (
 func (b *backend) pathDynamicCredsCreate() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: strings.TrimSuffix(dynamicCredPath, "/") + GenericNameWithForwardSlashRegex("name"),
+			Pattern: strings.TrimSuffix(dynamicCredPath, "/") + genericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "request",

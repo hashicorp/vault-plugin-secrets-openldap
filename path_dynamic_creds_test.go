@@ -369,7 +369,7 @@ func TestDynamicCredsRead_success(t *testing.T) {
 }
 
 func TestDynamicCredsRead_success_hierarchicalRolePath(t *testing.T) {
-	t.Run("list dynamic roles with hierarchical role path", func(t *testing.T) {
+	t.Run("read dynamic role creds with hierarchical role path", func(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(context.Background())
 		configureOpenLDAPMount(t, b, storage)

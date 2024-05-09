@@ -5,16 +5,18 @@ package openldap
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/stretchr/testify/require"
 )
 
 // The library of service accounts that can be checked out
 // is a discrete set of features. This test suite provides
 // end-to-end tests of these interrelated endpoints.
-func TestCheckOuts(t *testing.T) {
+func TestCheckOut(t *testing.T) {
 	ctx := context.Background()
 	b, s := getBackend(false)
 	defer b.Cleanup(ctx)
@@ -32,33 +34,117 @@ func TestCheckOuts(t *testing.T) {
 	}
 	resp, err := b.HandleRequest(ctx, req)
 	if err != nil || (resp != nil && resp.IsError()) {
-		t.Fatal(err)
+		t.Fatalf("err: %v, resp: %v", err, resp.Error())
 	}
 
+	setName := "test-set"
+	ts := testSuite{
+		b:               b,
+		s:               s,
+		name:            setName,
+		svcAccountNames: getTestSvcAccountNames(setName, 2),
+	}
 	// Exercise all set endpoints.
-	t.Run("write set", WriteSet(b, s))
-	t.Run("read set", ReadSet(b, s))
-	t.Run("read set status", ReadSetStatus(b, s))
-	t.Run("write set toggle off", WriteSetToggleOff(b, s))
-	t.Run("read set toggle off", ReadSetToggleOff(b, s))
-	t.Run("write conflicting set", WriteSetWithConflictingServiceAccounts(b, s))
-	t.Run("list sets", ListSets(b, s))
-	t.Run("delete set", DeleteSet(b, s))
+	t.Run("write set", ts.WriteSet())
+	t.Run("read set", ts.ReadSet())
+	t.Run("read set status", ts.ReadSetStatus())
+	t.Run("write set toggle off", ts.WriteSetToggleOff())
+	t.Run("read set toggle off", ts.ReadSetToggleOff())
+	t.Run("write conflicting set", ts.WriteSetWithConflictingServiceAccounts())
+	t.Run("list sets", ts.ListSets([]string{ts.name}))
+	t.Run("delete set", ts.DeleteSet())
 
 	// Do some common updates on sets and ensure they work.
-	t.Run("write set", WriteSet(b, s))
-	t.Run("add service account", AddAnotherServiceAccount(b, s))
-	t.Run("remove service account", RemoveServiceAccount(b, s))
+	t.Run("write set", ts.WriteSet())
+	t.Run("add service account", ts.AddAnotherServiceAccount())
+	t.Run("remove service account", ts.RemoveServiceAccount())
 
-	t.Run("check initial status", CheckInitialStatus(b, s))
-	t.Run("check out account", PerformCheckOut(b, s))
-	t.Run("check updated status", CheckUpdatedStatus(b, s))
-	t.Run("normal check in", NormalCheckIn(b, s))
-	t.Run("return to initial status", CheckInitialStatus(b, s))
-	t.Run("check out again", PerformCheckOut(b, s))
-	t.Run("check updated status", CheckUpdatedStatus(b, s))
-	t.Run("force check in", ForceCheckIn(b, s))
-	t.Run("check all are available", CheckInitialStatus(b, s))
+	t.Run("check initial status", ts.CheckInitialStatus())
+	t.Run("check out account", ts.PerformCheckOut())
+	t.Run("check updated status", ts.CheckUpdatedStatus())
+	t.Run("normal check in", ts.NormalCheckIn())
+	t.Run("return to initial status", ts.CheckInitialStatus())
+	t.Run("check out again", ts.PerformCheckOut())
+	t.Run("check updated status", ts.CheckUpdatedStatus())
+	t.Run("force check in", ts.ForceCheckIn())
+	t.Run("check all are available", ts.CheckInitialStatus())
+}
+
+func TestCheckOutHierarchicalPaths(t *testing.T) {
+	ctx := context.Background()
+	b, s := getBackend(false)
+	defer b.Cleanup(ctx)
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      configPath,
+		Storage:   s,
+		Data: map[string]interface{}{
+			"binddn":   "euclid",
+			"password": "password",
+			"url":      "ldap://ldap.forumsys.com:389",
+			"userdn":   "cn=read-only-admin,dc=example,dc=com",
+		},
+	}
+	resp, err := b.HandleRequest(ctx, req)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err: %v, resp: %v", err, resp.Error())
+	}
+
+	setNames := []string{"foo", "org/secure", "org/platform/dev", "org/platform/support"}
+
+	var tSuiteForList testSuite
+	for _, setName := range setNames {
+		ts := testSuite{
+			b:               b,
+			s:               s,
+			name:            setName,
+			svcAccountNames: getTestSvcAccountNames(setName, 2),
+		}
+		// Exercise all set endpoints expect List Sets
+		t.Run("write set", ts.WriteSet())
+		t.Run("read set", ts.ReadSet())
+		t.Run("read set status", ts.ReadSetStatus())
+		t.Run("write set toggle off", ts.WriteSetToggleOff())
+		t.Run("read set toggle off", ts.ReadSetToggleOff())
+		t.Run("write conflicting set", ts.WriteSetWithConflictingServiceAccounts())
+		t.Run("delete set", ts.DeleteSet())
+
+		// Do some common updates on sets and ensure they work.
+		t.Run("write set", ts.WriteSet())
+		t.Run("add service account", ts.AddAnotherServiceAccount())
+		t.Run("remove service account", ts.RemoveServiceAccount())
+
+		t.Run("check initial status", ts.CheckInitialStatus())
+		t.Run("check out account", ts.PerformCheckOut())
+		t.Run("check updated status", ts.CheckUpdatedStatus())
+		t.Run("normal check in", ts.NormalCheckIn())
+		t.Run("return to initial status", ts.CheckInitialStatus())
+		t.Run("check out again", ts.PerformCheckOut())
+		t.Run("check updated status", ts.CheckUpdatedStatus())
+		t.Run("force check in", ts.ForceCheckIn())
+		t.Run("check all are available", ts.CheckInitialStatus())
+
+		// capture test suite so we can perform a listing on all the created sets
+		tSuiteForList = ts
+	}
+
+	tests := []struct {
+		path             string
+		expectedListResp []string
+	}{
+		{path: "org", expectedListResp: []string{"platform/", "secure"}},
+		{path: "org/platform", expectedListResp: []string{"dev", "support"}},
+	}
+	for _, tt := range tests {
+		// `LIST /library/:role_set`
+		// will return direct sub-keys split on "/" for each level (split)
+		t.Run("list sets hierarchy", tSuiteForList.ListSetsHierarchy(tt.path, tt.expectedListResp))
+	}
+
+	// `LIST /library`
+	// will direct sub-keys split on "/" for the FIRST level (split) only
+	t.Run("list library hierarchy", tSuiteForList.ListSets([]string{"foo", "org/"}))
 }
 
 // TestCheckOutRaces executes a whole bunch of calls at once and only looks for
@@ -193,22 +279,29 @@ func TestCheckOutRaces(t *testing.T) {
 	}
 }
 
-func WriteSet(b logical.Backend, s logical.Storage) func(t *testing.T) {
+type testSuite struct {
+	b               logical.Backend
+	s               logical.Storage
+	name            string
+	svcAccountNames []string
+}
+
+func (ts testSuite) WriteSet() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.CreateOperation,
-			Path:      libraryPrefix + "test-set",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name,
+			Storage:   ts.s,
 			Data: map[string]interface{}{
-				"service_account_names":        []string{"tester1@example.com", "tester2@example.com"},
+				"service_account_names":        ts.svcAccountNames,
 				"ttl":                          "10h",
 				"max_ttl":                      "11h",
 				"disable_check_in_enforcement": true,
 			},
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp != nil {
 			t.Fatalf("expected an empty response, got: %v", resp)
@@ -216,19 +309,20 @@ func WriteSet(b logical.Backend, s logical.Storage) func(t *testing.T) {
 	}
 }
 
-func AddAnotherServiceAccount(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) AddAnotherServiceAccount() func(t *testing.T) {
+	newSvcAccountSet := append(ts.svcAccountNames, "tester3@example.com")
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.UpdateOperation,
-			Path:      libraryPrefix + "test-set",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name,
+			Storage:   ts.s,
 			Data: map[string]interface{}{
-				"service_account_names": []string{"tester1@example.com", "tester2@example.com", "tester3@example.com"},
+				"service_account_names": newSvcAccountSet,
 			},
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp != nil {
 			t.Fatalf("expected an empty response, got: %v", resp)
@@ -236,19 +330,19 @@ func AddAnotherServiceAccount(b logical.Backend, s logical.Storage) func(t *test
 	}
 }
 
-func RemoveServiceAccount(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) RemoveServiceAccount() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.UpdateOperation,
-			Path:      libraryPrefix + "test-set",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name,
+			Storage:   ts.s,
 			Data: map[string]interface{}{
-				"service_account_names": []string{"tester1@example.com", "tester2@example.com"},
+				"service_account_names": ts.svcAccountNames,
 			},
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp != nil {
 			t.Fatalf("expected an empty response, got: %v", resp)
@@ -256,23 +350,23 @@ func RemoveServiceAccount(b logical.Backend, s logical.Storage) func(t *testing.
 	}
 }
 
-func ReadSet(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) ReadSet() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.ReadOperation,
-			Path:      libraryPrefix + "test-set",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name,
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
 		}
 		serviceAccountNames := resp.Data["service_account_names"].([]string)
-		if len(serviceAccountNames) != 2 {
-			t.Fatal("expected 2")
+		if len(serviceAccountNames) != len(ts.svcAccountNames) {
+			t.Fatalf("expected %d", len(ts.svcAccountNames))
 		}
 		disableCheckInEnforcement := resp.Data["disable_check_in_enforcement"].(bool)
 		if !disableCheckInEnforcement {
@@ -289,21 +383,21 @@ func ReadSet(b logical.Backend, s logical.Storage) func(t *testing.T) {
 	}
 }
 
-func WriteSetToggleOff(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) WriteSetToggleOff() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.UpdateOperation,
-			Path:      libraryPrefix + "test-set",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name,
+			Storage:   ts.s,
 			Data: map[string]interface{}{
-				"service_account_names":        []string{"tester1@example.com", "tester2@example.com"},
+				"service_account_names":        ts.svcAccountNames,
 				"ttl":                          "10h",
 				"disable_check_in_enforcement": false,
 			},
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp != nil {
 			t.Fatalf("expected an empty response, got: %v", resp)
@@ -311,23 +405,23 @@ func WriteSetToggleOff(b logical.Backend, s logical.Storage) func(t *testing.T) 
 	}
 }
 
-func ReadSetToggleOff(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) ReadSetToggleOff() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.ReadOperation,
-			Path:      libraryPrefix + "test-set",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name,
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
 		}
 		serviceAccountNames := resp.Data["service_account_names"].([]string)
-		if len(serviceAccountNames) != 2 {
-			t.Fatal("expected 2")
+		if len(serviceAccountNames) != len(ts.svcAccountNames) {
+			t.Fatalf("expected %d", len(ts.svcAccountNames))
 		}
 		disableCheckInEnforcement := resp.Data["disable_check_in_enforcement"].(bool)
 		if disableCheckInEnforcement {
@@ -336,44 +430,48 @@ func ReadSetToggleOff(b logical.Backend, s logical.Storage) func(t *testing.T) {
 	}
 }
 
-func ReadSetStatus(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) ReadSetStatus() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.ReadOperation,
-			Path:      libraryPrefix + "test-set/status",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name + "/status",
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
 		}
-		if len(resp.Data) != 2 {
-			t.Fatal("length should be 2 because there are two service accounts in this set")
+		if len(resp.Data) != len(ts.svcAccountNames) {
+			t.Fatalf("expected %d service accounts in this set", len(ts.svcAccountNames))
 		}
-		if resp.Data["tester1@example.com"] == nil {
-			t.Fatal("expected non-nil map")
-		}
-		testerStatus := resp.Data["tester1@example.com"].(map[string]interface{})
-		if !testerStatus["available"].(bool) {
-			t.Fatal("should be available for checkout")
+		for i := 0; i < len(ts.svcAccountNames); i++ {
+			n := ts.svcAccountNames[i]
+			if resp.Data[n] == nil {
+				t.Fatal("expected non-nil map")
+			}
+			testerStatus := resp.Data[n].(map[string]interface{})
+			if !testerStatus["available"].(bool) {
+				t.Fatal("should be available for checkout")
+			}
 		}
 	}
 }
 
-func WriteSetWithConflictingServiceAccounts(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) WriteSetWithConflictingServiceAccounts() func(t *testing.T) {
+	existingSvcAcc := ts.svcAccountNames[0]
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.CreateOperation,
 			Path:      libraryPrefix + "test-set2",
-			Storage:   s,
+			Storage:   ts.s,
 			Data: map[string]interface{}{
-				"service_account_names": "tester1@example.com",
+				"service_account_names": existingSvcAcc,
 			},
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -383,16 +481,16 @@ func WriteSetWithConflictingServiceAccounts(b logical.Backend, s logical.Storage
 	}
 }
 
-func ListSets(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) ListSets(expectedListResp []string) func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.ListOperation,
 			Path:      libraryPrefix,
-			Storage:   s,
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
@@ -401,25 +499,42 @@ func ListSets(b logical.Backend, s logical.Storage) func(t *testing.T) {
 			t.Fatal("expected non-nil data")
 		}
 		listedKeys := resp.Data["keys"].([]string)
-		if len(listedKeys) != 1 {
-			t.Fatalf("expected 1 key but received %s", listedKeys)
-		}
-		if "test-set" != listedKeys[0] {
-			t.Fatal("expected test-set to be the only listed item")
-		}
+		require.Equal(t, expectedListResp, listedKeys)
 	}
 }
 
-func DeleteSet(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) ListSetsHierarchy(path string, expectedListResp []string) func(t *testing.T) {
+	return func(t *testing.T) {
+		req := &logical.Request{
+			Operation: logical.ListOperation,
+			Path:      libraryPrefix + path + "/",
+			Storage:   ts.s,
+		}
+		resp, err := ts.b.HandleRequest(context.Background(), req)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
+		}
+		if resp == nil {
+			t.Fatal("expected a response")
+		}
+		if resp.Data["keys"] == nil {
+			t.Fatal("expected non-nil data")
+		}
+		listedKeys := resp.Data["keys"].([]string)
+		require.Equal(t, expectedListResp, listedKeys)
+	}
+}
+
+func (ts testSuite) DeleteSet() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.DeleteOperation,
-			Path:      libraryPrefix + "test-set",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name,
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp != nil {
 			t.Fatalf("expected an empty response, got: %v", resp)
@@ -427,50 +542,43 @@ func DeleteSet(b logical.Backend, s logical.Storage) func(t *testing.T) {
 	}
 }
 
-func CheckInitialStatus(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) CheckInitialStatus() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.ReadOperation,
-			Path:      libraryPrefix + "test-set/status",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name + "/status",
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
 		}
-		if resp.Data["tester1@example.com"] == nil {
-			t.Fatal("expected map to not be nil")
-		}
-		tester1CheckOut := resp.Data["tester1@example.com"].(map[string]interface{})
-		available := tester1CheckOut["available"].(bool)
-		if !available {
-			t.Fatal("tester1 should be available")
-		}
-
-		if resp.Data["tester2@example.com"] == nil {
-			t.Fatal("expected map to not be nil")
-		}
-		tester2CheckOut := resp.Data["tester2@example.com"].(map[string]interface{})
-		available = tester2CheckOut["available"].(bool)
-		if !available {
-			t.Fatal("tester2 should be available")
+		for _, svcAcc := range ts.svcAccountNames {
+			if resp.Data[svcAcc] == nil {
+				t.Fatal("expected map to not be nil")
+			}
+			tester1CheckOut := resp.Data[svcAcc].(map[string]interface{})
+			available := tester1CheckOut["available"].(bool)
+			if !available {
+				t.Fatalf("%s should be available", svcAcc)
+			}
 		}
 	}
 }
 
-func PerformCheckOut(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) PerformCheckOut() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.UpdateOperation,
-			Path:      libraryPrefix + "test-set/check-out",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name + "/check-out",
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
@@ -503,16 +611,16 @@ func PerformCheckOut(b logical.Backend, s logical.Storage) func(t *testing.T) {
 	}
 }
 
-func CheckUpdatedStatus(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) CheckUpdatedStatus() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.ReadOperation,
-			Path:      libraryPrefix + "test-set/status",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name + "/status",
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
@@ -521,16 +629,16 @@ func CheckUpdatedStatus(b logical.Backend, s logical.Storage) func(t *testing.T)
 			t.Fatal("expected data to not be nil")
 		}
 
-		if resp.Data["tester1@example.com"] == nil {
+		if resp.Data[ts.svcAccountNames[0]] == nil {
 			t.Fatal("expected map to not be nil")
 		}
-		tester1CheckOut := resp.Data["tester1@example.com"].(map[string]interface{})
+		tester1CheckOut := resp.Data[ts.svcAccountNames[0]].(map[string]interface{})
 		tester1Available := tester1CheckOut["available"].(bool)
 
-		if resp.Data["tester2@example.com"] == nil {
+		if resp.Data[ts.svcAccountNames[1]] == nil {
 			t.Fatal("expected map to not be nil")
 		}
-		tester2CheckOut := resp.Data["tester2@example.com"].(map[string]interface{})
+		tester2CheckOut := resp.Data[ts.svcAccountNames[1]].(map[string]interface{})
 		tester2Available := tester2CheckOut["available"].(bool)
 
 		if tester1Available && tester2Available {
@@ -539,16 +647,16 @@ func CheckUpdatedStatus(b logical.Backend, s logical.Storage) func(t *testing.T)
 	}
 }
 
-func NormalCheckIn(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) NormalCheckIn() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.UpdateOperation,
-			Path:      libraryPrefix + "test-set/check-in",
-			Storage:   s,
+			Path:      libraryPrefix + ts.name + "/check-in",
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
@@ -560,16 +668,16 @@ func NormalCheckIn(b logical.Backend, s logical.Storage) func(t *testing.T) {
 	}
 }
 
-func ForceCheckIn(b logical.Backend, s logical.Storage) func(t *testing.T) {
+func (ts testSuite) ForceCheckIn() func(t *testing.T) {
 	return func(t *testing.T) {
 		req := &logical.Request{
 			Operation: logical.UpdateOperation,
-			Path:      libraryPrefix + "manage/test-set/check-in",
-			Storage:   s,
+			Path:      libraryManagePrefix + ts.name + "/check-in",
+			Storage:   ts.s,
 		}
-		resp, err := b.HandleRequest(context.Background(), req)
+		resp, err := ts.b.HandleRequest(context.Background(), req)
 		if err != nil || (resp != nil && resp.IsError()) {
-			t.Fatal(err)
+			t.Fatalf("err: %v, resp: %v", err, resp.Error())
 		}
 		if resp == nil {
 			t.Fatal("expected a response")
@@ -581,7 +689,7 @@ func ForceCheckIn(b logical.Backend, s logical.Storage) func(t *testing.T) {
 	}
 }
 
-func Test_librarySet_Validate(t *testing.T) {
+func TestCheckOut_librarySet_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
 		set     *librarySet
@@ -630,4 +738,12 @@ func Test_librarySet_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func getTestSvcAccountNames(name string, count int) []string {
+	var s []string
+	for i := 0; i < count; i++ {
+		s = append(s, fmt.Sprintf("%s-tester-%d@example.com", name, i))
+	}
+	return s
 }

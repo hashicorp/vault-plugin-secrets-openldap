@@ -6,6 +6,7 @@ package openldap
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-secure-stdlib/strutil"
@@ -14,7 +15,10 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-const libraryPrefix = "library/"
+const (
+	libraryPrefix       = "library/"
+	libraryManagePrefix = "library/manage/"
+)
 
 type librarySet struct {
 	ServiceAccountNames       []string      `json:"service_account_names"`
@@ -45,7 +49,7 @@ func (l *librarySet) Validate() error {
 func (b *backend) pathListSets() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: libraryPrefix + "?$",
+			Pattern: strings.TrimSuffix(libraryPrefix, "/") + optionalGenericNameWithForwardSlashListRegex("path"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "list",
@@ -55,14 +59,21 @@ func (b *backend) pathListSets() []*framework.Path {
 					Callback: b.listSetsOperation,
 				},
 			},
+			Fields: map[string]*framework.FieldSchema{
+				"path": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "Path of sets to list",
+				},
+			},
 			HelpSynopsis:    pathListSetsHelpSyn,
 			HelpDescription: pathListSetsHelpDesc,
 		},
 	}
 }
 
-func (b *backend) listSetsOperation(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
-	keys, err := req.Storage.List(ctx, libraryPrefix)
+func (b *backend) listSetsOperation(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	setPath := data.Get("path").(string)
+	keys, err := req.Storage.List(ctx, libraryPrefix+setPath)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +83,7 @@ func (b *backend) listSetsOperation(ctx context.Context, req *logical.Request, _
 func (b *backend) pathSets() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: libraryPrefix + framework.GenericNameRegex("name"),
+			Pattern: strings.TrimSuffix(libraryPrefix, "/") + genericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAPLibrary,
 			},

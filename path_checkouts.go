@@ -6,6 +6,7 @@ package openldap
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/armon/go-metrics"
@@ -19,7 +20,7 @@ const checkoutKeyType = "checkout-creds"
 func (b *backend) pathSetCheckOut() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: libraryPrefix + framework.GenericNameRegex("name") + "/check-out$",
+			Pattern: strings.TrimSuffix(libraryPrefix, "/") + genericNameWithForwardSlashRegex("name") + "/check-out$",
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "check-out",
@@ -183,7 +184,7 @@ func (b *backend) endCheckOut(ctx context.Context, req *logical.Request, _ *fram
 func (b *backend) pathSetCheckIn() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: libraryPrefix + framework.GenericNameRegex("name") + "/check-in$",
+			Pattern: strings.TrimSuffix(libraryPrefix, "/") + genericNameWithForwardSlashRegex("name") + "/check-in$",
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "check-in",
@@ -213,7 +214,7 @@ func (b *backend) pathSetCheckIn() []*framework.Path {
 func (b *backend) pathSetManageCheckIn() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: libraryPrefix + "manage/" + framework.GenericNameRegex("name") + "/check-in$",
+			Pattern: strings.TrimSuffix(libraryManagePrefix, "/") + genericNameWithForwardSlashRegex("name") + "/check-in$",
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "force-check-in",
@@ -328,7 +329,7 @@ func (b *backend) operationCheckIn(overrideCheckInEnforcement bool) framework.Op
 func (b *backend) pathSetStatus() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: libraryPrefix + framework.GenericNameRegex("name") + "/status$",
+			Pattern: strings.TrimSuffix(libraryPrefix, "/") + genericNameWithForwardSlashRegex("name") + "/status$",
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAPLibrary,
 				OperationVerb:   "check-status",

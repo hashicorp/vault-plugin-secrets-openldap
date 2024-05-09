@@ -51,6 +51,19 @@ func Backend(client ldapClient) *backend {
 			},
 		},
 		Paths: framework.PathAppend(
+			// These paths must be at the top of the list since their regex
+			// Patterns are the most specific. Otherwise, a more generic regex
+			// will swallow the request because role and set names can contain
+			// arbitrary numbers of slashes.
+			// For example, a request to `library/:set_name/check-in` could be
+			// swallowed by the regex for `library/:set_name`.
+			b.pathSetManageCheckIn(),
+			b.pathSetCheckIn(),
+			b.pathSetCheckOut(),
+			b.pathSetStatus(),
+
+			// These paths are more generic than the above. They must be
+			// appended last.
 			b.pathListStaticRoles(),
 			b.pathConfig(),
 			b.pathDynamicRoles(),
@@ -58,12 +71,8 @@ func Backend(client ldapClient) *backend {
 			b.pathStaticRoles(),
 			b.pathStaticCredsCreate(),
 			b.pathRotateCredentials(),
-			b.pathSetCheckIn(),
-			b.pathSetManageCheckIn(),
-			b.pathSetCheckOut(),
-			b.pathSetStatus(),
-			b.pathSets(),
 			b.pathListSets(),
+			b.pathSets(),
 		),
 		InitializeFunc: b.initialize,
 		Secrets: []*framework.Secret{

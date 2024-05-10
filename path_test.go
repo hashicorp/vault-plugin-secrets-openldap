@@ -70,11 +70,17 @@ func TestPathRegex(t *testing.T) {
 			input:   "prefix/foo-.bar",
 			want:    map[string]string{"value": "foo-.bar"},
 		},
-		// TODO(JM): this should work
-		// "multi-part-special-chars": {
+		"multi-part-special-chars": {
+			pattern: "prefix" + genericNameWithForwardSlashRegex("value"),
+			input:   "prefix/foo-.bar/baz-.qux",
+			want:    map[string]string{"value": "foo-.bar/baz-.qux"},
+		},
+		// TODO(JM): this should error
+		// "multi-part-special-chars-error": {
 		// 	pattern: "prefix" + genericNameWithForwardSlashRegex("value"),
 		// 	input:   "prefix/foo-.bar/baz-.",
-		// 	want:    map[string]string{"value": "foo-.bar/baz-."},
+		// 	want:    nil,
+		// 	wantErr: true,
 		// },
 		// TODO(JM): this should error
 		// "multi-part-error-special-chars": {
@@ -83,17 +89,26 @@ func TestPathRegex(t *testing.T) {
 		// 	want:    nil,
 		// 	wantErr: true,
 		// },
+		// TODO(JM): this should error
+		// "multi-part-error-special-chars": {
+		// 	pattern: "prefix" + genericNameWithForwardSlashRegex("value"),
+		// 	input:   "prefix/foo-.@bar/baz",
+		// 	want:    nil,
+		// 	wantErr: true,
+		// },
 	}
 
 	for name, tc := range tests {
-		re, _ := regexp.Compile(tc.pattern)
-		got, err := getCaptures(re, tc.input)
-		if tc.wantErr {
-			require.Error(t, err, "failed test: "+name)
-		} else {
-			require.NoError(t, err, "failed test: "+name)
-			require.Equal(t, tc.want, got, "failed test: "+name)
-		}
+		t.Run(name, func(t *testing.T) {
+			re, _ := regexp.Compile(tc.pattern)
+			got, err := getCaptures(re, tc.input)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.want, got)
+			}
+		})
 	}
 }
 

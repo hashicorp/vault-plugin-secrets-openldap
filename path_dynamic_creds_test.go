@@ -368,6 +368,46 @@ func TestDynamicCredsRead_success(t *testing.T) {
 	}
 }
 
+func TestDynamicCredsRead_success_hierarchicalRolePath(t *testing.T) {
+	t.Run("read dynamic role creds with hierarchical role path", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+		configureOpenLDAPMount(t, b, storage)
+
+		roles := []string{"org/secure", "org/platform/dev", "org/platform/support"}
+
+		// create all the roles
+		for _, role := range roles {
+			data := getTestDynamicRoleConfig(role)
+			resp, err := createDynamicRoleWithData(t, b, storage, role, data)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("err:%s resp:%#v\n", err, resp)
+			}
+		}
+
+		// read all the creds
+		for _, rolePath := range roles {
+			req := &logical.Request{
+				Operation: logical.ReadOperation,
+				Path:      dynamicCredPath + rolePath,
+				Storage:   storage,
+			}
+			resp, err := b.HandleRequest(context.Background(), req)
+			require.NoError(t, err)
+
+			username := getStringT(t, resp.Data, "username")
+			require.NotEmpty(t, username)
+			require.Contains(t, username, rolePath)
+
+			password := getStringT(t, resp.Data, "password")
+			require.NotEmpty(t, password)
+
+			dns := getStringSlice(t, resp.Data, "distinguished_names")
+			require.Len(t, dns, 1)
+		}
+	})
+}
+
 func TestSecretCredsRenew(t *testing.T) {
 	roleName := "testrole"
 	now := time.Now()

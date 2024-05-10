@@ -504,7 +504,7 @@ func TestListRoles(t *testing.T) {
 		for _, rolePath := range rolePaths {
 			req := &logical.Request{
 				Operation: logical.ListOperation,
-				Path:      staticRolePath + "/" + rolePath,
+				Path:      staticRolePath + rolePath,
 				Storage:   storage,
 				Data:      nil,
 			}
@@ -515,7 +515,6 @@ func TestListRoles(t *testing.T) {
 			}
 
 			keys := resp.Data["keys"].([]string)
-			t.Logf("keys: %#+v", keys)
 			if len(keys) != 2 {
 				t.Fatalf("expected list with %d keys, got %d", 2, len(keys))
 			}

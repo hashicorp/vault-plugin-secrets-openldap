@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"path"
+	"strings"
 	"time"
 
 	"github.com/go-ldap/ldif"
@@ -27,7 +27,7 @@ const (
 func (b *backend) pathDynamicRoles() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: path.Join(dynamicRolePath, framework.GenericNameRegex("name")),
+			Pattern: strings.TrimSuffix(dynamicRolePath, "/") + genericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationSuffix: "dynamic-role",
@@ -84,11 +84,17 @@ func (b *backend) pathDynamicRoles() []*framework.Path {
 			HelpDescription: staticRoleHelpDescription,
 		},
 		{
-			Pattern: dynamicRolePath + "?$",
+			Pattern: strings.TrimSuffix(dynamicRolePath, "/") + optionalGenericNameWithForwardSlashListRegex("path"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "list",
 				OperationSuffix: "dynamic-roles",
+			},
+			Fields: map[string]*framework.FieldSchema{
+				"path": {
+					Type:        framework.TypeLowerCaseString,
+					Description: "Path of roles to list",
+				},
 			},
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ListOperation: &framework.PathOperation{
@@ -286,7 +292,8 @@ func (b *backend) pathDynamicRoleRead(ctx context.Context, req *logical.Request,
 }
 
 func (b *backend) pathDynamicRoleList(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roles, err := req.Storage.List(ctx, dynamicRolePath)
+	rolePath := data.Get("path").(string)
+	roles, err := req.Storage.List(ctx, dynamicRolePath+rolePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list roles: %w", err)
 	}

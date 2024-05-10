@@ -6,6 +6,7 @@ package openldap
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-ldap/ldif"
@@ -21,7 +22,7 @@ import (
 func (b *backend) pathDynamicCredsCreate() []*framework.Path {
 	return []*framework.Path{
 		{
-			Pattern: dynamicCredPath + framework.GenericNameRegex("name"),
+			Pattern: strings.TrimSuffix(dynamicCredPath, "/") + genericNameWithForwardSlashRegex("name"),
 			DisplayAttrs: &framework.DisplayAttributes{
 				OperationPrefix: operationPrefixLDAP,
 				OperationVerb:   "request",

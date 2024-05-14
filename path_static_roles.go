@@ -32,8 +32,7 @@ func genericNameWithForwardSlashRegex(name string) string {
 // including a role path in list options. The role path can be used to list
 // nested roles at arbitrary depth.
 func optionalGenericNameWithForwardSlashListRegex(name string) string {
-	// TODO(JM): List regex should support optional trailing slash
-	return fmt.Sprintf("/?(/(?P<%s>.+/))?", name)
+	return fmt.Sprintf("/?(?P<%s>.+)?", name)
 }
 
 func (b *backend) pathListStaticRoles() []*framework.Path {

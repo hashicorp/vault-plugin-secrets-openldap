@@ -64,15 +64,15 @@ func Backend(client ldapClient) *backend {
 
 			// These paths are more generic than the above. They must be
 			// appended last.
-			b.pathListStaticRoles(),
 			b.pathConfig(),
 			b.pathDynamicRoles(),
 			b.pathDynamicCredsCreate(),
 			b.pathStaticRoles(),
 			b.pathStaticCredsCreate(),
+			b.pathListStaticRoles(),
 			b.pathRotateCredentials(),
-			b.pathListSets(),
 			b.pathSets(),
+			b.pathListSets(),
 		),
 		InitializeFunc: b.initialize,
 		Secrets: []*framework.Secret{

@@ -498,8 +498,6 @@ func TestListRoles(t *testing.T) {
 			}
 		}
 
-		// TODO(JM): List regex should support optional trailing slash
-		// rolePaths := []string{"org", "org/", "org/platform", "org/platform/"}
 		rolePaths := []string{"org/", "org/platform/"}
 		for _, rolePath := range rolePaths {
 			req := &logical.Request{
@@ -509,7 +507,6 @@ func TestListRoles(t *testing.T) {
 				Data:      nil,
 			}
 			resp, err := b.HandleRequest(context.Background(), req)
-
 			if err != nil || (resp != nil && resp.IsError()) {
 				t.Fatalf("path: %s, err:%s resp:%#v\n", rolePath, err, resp)
 			}

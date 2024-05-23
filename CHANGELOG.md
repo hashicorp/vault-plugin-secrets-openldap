@@ -1,5 +1,13 @@
 ## Unreleased
 
+## v0.13.0
+
+FEATURES:
+* Enable role and set names with hierarchical paths
+  * https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/102
+  * https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/104
+  * https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/105
+
 IMPROVEMENTS:
 * Updated dependencies (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/101):
    * `github.com/go-ldap/ldap/v3` v3.4.4 -> v3.4.6

@@ -238,13 +238,17 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	name := data.Get("name").(string)
 
+	if strings.Contains(name, "/") {
+		return logical.ErrorResponse("role names can not contain slashes"), nil
+	}
+
 	// Grab the exclusive lock as well potentially pop and re-push the queue item
 	// for this role
 	lock := locksutil.LockForKey(b.roleLocks, name)
 	lock.Lock()
 	defer lock.Unlock()
 
-	role, err := b.staticRole(ctx, req.Storage, data.Get("name").(string))
+	role, err := b.staticRole(ctx, req.Storage, name)
 	if err != nil {
 		return nil, err
 	}

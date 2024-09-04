@@ -62,6 +62,13 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 			continue
 		}
 
+		// It's possible the role was created with a slash in the name, in which case List() will only return the first
+		// part of it, and role will be nil. It's effectively an orphan at this point.
+		if role == nil {
+			log.Warn("unable to read static role, possibly due to a malformed role name", "role", roleName)
+			continue
+		}
+
 		item := queue.Item{
 			Key:      roleName,
 			Priority: role.StaticAccount.NextRotationTime().Unix(),

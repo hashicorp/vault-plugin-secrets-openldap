@@ -10,9 +10,7 @@
   * `github.com/hashicorp/go-secure-stdlib/parseutil` v0.1.7 -> v0.1.8
   * `github.com/hashicorp/vault/api` v1.13.0 -> v1.14.0
   * `github.com/hashicorp/vault/sdk` v0.12.0 -> v0.13.0
-  * `github.com/ory/dockertest/v3` v3.10.0 -> v3.11.0
   * `golang.org/x/text` v0.14.0 -> v0.18.0
-  * `github.com/hashicorp/go-secure-stdlib/plugincontainer` v0.3.0 -> v0.4.0
   * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
 
 ## v0.13.0

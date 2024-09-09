@@ -12,6 +12,7 @@
   * `github.com/hashicorp/vault/sdk` v0.12.0 -> v0.13.0
   * `golang.org/x/text` v0.14.0 -> v0.18.0
   * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
+* bump .go-version to 1.22.6
 
 ## v0.13.0
 

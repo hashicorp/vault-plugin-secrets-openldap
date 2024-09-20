@@ -16,6 +16,85 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestInitQueueHierarchicalPaths tests that the static role rotation queue
+// gets initialized with all the roles from storage.
+func TestInitQueueHierarchicalPaths(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		roles []string
+	}{
+		{
+			"empty",
+			[]string{},
+		},
+		{
+			"single-role-non-hierarchical-path",
+			[]string{"a"},
+		},
+		{
+			"single-hierarchical-path",
+			[]string{"a/b/c/d"},
+		},
+		{
+			"multi-role-non-hierarchical-path",
+			[]string{"a", "b"},
+		},
+		{
+			"multi-role-with-hierarchical-path",
+			[]string{"a", "a/b"},
+		},
+		{
+			"multi-role-multi-hierarchical-path",
+			[]string{"a", "a/b", "a/b/c/d/e", "f"},
+		},
+		{
+			"multi-role-all-hierarchical-path",
+			[]string{"a/b", "a/b/c", "d/e/f", "d/e/f/h/i/j", "d/e/f/h/x"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			config := &logical.BackendConfig{
+				Logger: logging.NewVaultLogger(log.Debug),
+
+				System: &logical.StaticSystemView{
+					DefaultLeaseTTLVal: defaultLeaseTTLVal,
+					MaxLeaseTTLVal:     maxLeaseTTLVal,
+				},
+				StorageView: &logical.InmemStorage{},
+			}
+
+			b := Backend(&fakeLdapClient{throwErrs: false})
+			b.Setup(context.Background(), config)
+
+			b.credRotationQueue = queue.New()
+			initCtx := context.Background()
+			ictx, cancel := context.WithCancel(initCtx)
+			b.cancelQueue = cancel
+
+			defer b.Cleanup(ctx)
+			configureOpenLDAPMount(t, b, config.StorageView)
+
+			for _, r := range tc.roles {
+				createRole(t, b, config.StorageView, r)
+			}
+
+			// Reset the rotation queue to simulate startup memory state
+			b.credRotationQueue = queue.New()
+
+			// Now finish the startup process by populating the queue
+			b.initQueue(ictx, &logical.InitializationRequest{
+				Storage: config.StorageView,
+			})
+
+			queueLen := b.credRotationQueue.Len()
+			if queueLen != len(tc.roles) {
+				t.Fatalf("unexpected rotated queue length: got=%d, want=%d", queueLen, len(tc.roles))
+			}
+		})
+	}
+}
+
 func TestAutoRotate(t *testing.T) {
 	t.Run("auto rotate role", func(t *testing.T) {
 		b, storage := getBackend(false)

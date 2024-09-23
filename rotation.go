@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-secure-stdlib/base62"
@@ -32,6 +33,7 @@ const (
 // rotations have been processed. It lists the roles from storage and searches
 // for any that have an associated static account, then adds them to the
 // priority queue for rotations.
+
 func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 	log := b.Logger()
 	log.Info("populating role rotation queue")
@@ -42,9 +44,9 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 		log.Warn("unable to load rotation WALs", "error", err)
 	}
 
-	roles, err := s.List(ctx, staticRolePath)
+	roles, err := b.getAllStaticRoles(ctx, s)
 	if err != nil {
-		log.Warn("unable to list role for enqueueing", "error", err)
+		log.Warn("unable to list roles for enqueueing", "error", err)
 		return
 	}
 
@@ -59,6 +61,10 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 		role, err := b.staticRole(ctx, s, roleName)
 		if err != nil {
 			log.Warn("unable to read static role", "error", err, "role", roleName)
+			continue
+		}
+		if role == nil {
+			log.Error("role not found in storage", "roleName", roleName)
 			continue
 		}
 
@@ -578,4 +584,51 @@ func (b *backend) popFromRotationQueueByKey(name string) (*queue.Item, error) {
 		}
 	}
 	return nil, queue.ErrEmpty
+}
+
+// getAllStaticRoles returns a slice of all static roles from storage
+func (b *backend) getAllStaticRoles(ctx context.Context, s logical.Storage) ([]string, error) {
+	var allRoles []string
+
+	roles, err := s.List(ctx, staticRolePath)
+	if err != nil {
+		return allRoles, fmt.Errorf("unable to list roles: %w", err)
+	}
+
+	// Roles can be defined with hierarchical paths, e.g. "foo/bar/baz". But
+	// the storage.List() call to the top-level static role path will only
+	// return the top-level keys in the hierarchy. So we perform a
+	// non-recursive breadth-first search through all the keys returned from
+	// storage.List(). If a given node points to a static role, we append to
+	// the return slice.
+	for i := 0; i < len(roles); i++ {
+		path := roles[i]
+
+		role, err := b.staticRole(ctx, s, path)
+		if err != nil {
+			return allRoles, fmt.Errorf("unable to read static role %q: %w", path, err)
+		}
+
+		if role == nil && strings.HasSuffix(path, "/") {
+			// this is a directory
+			subPaths, err := s.List(ctx, staticRolePath+path)
+			if err != nil {
+				return allRoles, fmt.Errorf("unable to list roles: %w", err)
+			}
+
+			// append to the roles slice to continue search in the sub-directory
+			for _, subPath := range subPaths {
+				// prevent infinite loop but this should never happen
+				if subPath == "" {
+					continue
+				}
+				subPath = fmt.Sprintf("%s%s", path, subPath)
+				roles = append(roles, subPath)
+			}
+		} else {
+			// a role exists at this path, append to the return slice
+			allRoles = append(allRoles, path)
+		}
+	}
+	return allRoles, nil
 }

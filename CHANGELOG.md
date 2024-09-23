@@ -1,5 +1,10 @@
 ## Unreleased
 
+## v0.14.1
+
+BUG FIXES:
+* fix a panic on init when static roles have names defined as hierarchical paths (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/115)
+
 ## v0.14.0
 
 ### IMPROVEMENTS:

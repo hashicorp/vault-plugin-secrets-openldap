@@ -82,10 +82,16 @@ func TestInitQueueHierarchicalPaths(t *testing.T) {
 			// Reset the rotation queue to simulate startup memory state
 			b.credRotationQueue = queue.New()
 
+			// Load managed LDAP users into memory from storage
+			staticRoles, err := b.loadManagedUsers(ictx, config.StorageView)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			// Now finish the startup process by populating the queue
 			b.initQueue(ictx, &logical.InitializationRequest{
 				Storage: config.StorageView,
-			})
+			}, staticRoles)
 
 			queueLen := b.credRotationQueue.Len()
 			if queueLen != len(tc.roles) {
@@ -379,10 +385,16 @@ func TestStoredWALsCorrectlyProcessed(t *testing.T) {
 			// Reset the rotation queue to simulate startup memory state
 			b.credRotationQueue = queue.New()
 
+			// Load managed LDAP users into memory from storage
+			staticRoles, err := b.loadManagedUsers(ictx, config.StorageView)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			// Now finish the startup process by populating the queue, which should discard the WAL
 			b.initQueue(ictx, &logical.InitializationRequest{
 				Storage: config.StorageView,
-			})
+			}, staticRoles)
 
 			if tc.shouldRotate {
 				requireWALs(t, config.StorageView, 1)

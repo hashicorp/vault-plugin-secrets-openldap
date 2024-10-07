@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/go-secure-stdlib/base62"
@@ -33,8 +32,7 @@ const (
 // rotations have been processed. It lists the roles from storage and searches
 // for any that have an associated static account, then adds them to the
 // priority queue for rotations.
-
-func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
+func (b *backend) populateQueue(ctx context.Context, s logical.Storage, roles map[string]*roleEntry) {
 	log := b.Logger()
 	log.Info("populating role rotation queue")
 
@@ -42,25 +40,6 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage) {
 	walMap, err := b.loadStaticWALs(ctx, s)
 	if err != nil {
 		log.Warn("unable to load rotation WALs", "error", err)
-	}
-
-	roles := map[string]*roleEntry{}
-	f := func(roleName string) (bool, error) {
-		entry, err := b.staticRole(ctx, s, roleName)
-		if err != nil {
-			log.Warn("unable to read static role", "error", err, "role", roleName)
-			return false, err
-		}
-		entryExists := entry != nil && !strings.HasSuffix(roleName, "/")
-		if entryExists {
-			roles[roleName] = entry
-		}
-		return entryExists, nil
-	}
-	err = walkStoragePath(ctx, s, staticRolePath, f)
-	if err != nil {
-		log.Warn("unable to list roles for enqueueing", "error", err)
-		return
 	}
 
 	for roleName, role := range roles {
@@ -460,7 +439,7 @@ func (b *backend) GeneratePassword(ctx context.Context, cfg *config) (string, er
 // not wait for success or failure of it's tasks before continuing. This is to
 // avoid blocking the mount process while loading and evaluating existing roles,
 // etc.
-func (b *backend) initQueue(ctx context.Context, conf *logical.InitializationRequest) {
+func (b *backend) initQueue(ctx context.Context, conf *logical.InitializationRequest, staticRoles map[string]*roleEntry) {
 	// Verify this mount is on the primary server, or is a local mount. If not, do
 	// not create a queue or launch a ticker. Both processing the WAL list and
 	// populating the queue are done sequentially and before launching a
@@ -472,7 +451,7 @@ func (b *backend) initQueue(ctx context.Context, conf *logical.InitializationReq
 		b.Logger().Info("initializing database rotation queue")
 
 		// Load roles and populate queue with static accounts
-		b.populateQueue(ctx, conf.Storage)
+		b.populateQueue(ctx, conf.Storage, staticRoles)
 
 		// Launch ticker
 		go b.runTicker(ctx, conf.Storage)

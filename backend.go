@@ -89,7 +89,8 @@ func Backend(client ldapClient) *backend {
 
 func (b *backend) initialize(ctx context.Context, initRequest *logical.InitializationRequest) error {
 	// Load managed LDAP users into memory from storage
-	if err := b.loadManagedUsers(ctx, initRequest.Storage); err != nil {
+	staticRoles, err := b.loadManagedUsers(ctx, initRequest.Storage)
+	if err != nil {
 		return err
 	}
 
@@ -99,7 +100,7 @@ func (b *backend) initialize(ctx context.Context, initRequest *logical.Initializ
 	b.cancelQueue = cancel
 
 	// Load static role queue and kickoff new periodic ticker
-	go b.initQueue(ictx, initRequest)
+	go b.initQueue(ictx, initRequest, staticRoles)
 
 	return nil
 }
@@ -199,7 +200,7 @@ func walkStoragePath(ctx context.Context, s logical.Storage, path string, walker
 // loadManagedUsers loads users managed by the secrets engine from storage into
 // the backend's managedUsers set. Users are loaded from both the static role and
 // check-in/check-out systems. Returns an error if one occurs during loading.
-func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error {
+func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) (map[string]*roleEntry, error) {
 	log := b.Logger()
 	b.managedUserLock.Lock()
 	defer b.managedUserLock.Unlock()
@@ -225,7 +226,7 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 	}
 	err := walkStoragePath(ctx, s, staticRolePath, roleFunc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for roleName, role := range roles {
@@ -258,7 +259,7 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 	}
 	err = walkStoragePath(ctx, s, libraryPrefix, setFunc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for setName, set := range librarySets {
 		if set == nil {
@@ -276,7 +277,7 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 		}
 	}
 
-	return nil
+	return roles, nil
 }
 
 const backendHelp = `

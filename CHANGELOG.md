@@ -1,5 +1,9 @@
 ## Unreleased
 
+BUG FIXES:
+
+* fix a panic on static role creation when the config is unset (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/119)
+
 ## v0.14.1
 
 BUG FIXES:

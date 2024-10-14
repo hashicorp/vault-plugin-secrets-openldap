@@ -55,12 +55,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 				OperationVerb:   "rotate",
 				OperationSuffix: "static-role",
 			},
-			Fields: map[string]*framework.FieldSchema{
-				"name": {
-					Type:        framework.TypeString,
-					Description: "Name of the static role",
-				},
-			},
+			Fields: fieldsForType(rotateRolePath),
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback:                    b.pathRotateRoleCredentialsUpdate,

@@ -27,6 +27,11 @@ BUG FIXES:
   * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
 * bump .go-version to 1.22.6
 
+## v0.13.2
+
+BUG FIXES:
+* fix case sensitivity issues in the role rotation process (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/118)
+
 ## v0.13.1
 
 BUG FIXES:

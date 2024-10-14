@@ -471,7 +471,7 @@ func (b *backend) pathStaticRoleList(ctx context.Context, req *logical.Request, 
 }
 
 func (b *backend) staticRole(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
-	completeRole := strings.ToLower(staticRolePath + roleName)
+	completeRole := staticRolePath + roleName
 	entry, err := s.Get(ctx, completeRole)
 	if err != nil {
 		return nil, err

@@ -55,12 +55,7 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 				OperationVerb:   "rotate",
 				OperationSuffix: "static-role",
 			},
-			Fields: map[string]*framework.FieldSchema{
-				"name": {
-					Type:        framework.TypeString,
-					Description: "Name of the static role",
-				},
-			},
+			Fields: fieldsForType(rotateRolePath),
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback:                    b.pathRotateRoleCredentialsUpdate,
@@ -124,7 +119,7 @@ due to %s, configure a new binddn and bindpass to restore ldap function`, pwdSto
 }
 
 func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	name := strings.ToLower(data.Get("name").(string)) // Convert to lowercase
+	name := data.Get("name").(string)
 	if name == "" {
 		return logical.ErrorResponse("empty role name attribute given"), nil
 	}

@@ -6,6 +6,7 @@ package openldap
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -229,7 +230,7 @@ func TestPasswordPolicyModificationInvalidatesWAL(t *testing.T) {
 		requireWALs(t, storage, 1)
 
 		// The role password should still be the password generated from policy 1
-		role, err := b.staticRole(ctx, storage, tc.testName)
+		role, err := b.staticRole(ctx, storage, strings.ToLower(tc.testName))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,7 +254,7 @@ func TestPasswordPolicyModificationInvalidatesWAL(t *testing.T) {
 		}
 
 		// The role password should be the password generated from policy 2
-		role, err = b.staticRole(ctx, storage, tc.testName)
+		role, err = b.staticRole(ctx, storage, strings.ToLower(tc.testName))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -289,7 +290,7 @@ func TestRollsPasswordForwardsUsingWAL(t *testing.T) {
 		configureOpenLDAPMount(t, b, storage)
 		createRole(t, b, storage, "hashicorp")
 
-		role, err := b.staticRole(ctx, storage, tc.testName)
+		role, err := b.staticRole(ctx, storage, strings.ToLower(tc.testName))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -301,7 +302,7 @@ func TestRollsPasswordForwardsUsingWAL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		role, err = b.staticRole(ctx, storage, tc.testName)
+		role, err = b.staticRole(ctx, storage, strings.ToLower(tc.testName))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -320,7 +321,7 @@ func TestRollsPasswordForwardsUsingWAL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		role, err = b.staticRole(ctx, storage, tc.testName)
+		role, err = b.staticRole(ctx, storage, strings.ToLower(tc.testName))
 		if err != nil {
 			t.Fatal(err)
 		}

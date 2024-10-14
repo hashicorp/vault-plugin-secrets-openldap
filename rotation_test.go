@@ -5,6 +5,8 @@ package openldap
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -124,104 +126,132 @@ func TestAutoRotate(t *testing.T) {
 // a password policy change should cause the WAL to be discarded and a new
 // password to be generated using the updated policy.
 func TestPasswordPolicyModificationInvalidatesWAL(t *testing.T) {
-	ctx := context.Background()
-	b, storage := getBackend(false)
-	defer b.Cleanup(ctx)
+	for _, tc := range []struct {
+		testName string
+	}{
+		{
+			"hashicorp",
+		},
+		{
+			"HASHICORP",
+		},
+		{
+			"hashicORp",
+		},
+	} {
+		ctx := context.Background()
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
 
-	configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy1)
-	createRole(t, b, storage, "hashicorp")
+		configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy1)
+		createRole(t, b, storage, "hashicorp")
 
-	// Create a WAL entry from a partial failure to rotate
-	generateWALFromFailedRotation(t, b, storage, "hashicorp")
-	requireWALs(t, storage, 1)
+		// Create a WAL entry from a partial failure to rotate
+		generateWALFromFailedRotation(t, b, storage, "hashicorp")
+		requireWALs(t, storage, 1)
 
-	// The role password should still be the password generated from policy 1
-	role, err := b.staticRole(ctx, storage, "hashicorp")
-	if err != nil {
-		t.Fatal(err)
+		// The role password should still be the password generated from policy 1
+		role, err := b.staticRole(ctx, storage, strings.ToLower(tc.testName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if role.StaticAccount.Password != testPasswordFromPolicy1 {
+			t.Fatalf("expected %v, got %v", testPasswordFromPolicy1, role.StaticAccount.Password)
+		}
+
+		// Update the password policy on the configuration
+		configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy2)
+
+		// Manually rotate the role. It should not use the password from the WAL entry
+		// created earlier. Instead, it should result in generation of a new password
+		// using the updated policy 2.
+		_, err = b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      "rotate-role/hashicorp",
+			Storage:   storage,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// The role password should be the password generated from policy 2
+		role, err = b.staticRole(ctx, storage, strings.ToLower(tc.testName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if role.StaticAccount.Password != testPasswordFromPolicy2 {
+			t.Fatalf("expected %v, got %v", testPasswordFromPolicy2, role.StaticAccount.Password)
+		}
+		if role.StaticAccount.LastPassword != testPasswordFromPolicy1 {
+			t.Fatalf("expected %v, got %v", testPasswordFromPolicy1, role.StaticAccount.LastPassword)
+		}
+
+		// The WAL entry should be deleted after the successful rotation
+		requireWALs(t, storage, 0)
 	}
-	if role.StaticAccount.Password != testPasswordFromPolicy1 {
-		t.Fatalf("expected %v, got %v", testPasswordFromPolicy1, role.StaticAccount.Password)
-	}
-
-	// Update the password policy on the configuration
-	configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy2)
-
-	// Manually rotate the role. It should not use the password from the WAL entry
-	// created earlier. Instead, it should result in generation of a new password
-	// using the updated policy 2.
-	_, err = b.HandleRequest(ctx, &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "rotate-role/hashicorp",
-		Storage:   storage,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// The role password should be the password generated from policy 2
-	role, err = b.staticRole(ctx, storage, "hashicorp")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if role.StaticAccount.Password != testPasswordFromPolicy2 {
-		t.Fatalf("expected %v, got %v", testPasswordFromPolicy2, role.StaticAccount.Password)
-	}
-	if role.StaticAccount.LastPassword != testPasswordFromPolicy1 {
-		t.Fatalf("expected %v, got %v", testPasswordFromPolicy1, role.StaticAccount.LastPassword)
-	}
-
-	// The WAL entry should be deleted after the successful rotation
-	requireWALs(t, storage, 0)
 }
 
 func TestRollsPasswordForwardsUsingWAL(t *testing.T) {
-	ctx := context.Background()
-	b, storage := getBackend(false)
-	defer b.Cleanup(ctx)
-	configureOpenLDAPMount(t, b, storage)
-	createRole(t, b, storage, "hashicorp")
+	for _, tc := range []struct {
+		testName string
+	}{
+		{
+			"hashicorp",
+		},
+		{
+			"HASHICORP",
+		},
+		{
+			"hashicORp",
+		},
+	} {
+		ctx := context.Background()
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+		createRole(t, b, storage, "hashicorp")
 
-	role, err := b.staticRole(ctx, storage, "hashicorp")
-	if err != nil {
-		t.Fatal(err)
-	}
-	oldPassword := role.StaticAccount.Password
+		role, err := b.staticRole(ctx, storage, strings.ToLower(tc.testName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		oldPassword := role.StaticAccount.Password
 
-	generateWALFromFailedRotation(t, b, storage, "hashicorp")
-	walIDs := requireWALs(t, storage, 1)
-	wal, err := b.findStaticWAL(ctx, storage, walIDs[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	role, err = b.staticRole(ctx, storage, "hashicorp")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Role's password should still be the WAL's old password
-	if role.StaticAccount.Password != oldPassword {
-		t.Fatal(role.StaticAccount.Password, oldPassword)
-	}
+		generateWALFromFailedRotation(t, b, storage, tc.testName)
+		walIDs := requireWALs(t, storage, 1)
+		wal, err := b.findStaticWAL(ctx, storage, walIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		role, err = b.staticRole(ctx, storage, strings.ToLower(tc.testName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Role's password should still be the WAL's old password
+		if role.StaticAccount.Password != oldPassword {
+			t.Fatal(role.StaticAccount.Password, oldPassword)
+		}
 
-	// Trigger a retry on the rotation, it should use WAL's new password
-	_, err = b.HandleRequest(ctx, &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "rotate-role/hashicorp",
-		Storage:   storage,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+		// Trigger a retry on the rotation, it should use WAL's new password
+		_, err = b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      fmt.Sprintf("rotate-role/%s", tc.testName),
+			Storage:   storage,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	role, err = b.staticRole(ctx, storage, "hashicorp")
-	if err != nil {
-		t.Fatal(err)
+		role, err = b.staticRole(ctx, storage, strings.ToLower(tc.testName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if role.StaticAccount.Password != wal.NewPassword {
+			t.Fatal(role.StaticAccount.Password, wal.NewPassword)
+		}
+		// WAL should be cleared by the successful rotate
+		requireWALs(t, storage, 0)
 	}
-	if role.StaticAccount.Password != wal.NewPassword {
-		t.Fatal(role.StaticAccount.Password, wal.NewPassword)
-	}
-	// WAL should be cleared by the successful rotate
-	requireWALs(t, storage, 0)
 }
 
 func TestStoredWALsCorrectlyProcessed(t *testing.T) {

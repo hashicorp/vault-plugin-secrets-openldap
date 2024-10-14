@@ -1,5 +1,59 @@
 ## Unreleased
 
+## v0.14.2
+
+BUG FIXES:
+
+* fix a panic on static role creation when the config is unset (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/119)
+
+* fix case sensitivity issues in the role rotation process (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/118)
+
+## v0.14.1
+
+BUG FIXES:
+* fix a panic on init when static roles have names defined as hierarchical paths (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/115)
+
+## v0.14.0
+
+### IMPROVEMENTS:
+
+* update dependencies [GH-113](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/113)
+  * `github.com/go-ldap/ldap/v3` v3.4.6 -> v3.4.8
+  * `github.com/hashicorp/go-hclog` v1.6.2 -> v1.6.3
+  * `github.com/hashicorp/go-secure-stdlib/parseutil` v0.1.7 -> v0.1.8
+  * `github.com/hashicorp/vault/api` v1.13.0 -> v1.14.0
+  * `github.com/hashicorp/vault/sdk` v0.12.0 -> v0.13.0
+  * `golang.org/x/text` v0.14.0 -> v0.18.0
+  * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
+* bump .go-version to 1.22.6
+
+## v0.13.1
+
+BUG FIXES:
+* fix a panic on init when static roles have names defined as hierarchical paths (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/116)
+
+## v0.13.0
+
+FEATURES:
+* Enable role and set names with hierarchical paths
+  * https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/102
+  * https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/104
+  * https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/105
+
+IMPROVEMENTS:
+* Updated dependencies (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/101):
+   * `github.com/go-ldap/ldap/v3` v3.4.4 -> v3.4.6
+   * `github.com/hashicorp/go-hclog` v1.5.0 -> v1.6.2
+   * `github.com/hashicorp/go-secure-stdlib/parseutil` v0.1.7 -> v0.1.8
+   * `github.com/hashicorp/vault/api` v1.9.2 -> v1.13.0
+   * `github.com/hashicorp/vault/sdk` v0.11.1-0.20240325190132-c20eae3e84c5 -> v0.12.0
+   * `github.com/stretchr/testify` v1.8.4 -> v1.9.0
+
+## v0.12.2
+
+### BUG FIXES:
+* fix case sensitivity issues in the role rotation process
+
 ## v0.12.1
 
 ### BUG FIXES:

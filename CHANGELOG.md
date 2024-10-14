@@ -1,8 +1,12 @@
 ## Unreleased
 
+## v0.14.2
+
 BUG FIXES:
 
 * fix a panic on static role creation when the config is unset (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/119)
+
+* fix case sensitivity issues in the role rotation process (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/118)
 
 ## v0.14.1
 

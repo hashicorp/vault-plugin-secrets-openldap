@@ -129,6 +129,22 @@ func TestCheckOutHierarchicalPaths(t *testing.T) {
 		tSuiteForList = ts
 	}
 
+	// Reset the managed users to simulate startup memory state
+	b.managedUsers = make(map[string]struct{})
+	// Now finish the startup process by populating the managed users
+	b.loadManagedUsers(ctx, s)
+
+	for _, setName := range setNames {
+		ts := testSuite{
+			b:               b,
+			s:               s,
+			name:            setName,
+			svcAccountNames: getTestSvcAccountNames(setName, 2),
+		}
+
+		t.Run("write conflicting set", ts.WriteSetWithConflictingServiceAccounts())
+	}
+
 	tests := []struct {
 		path             string
 		expectedListResp []string
@@ -143,7 +159,7 @@ func TestCheckOutHierarchicalPaths(t *testing.T) {
 	}
 
 	// `LIST /library`
-	// will direct sub-keys split on "/" for the FIRST level (split) only
+	// will return direct sub-keys split on "/" for the FIRST level (split) only
 	t.Run("list library hierarchy", tSuiteForList.ListSets([]string{"foo", "org/"}))
 }
 

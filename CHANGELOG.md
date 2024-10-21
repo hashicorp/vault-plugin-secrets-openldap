@@ -1,5 +1,11 @@
 ## Unreleased
 
+## v0.14.3
+
+BUG FIXES:
+
+* fix an edge case where add an LDAP user or service account can be added to more than one role or set (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/123)
+
 ## v0.14.2
 
 BUG FIXES:

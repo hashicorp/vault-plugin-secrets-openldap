@@ -1,5 +1,13 @@
 ## Unreleased
 
+## v0.14.2
+
+BUG FIXES:
+
+* fix a panic on static role creation when the config is unset (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/119)
+
+* fix case sensitivity issues in the role rotation process (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/118)
+
 ## v0.14.1
 
 BUG FIXES:
@@ -18,6 +26,11 @@ BUG FIXES:
   * `golang.org/x/text` v0.14.0 -> v0.18.0
   * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
 * bump .go-version to 1.22.6
+
+## v0.13.1
+
+BUG FIXES:
+* fix a panic on init when static roles have names defined as hierarchical paths (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/116)
 
 ## v0.13.0
 

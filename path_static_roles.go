@@ -5,7 +5,6 @@ package openldap
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -318,8 +317,12 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// otherwise, go get it if this is a create request.
 		c, err := readConfig(ctx, req.Storage)
 		if err != nil {
-			return nil, errors.New("couldn't find configuration for this create operation's endpoint")
+			return nil, err
 		}
+		if c == nil {
+			return logical.ErrorResponse("missing LDAP configuration"), nil
+		}
+
 		skipRotation = c.SkipStaticRoleImportRotation
 	}
 
@@ -468,7 +471,8 @@ func (b *backend) pathStaticRoleList(ctx context.Context, req *logical.Request, 
 }
 
 func (b *backend) staticRole(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
-	entry, err := s.Get(ctx, staticRolePath+roleName)
+	completeRole := staticRolePath + roleName
+	entry, err := s.Get(ctx, completeRole)
 	if err != nil {
 		return nil, err
 	}

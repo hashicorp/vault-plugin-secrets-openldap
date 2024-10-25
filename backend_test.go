@@ -57,7 +57,7 @@ func getBackend(throwsErr bool) (*backend, logical.Storage) {
 	// Load queue and kickoff new periodic ticker
 	b.initQueue(ictx, &logical.InitializationRequest{
 		Storage: config.StorageView,
-	})
+	}, nil)
 
 	return b, config.StorageView
 }

@@ -5,6 +5,7 @@ package openldap
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -88,7 +89,8 @@ func Backend(client ldapClient) *backend {
 
 func (b *backend) initialize(ctx context.Context, initRequest *logical.InitializationRequest) error {
 	// Load managed LDAP users into memory from storage
-	if err := b.loadManagedUsers(ctx, initRequest.Storage); err != nil {
+	staticRoles, err := b.loadManagedUsers(ctx, initRequest.Storage)
+	if err != nil {
 		return err
 	}
 
@@ -98,7 +100,7 @@ func (b *backend) initialize(ctx context.Context, initRequest *logical.Initializ
 	b.cancelQueue = cancel
 
 	// Load static role queue and kickoff new periodic ticker
-	go b.initQueue(ictx, initRequest)
+	go b.initQueue(ictx, initRequest, staticRoles)
 
 	return nil
 }
@@ -149,10 +151,57 @@ type backend struct {
 	checkOutLocks []*locksutil.LockEntry
 }
 
+// walkfunc type takes a storage path argument and returns true if a storage
+// entry exists, false otherwise
+type walkFunc func(string) (bool, error)
+
+// walkStoragePath performs a non-recursive breadth-first search of the given
+// storage path and applies the walkfunc to each storage entry
+func walkStoragePath(ctx context.Context, s logical.Storage, path string, walker walkFunc) error {
+	keys, err := s.List(ctx, path)
+	if err != nil {
+		return fmt.Errorf("unable to list keys: %w", err)
+	}
+
+	// Storage entries can be defined with hierarchical paths, e.g.
+	// "foo/bar/baz". But the storage.List() call to the top-level key will
+	// only return the top-level keys in the hierarchy. So we perform a
+	// non-recursive breadth-first search through all the keys returned from
+	// storage.List() and apply the walkfunc.
+	for i := 0; i < len(keys); i++ {
+		key := keys[i]
+
+		entryExists, err := walker(key)
+		if err != nil {
+			return fmt.Errorf("unable to read entry %q: %w", key, err)
+		}
+
+		if !entryExists && strings.HasSuffix(key, "/") {
+			// this is a directory
+			subKeys, err := s.List(ctx, path+key)
+			if err != nil {
+				return fmt.Errorf("unable to list keys: %w", err)
+			}
+
+			// append to the keys slice to continue search in the sub-directory
+			for _, subKey := range subKeys {
+				// prevent infinite loop but this should never happen
+				if subKey == "" {
+					continue
+				}
+				subKey = fmt.Sprintf("%s%s", key, subKey)
+				keys = append(keys, subKey)
+			}
+		}
+	}
+	return nil
+}
+
 // loadManagedUsers loads users managed by the secrets engine from storage into
 // the backend's managedUsers set. Users are loaded from both the static role and
 // check-in/check-out systems. Returns an error if one occurs during loading.
-func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error {
+func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) (map[string]*roleEntry, error) {
+	log := b.Logger()
 	b.managedUserLock.Lock()
 	defer b.managedUserLock.Unlock()
 
@@ -162,16 +211,26 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 	b.managedUsers = make(map[string]struct{})
 
 	// Load users managed under static roles
-	staticRoles, err := s.List(ctx, staticRolePath)
-	if err != nil {
-		return err
-	}
-	for _, roleName := range staticRoles {
-		staticRole, err := b.staticRole(ctx, s, roleName)
+	roles := map[string]*roleEntry{}
+	roleFunc := func(roleName string) (bool, error) {
+		entry, err := b.staticRole(ctx, s, roleName)
 		if err != nil {
-			return err
+			log.Warn("unable to read static role", "error", err, "role", roleName)
+			return false, err
 		}
-		if staticRole == nil || staticRole.StaticAccount == nil {
+		entryExists := entry != nil && !strings.HasSuffix(roleName, "/")
+		if entryExists {
+			roles[roleName] = entry
+		}
+		return entryExists, nil
+	}
+	err := walkStoragePath(ctx, s, staticRolePath, roleFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	for roleName, role := range roles {
+		if role == nil || role.StaticAccount == nil {
 			// This indicates that a static role returned from the list operation was
 			// deleted before the read operation in this loop. This shouldn't happen
 			// at this point in the plugin lifecycle, so we'll log if it does.
@@ -181,19 +240,28 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 		}
 
 		// Add the static role user to the managed user set
-		b.managedUsers[staticRole.StaticAccount.Username] = struct{}{}
+		b.managedUsers[role.StaticAccount.Username] = struct{}{}
 	}
 
 	// Load users managed under library sets
-	librarySets, err := s.List(ctx, libraryPrefix)
-	if err != nil {
-		return err
-	}
-	for _, setName := range librarySets {
-		set, err := readSet(ctx, s, setName)
+	librarySets := map[string]*librarySet{}
+	setFunc := func(setName string) (bool, error) {
+		entry, err := readSet(ctx, s, setName)
 		if err != nil {
-			return err
+			log.Warn("unable to read library set", "error", err, "set", setName)
+			return false, err
 		}
+		entryExists := entry != nil && !strings.HasSuffix(setName, "/")
+		if entryExists {
+			librarySets[setName] = entry
+		}
+		return entryExists, nil
+	}
+	err = walkStoragePath(ctx, s, libraryPrefix, setFunc)
+	if err != nil {
+		return nil, err
+	}
+	for setName, set := range librarySets {
 		if set == nil {
 			// This indicates that a library set returned from the list operation was
 			// deleted before the read operation in this loop. This shouldn't happen
@@ -209,7 +277,7 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) error
 		}
 	}
 
-	return nil
+	return roles, nil
 }
 
 const backendHelp = `

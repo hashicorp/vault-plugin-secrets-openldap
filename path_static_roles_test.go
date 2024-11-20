@@ -435,6 +435,123 @@ func TestRoles(t *testing.T) {
 	})
 }
 
+func TestRoles_NewPasswordGeneration(t *testing.T) {
+	ctx := context.Background()
+	b, storage := getBackend(false)
+	defer b.Cleanup(ctx)
+	configureOpenLDAPMount(t, b, storage)
+
+	// Create the role
+	roleName := "hashicorp"
+	createRole(t, b, storage, roleName)
+
+	t.Run("rotation failures should generate new password on retry", func(t *testing.T) {
+		// Fail to rotate the role
+		generateWALFromFailedRotation(t, b, storage, roleName)
+
+		// Get WAL
+		walIDs := requireWALs(t, storage, 1)
+		wal, err := b.findStaticWAL(ctx, storage, walIDs[0])
+		if err != nil || wal == nil {
+			t.Fatal(err)
+		}
+
+		// Store password
+		initialPassword := wal.NewPassword
+
+		// Rotate role manually and fail again
+		generateWALFromFailedRotation(t, b, storage, roleName)
+
+		// Get WAL
+		walIDs = requireWALs(t, storage, 1)
+		wal, err = b.findStaticWAL(ctx, storage, walIDs[0])
+		if err != nil || wal == nil {
+			t.Fatal(err)
+		}
+
+		// Confirm new WAL credential was created
+		newPassword := wal.NewPassword
+		if initialPassword == newPassword {
+			t.Fatalf("expected password to be different on second retry")
+		}
+
+		// Successfully rotate the role
+		_, err = b.HandleRequest(context.Background(), &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      "rotate-role/" + roleName,
+			Storage:   storage,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Ensure WAL is flushed
+		walIDs = requireWALs(t, storage, 0)
+
+		// Read the role
+		resp, err := readStaticRole(t, b, storage, roleName)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		// Confirm successful rotation uses different password than WAL password
+		if resp.Data["password"] == newPassword {
+			t.Fatalf("expected password to be different after rotation")
+		}
+	})
+
+	t.Run("updating password policy should generate new password", func(t *testing.T) {
+		// Fail to rotate the role
+		generateWALFromFailedRotation(t, b, storage, roleName)
+
+		// Get WAL
+		walIDs := requireWALs(t, storage, 1)
+		wal, err := b.findStaticWAL(ctx, storage, walIDs[0])
+		if err != nil || wal == nil {
+			t.Fatal(err)
+		}
+
+		expectedPassword := wal.NewPassword
+
+		// Update Password Policy
+		configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy1, true)
+
+		// Rotate role manually and fail again
+		generateWALFromFailedRotation(t, b, storage, roleName)
+		// Get WAL
+		walIDs = requireWALs(t, storage, 1)
+		wal, err = b.findStaticWAL(ctx, storage, walIDs[0])
+		if err != nil || wal == nil {
+			t.Fatal(err)
+		}
+
+		// confirm new password is generated and is different from previous password
+		newPassword := wal.NewPassword
+		if expectedPassword == newPassword {
+			t.Fatalf("expected password to be different on second retry")
+		}
+
+		// confirm new password uses policy
+		if newPassword != testPasswordFromPolicy1 {
+			t.Fatalf("expected password %s, got %s", testPasswordFromPolicy1, newPassword)
+		}
+
+		// Successfully rotate the role
+		_, err = b.HandleRequest(context.Background(), &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      "rotate-role/" + roleName,
+			Storage:   storage,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Ensure WAL is flushed
+		walIDs = requireWALs(t, storage, 0)
+	})
+
+}
+
 func TestListRoles(t *testing.T) {
 	t.Run("list roles", func(t *testing.T) {
 		b, storage := getBackend(false)
@@ -631,10 +748,10 @@ func TestWALsDeletedOnRoleDeletion(t *testing.T) {
 func configureOpenLDAPMount(t *testing.T, b *backend, storage logical.Storage) {
 	t.Helper()
 
-	configureOpenLDAPMountWithPasswordPolicy(t, b, storage, "")
+	configureOpenLDAPMountWithPasswordPolicy(t, b, storage, "", false)
 }
 
-func configureOpenLDAPMountWithPasswordPolicy(t *testing.T, b *backend, storage logical.Storage, policy string) {
+func configureOpenLDAPMountWithPasswordPolicy(t *testing.T, b *backend, storage logical.Storage, policy string, isUpdate bool) {
 	t.Helper()
 
 	data := map[string]interface{}{
@@ -648,8 +765,12 @@ func configureOpenLDAPMountWithPasswordPolicy(t *testing.T, b *backend, storage 
 		data["password_policy"] = policy
 	}
 
+	operation := logical.CreateOperation
+	if isUpdate {
+		operation = logical.UpdateOperation
+	}
 	resp, err := b.HandleRequest(context.Background(), &logical.Request{
-		Operation: logical.CreateOperation,
+		Operation: operation,
 		Path:      configPath,
 		Storage:   storage,
 		Data:      data,

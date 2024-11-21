@@ -343,6 +343,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 			// Generate a new WAL entry and credential
 			output.WALID = ""
 		default:
+			// Reuse the password from the existing WAL entry
 			newPassword = wal.NewPassword
 			usedExistingWAL = true
 		}

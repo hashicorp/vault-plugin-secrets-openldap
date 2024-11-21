@@ -321,6 +321,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	}
 
 	var newPassword string
+	var usedExistingWAL bool
 	if output.WALID != "" {
 		wal, err := b.findStaticWAL(ctx, s, output.WALID)
 		if err != nil {
@@ -342,17 +343,8 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 			// Generate a new WAL entry and credential
 			output.WALID = ""
 		default:
-			// TODO update once users have finer control over password policies
-			// once policies can be updated, update to reuse the stored WAL password
-			// this is a workaround to avoid infinite loop of reusing failing passwords
-			// https://hashicorp.atlassian.net/browse/VAULT-31104
-			b.Logger().Debug("password stored in WAL failed, generating new password", "role", input.RoleName, "WAL ID", output.WALID)
-			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
-				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
-			}
-
-			// Generate a new WAL entry and credential
-			output.WALID = ""
+			newPassword = wal.NewPassword
+			usedExistingWAL = true
 		}
 	}
 
@@ -393,6 +385,17 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		err = b.client.UpdateUserPassword(config.LDAP, input.Role.StaticAccount.Username, newPassword)
 	}
 	if err != nil {
+		if usedExistingWAL {
+			// A retried password has failed again. Delete WAL and try with fresh password
+			b.Logger().Debug("password stored in WAL failed, deleting WAL", "role", input.RoleName, "WAL ID", output.WALID)
+			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
+			}
+
+			// Generate a new WAL entry and credential for next attempt
+			output.WALID = ""
+		}
+
 		return output, err
 	}
 

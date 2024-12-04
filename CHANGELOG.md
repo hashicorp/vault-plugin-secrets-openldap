@@ -1,5 +1,9 @@
 ## Unreleased
 
+BUG FIXES:
+
+* Update static role rotation to generate a new password after 2 failed attempts (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/125)
+
 ## v0.14.3
 
 BUG FIXES:

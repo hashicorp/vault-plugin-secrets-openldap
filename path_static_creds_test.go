@@ -121,3 +121,18 @@ func TestCreds(t *testing.T) {
 		}
 	})
 }
+
+func readStaticCred(t *testing.T, b *backend, storage logical.Storage, roleName string) *logical.Response {
+	t.Helper()
+	req := &logical.Request{
+		Operation: logical.ReadOperation,
+		Path:      staticCredPath + roleName,
+		Storage:   storage,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if resp == nil || err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+	return resp
+}

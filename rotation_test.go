@@ -143,7 +143,7 @@ func TestPasswordPolicyModificationInvalidatesWAL(t *testing.T) {
 		b, storage := getBackend(false)
 		defer b.Cleanup(ctx)
 
-		configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy1)
+		configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy1, false)
 		createRole(t, b, storage, "hashicorp")
 
 		// Create a WAL entry from a partial failure to rotate
@@ -160,7 +160,7 @@ func TestPasswordPolicyModificationInvalidatesWAL(t *testing.T) {
 		}
 
 		// Update the password policy on the configuration
-		configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy2)
+		configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy2, false)
 
 		// Manually rotate the role. It should not use the password from the WAL entry
 		// created earlier. Instead, it should result in generation of a new password

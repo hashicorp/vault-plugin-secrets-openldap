@@ -328,6 +328,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	}
 
 	var newPassword string
+	var usedCredentialFromPreviousRotation bool
 	if output.WALID != "" {
 		wal, err := b.findStaticWAL(ctx, s, output.WALID)
 		if err != nil {
@@ -351,6 +352,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		default:
 			// Reuse the password from the existing WAL entry
 			newPassword = wal.NewPassword
+			usedCredentialFromPreviousRotation = true
 		}
 	}
 
@@ -391,6 +393,16 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		err = b.client.UpdateUserPassword(config.LDAP, input.Role.StaticAccount.Username, newPassword)
 	}
 	if err != nil {
+		if usedCredentialFromPreviousRotation {
+			b.Logger().Debug("password stored in WAL failed, deleting WAL", "role", input.RoleName, "WAL ID", output.WALID)
+			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
+			}
+
+			// Generate a new WAL entry and credential for next attempt
+			output.WALID = ""
+		}
+
 		return output, err
 	}
 

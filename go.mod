@@ -1,6 +1,6 @@
 module github.com/hashicorp/vault-plugin-secrets-openldap
 
-go 1.20
+go 1.23
 
 require (
 	github.com/armon/go-metrics v0.4.1

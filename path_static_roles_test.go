@@ -486,7 +486,6 @@ func TestRoles_NewPasswordGeneration(t *testing.T) {
 		if resp.Data["password"] == initialPassword {
 			t.Fatalf("expected password to be different after second retry")
 		}
-
 	})
 
 	t.Run("updating password policy should generate new password", func(t *testing.T) {
@@ -538,7 +537,6 @@ func TestRoles_NewPasswordGeneration(t *testing.T) {
 		// Ensure WAL is flushed
 		walIDs = requireWALs(t, storage, 0)
 	})
-
 }
 
 func TestListRoles(t *testing.T) {

@@ -312,6 +312,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// if we were asked to not rotate, just add the entry - this essentially becomes an update operation, except
 		// the item is new
 		if skipRotation {
+			n := time.Now()
+			role.StaticAccount.LastVaultRotation = n
 			entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
 			if err != nil {
 				return nil, err
@@ -325,7 +327,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 				Key: name,
 			}
 			// synthetically set lvr to now, so that it gets queued correctly
-			lvr = time.Now()
+			lvr = n
 			break
 		} else {
 			// setStaticAccountPassword calls Storage.Put and saves the role to storage

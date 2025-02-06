@@ -326,16 +326,31 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		skipRotation = c.SkipStaticRoleImportRotation
 	}
 
-	// lvr represents the role's LastVaultRotation
-	lvr := role.StaticAccount.LastVaultRotation
+	lastVaultRotation := role.StaticAccount.LastVaultRotation
 
 	// Only call setStaticAccountPassword if we're creating the role for the first time
 	var item *queue.Item
 	switch req.Operation {
 	case logical.CreateOperation:
-		// if we were asked to not rotate, just add the entry - this essentially becomes an update operation, except
-		// the item is new
 		if skipRotation {
+			b.Logger().Debug("skipping static role import rotation", "role", name)
+
+			// Synthetically set lastVaultRotation to now so that it gets
+			// queued correctly.
+			//
+			// We intentionally do not set role.StaticAccount.LastVaultRotation
+			// because the zero value indicates Vault has not rotated the
+			// password yet.
+			lastVaultRotation = time.Now()
+
+			// NextVaultRotation allows us to calculate the TTL on GET
+			// /static-creds requests and to calculate the queue priority in
+			// populateQueue() across restarts. We can't rely on
+			// LastVaultRotation in these cases bacause, when import rotation
+			// is skipped, LastVaultRotation is set to a zero value in storage.
+			role.StaticAccount.SetNextVaultRotation(lastVaultRotation)
+
+			// we were told not to rotate, just add the entry
 			entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
 			if err != nil {
 				return nil, err
@@ -348,8 +363,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			item = &queue.Item{
 				Key: name,
 			}
-			// synthetically set lvr to now, so that it gets queued correctly
-			lvr = time.Now()
 			break
 		} else {
 			// setStaticAccountPassword calls Storage.Put and saves the role to storage
@@ -372,7 +385,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 				return nil, err
 			}
 			// guard against RotationTime not being set or zero-value
-			lvr = resp.RotationTime
+			lastVaultRotation = resp.RotationTime
 			item = &queue.Item{
 				Key: name,
 			}
@@ -397,7 +410,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 	}
 
-	item.Priority = lvr.Add(role.StaticAccount.RotationPeriod).Unix()
+	item.Priority = lastVaultRotation.Add(role.StaticAccount.RotationPeriod).Unix()
 
 	// Add their rotation to the queue
 	if err := b.pushItem(item); err != nil {
@@ -432,6 +445,10 @@ type staticAccount struct {
 	// LastVaultRotation represents the last time Vault rotated the password
 	LastVaultRotation time.Time `json:"last_vault_rotation"`
 
+	// NextVaultRotation represents the next time Vault is expected to rotate
+	// the password
+	NextVaultRotation time.Time `json:"next_vault_rotation"`
+
 	// RotationPeriod is number in seconds between each rotation, effectively a
 	// "time to live". This value is compared to the LastVaultRotation to
 	// determine if a password needs to be rotated
@@ -441,7 +458,16 @@ type staticAccount struct {
 // NextRotationTime calculates the next rotation by adding the Rotation Period
 // to the last known vault rotation
 func (s *staticAccount) NextRotationTime() time.Time {
+	// LastVaultRotation can be zero if we skipped import rotation
+	if s.LastVaultRotation.IsZero() {
+		return s.NextVaultRotation
+	}
 	return s.LastVaultRotation.Add(s.RotationPeriod)
+}
+
+// SetNextVaultRotation
+func (s *staticAccount) SetNextVaultRotation(t time.Time) {
+	s.NextVaultRotation = t.Add(s.RotationPeriod)
 }
 
 // PasswordTTL calculates the approximate time remaining until the password is

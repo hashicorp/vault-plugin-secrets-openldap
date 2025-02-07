@@ -458,11 +458,7 @@ type staticAccount struct {
 // NextRotationTime calculates the next rotation by adding the Rotation Period
 // to the last known vault rotation
 func (s *staticAccount) NextRotationTime() time.Time {
-	// LastVaultRotation can be zero if we skipped import rotation
-	if s.LastVaultRotation.IsZero() {
-		return s.NextVaultRotation
-	}
-	return s.LastVaultRotation.Add(s.RotationPeriod)
+	return s.NextVaultRotation
 }
 
 // SetNextVaultRotation sets the next vault rotation to time t plus the role's

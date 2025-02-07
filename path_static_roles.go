@@ -345,7 +345,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			// NextVaultRotation allows calculating the TTL on GET /static-creds
 			// requests and to calculate the queue priority in populateQueue()
 			// across restarts. We can't rely on LastVaultRotation in these
-			// cases bacause, when import rotation is skipped, LastVaultRotation
+			// cases because, when import rotation is skipped, LastVaultRotation
 			// is set to a zero value in storage.
 			role.StaticAccount.SetNextVaultRotation(lastVaultRotation)
 

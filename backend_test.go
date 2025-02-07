@@ -59,6 +59,7 @@ func getBackendWithConfig(c *logical.BackendConfig, throwsErr bool) (*backend, *
 	return b, c
 }
 
+// testBackendConfig returns a backend config with inmem storage
 func testBackendConfig() *logical.BackendConfig {
 	return &logical.BackendConfig{
 		Logger: logging.NewVaultLogger(log.Debug),

@@ -55,45 +55,18 @@ func TestInitQueueHierarchicalPaths(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			config := &logical.BackendConfig{
-				Logger: logging.NewVaultLogger(log.Debug),
+			b, config := getBackendWithConfig(testBackendConfig(), false)
+			defer b.Cleanup(context.Background())
+			storage := config.StorageView
 
-				System: &logical.StaticSystemView{
-					DefaultLeaseTTLVal: defaultLeaseTTLVal,
-					MaxLeaseTTLVal:     maxLeaseTTLVal,
-				},
-				StorageView: &logical.InmemStorage{},
-			}
-
-			b := Backend(&fakeLdapClient{throwErrs: false})
-			b.Setup(context.Background(), config)
-
-			b.credRotationQueue = queue.New()
-			initCtx := context.Background()
-			ictx, cancel := context.WithCancel(initCtx)
-			b.cancelQueue = cancel
-
-			defer b.Cleanup(ctx)
-			configureOpenLDAPMount(t, b, config.StorageView)
+			configureOpenLDAPMount(t, b, storage)
 
 			for _, r := range tc.roles {
 				createRole(t, b, config.StorageView, r)
 			}
 
-			// Reset the rotation queue to simulate startup memory state
-			b.credRotationQueue = queue.New()
-
-			// Load managed LDAP users into memory from storage
-			staticRoles, err := b.loadManagedUsers(ictx, config.StorageView)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// Now finish the startup process by populating the queue
-			b.initQueue(ictx, &logical.InitializationRequest{
-				Storage: config.StorageView,
-			}, staticRoles)
+			// Reload backend to similate a Vault restart/startup memory state
+			getBackendWithConfig(config, false)
 
 			queueLen := b.credRotationQueue.Len()
 			if queueLen != len(tc.roles) {
@@ -263,9 +236,8 @@ func TestAutoRotate(t *testing.T) {
 			t.Fatal("expected last_password to be empty, it wasn't")
 		}
 
-		// Reload backend to similate a Vault restart
+		// Reload backend to similate a Vault restart/startup memory state
 		getBackendWithConfig(config, false)
-		time.Sleep(6 * time.Second)
 
 		resp = readStaticCred(t, b, storage, roleName)
 

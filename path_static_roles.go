@@ -451,7 +451,7 @@ type staticAccount struct {
 
 	// RotationPeriod is number in seconds between each rotation, effectively a
 	// "time to live". This value is compared to the LastVaultRotation to
-	// determine if a password needs to be rotated.
+	// determine if a password needs to be rotated
 	RotationPeriod time.Duration `json:"rotation_period"`
 }
 
@@ -465,7 +465,8 @@ func (s *staticAccount) NextRotationTime() time.Time {
 	return s.LastVaultRotation.Add(s.RotationPeriod)
 }
 
-// SetNextVaultRotation
+// SetNextVaultRotation sets the next vault rotation to time t plus the role's
+// rotation period.
 func (s *staticAccount) SetNextVaultRotation(t time.Time) {
 	s.NextVaultRotation = t.Add(s.RotationPeriod)
 }

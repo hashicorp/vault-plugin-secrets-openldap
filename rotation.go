@@ -55,8 +55,6 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage, roles ma
 			continue
 		}
 
-		log.Debug("JMF - populateQueue", "lvr", role.StaticAccount.LastVaultRotation)
-		log.Debug("JMF - populateQueue", "lvr is zero?", role.StaticAccount.LastVaultRotation.IsZero())
 		item := queue.Item{
 			Key:      roleName,
 			Priority: role.StaticAccount.NextRotationTime().Unix(),
@@ -193,7 +191,6 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 		// Break out of the for loop
 		return false
 	}
-	b.Logger().Debug(">>> JMF - ROTATE")
 
 	input := &setStaticAccountInput{
 		RoleName: item.Key,

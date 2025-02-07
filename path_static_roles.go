@@ -337,17 +337,16 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 
 			// Synthetically set lastVaultRotation to now so that it gets
 			// queued correctly.
-			//
-			// We intentionally do not set role.StaticAccount.LastVaultRotation
+			// NOTE: We intentionally do not set role.StaticAccount.LastVaultRotation
 			// because the zero value indicates Vault has not rotated the
 			// password yet.
 			lastVaultRotation = time.Now()
 
-			// NextVaultRotation allows us to calculate the TTL on GET
-			// /static-creds requests and to calculate the queue priority in
-			// populateQueue() across restarts. We can't rely on
-			// LastVaultRotation in these cases bacause, when import rotation
-			// is skipped, LastVaultRotation is set to a zero value in storage.
+			// NextVaultRotation allows calculating the TTL on GET /static-creds
+			// requests and to calculate the queue priority in populateQueue()
+			// across restarts. We can't rely on LastVaultRotation in these
+			// cases bacause, when import rotation is skipped, LastVaultRotation
+			// is set to a zero value in storage.
 			role.StaticAccount.SetNextVaultRotation(lastVaultRotation)
 
 			// we were told not to rotate, just add the entry
@@ -442,7 +441,8 @@ type staticAccount struct {
 	// This is returned on credential requests if it exists.
 	LastPassword string `json:"last_password"`
 
-	// LastVaultRotation represents the last time Vault rotated the password
+	// LastVaultRotation represents the last time Vault rotated the password. A
+	// zero value indicates the the password has never been rotated by Vault.
 	LastVaultRotation time.Time `json:"last_vault_rotation"`
 
 	// NextVaultRotation represents the next time Vault is expected to rotate
@@ -451,7 +451,7 @@ type staticAccount struct {
 
 	// RotationPeriod is number in seconds between each rotation, effectively a
 	// "time to live". This value is compared to the LastVaultRotation to
-	// determine if a password needs to be rotated
+	// determine if a password needs to be rotated.
 	RotationPeriod time.Duration `json:"rotation_period"`
 }
 

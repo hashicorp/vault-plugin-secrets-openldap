@@ -118,6 +118,78 @@ func TestAutoRotate(t *testing.T) {
 			t.Fatal("expected last_password to be equal to old password after auto rotation")
 		}
 	})
+
+	t.Run("skip_import_rotation is true and rotates after ttl expiration", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		configureOpenLDAPMount(t, b, storage)
+
+		data := map[string]interface{}{
+			"username":             "hashicorp",
+			"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period":      "5s",
+			"skip_import_rotation": true,
+		}
+
+		roleName := "hashicorp"
+		createStaticRoleWithData(t, b, storage, roleName, data)
+		resp := readStaticCred(t, b, storage, roleName)
+
+		if resp.Data["password"] != "" {
+			t.Fatal("expected password to be empty, it wasn't: skip_import_rotation was enabled, password should not be rotated on import")
+		}
+
+		// Wait for auto rotation (5s) + 1 second for breathing room
+		time.Sleep(time.Second * 6)
+
+		resp = readStaticCred(t, b, storage, roleName)
+
+		if resp.Data["password"] == "" {
+			t.Fatal("expected password to be set after auto rotation, it wasn't")
+		}
+		if resp.Data["last_password"] != "" {
+			t.Fatal("expected last_password to be empty after auto rotation, it wasn't")
+		}
+	})
+
+	t.Run("skip_import_rotation is true and does not rotate after backend reload", func(t *testing.T) {
+		b, config := getBackendWithConfig(testBackendConfig(), false)
+		defer b.Cleanup(context.Background())
+		storage := config.StorageView
+
+		configureOpenLDAPMount(t, b, storage)
+
+		data := map[string]interface{}{
+			"username":             "hashicorp",
+			"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period":      "10m",
+			"skip_import_rotation": true,
+		}
+
+		roleName := "hashicorp"
+		createStaticRoleWithData(t, b, storage, roleName, data)
+		resp := readStaticCred(t, b, storage, roleName)
+
+		if resp.Data["password"] != "" {
+			t.Fatal("expected password to be empty, it wasn't: skip_import_rotation was enabled, password should not be rotated on import")
+		}
+		if resp.Data["last_password"] != "" {
+			t.Fatal("expected last_password to be empty, it wasn't")
+		}
+
+		// Reload backend to similate a Vault restart/startup memory state
+		getBackendWithConfig(config, false)
+
+		resp = readStaticCred(t, b, storage, roleName)
+
+		if resp.Data["password"] != "" {
+			t.Fatal("expected password to be empty after backend reload, it wasn't: skip_import_rotation was enabled, password should not be rotated yet")
+		}
+		if resp.Data["last_password"] != "" {
+			t.Fatal("expected last_password to be empty after backend reload, it wasn't")
+		}
+	})
 }
 
 // TestPasswordPolicyModificationInvalidatesWAL tests that modification of the

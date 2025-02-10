@@ -1,5 +1,7 @@
 ## Unreleased
 
+## v0.14.4
+
 BUG FIXES:
 
 * Update static role rotation to generate a new password after 2 failed attempts (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/125)
@@ -58,6 +60,27 @@ IMPROVEMENTS:
    * `github.com/hashicorp/vault/api` v1.9.2 -> v1.13.0
    * `github.com/hashicorp/vault/sdk` v0.11.1-0.20240325190132-c20eae3e84c5 -> v0.12.0
    * `github.com/stretchr/testify` v1.8.4 -> v1.9.0
+
+
+## v0.12.4
+
+BUG FIXES:
+
+* Fix a bug where static role passwords are erroneously rotated across backend restarts when using skip import rotation. (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140)
+
+## v0.12.3
+
+BUG FIXES:
+
+* Update static role rotation to generate a new password after 2 failed attempts (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/125)
+
+IMPROVEMENTS:
+* Updated dependencies (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/133):
+  * `github.com/docker/docker` v24.0.9+incompatible -> v25.0.6+incompatible
+  * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
+  * `github.com/go-jose/go-jose/v3` v3.0.1 -> v3.0.3
+  * `golang.org/x/net` v0.17.0 -> v0.28.0
+  * `google.golang.org/protobuf` v1.30.0 ->  v1.34.2
 
 ## v0.12.2
 

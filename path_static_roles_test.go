@@ -682,7 +682,6 @@ func TestRoles_NewPasswordGeneration(t *testing.T) {
 		if resp.Data["password"] == initialPassword {
 			t.Fatalf("expected password to be different after second retry")
 		}
-
 	})
 
 	t.Run("updating password policy should generate new password", func(t *testing.T) {
@@ -734,7 +733,6 @@ func TestRoles_NewPasswordGeneration(t *testing.T) {
 		// Ensure WAL is flushed
 		walIDs = requireWALs(t, storage, 0)
 	})
-
 }
 
 func TestListRoles(t *testing.T) {
@@ -977,4 +975,16 @@ func createRole(t *testing.T, b *backend, storage logical.Storage, roleName stri
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func createStaticRoleWithData(t *testing.T, b *backend, s logical.Storage, name string, d map[string]interface{}) (*logical.Response, error) {
+	t.Helper()
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      staticRolePath + name,
+		Storage:   s,
+		Data:      d,
+	}
+
+	return b.HandleRequest(context.Background(), req)
 }

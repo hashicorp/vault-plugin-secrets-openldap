@@ -1,5 +1,9 @@
 ## Unreleased
 
+BUG FIXES:
+
+* Fix a bug where static role passwords are erroneously rotated across backend restarts when using skip import rotation. (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140)
+
 ## v0.14.4
 
 BUG FIXES:

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
 	"time"
 
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
@@ -104,6 +105,9 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 		Description: "The desired length of passwords that Vault generates.",
 		Deprecated:  true,
 	}
+
+	automatedrotationutil.AddAutomatedRotationFields(fields)
+
 	return fields
 }
 
@@ -179,6 +183,11 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	staticSkip := fieldData.Get("skip_static_role_import_rotation").(bool)
 	if _, set := fieldData.Raw["skip_static_role_import_rotation"]; existing != nil && !set {
 		staticSkip = conf.SkipStaticRoleImportRotation // use existing value if not set
+	}
+
+	err = conf.ParseAutomatedRotationFields(fieldData)
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
 	}
 
 	// Update config field values
@@ -264,6 +273,8 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 		configMap["schema"] = config.LDAP.Schema
 	}
 
+	config.PopulateAutomatedRotationData(configMap)
+
 	resp := &logical.Response{
 		Data: configMap,
 	}
@@ -281,6 +292,8 @@ type config struct {
 	LDAP                         *client.Config
 	PasswordPolicy               string `json:"password_policy,omitempty"`
 	SkipStaticRoleImportRotation bool   `json:"skip_static_role_import_rotation"`
+
+	automatedrotationutil.AutomatedRotationParams
 
 	// Deprecated
 	PasswordLength int `json:"length,omitempty"`

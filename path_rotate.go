@@ -69,7 +69,12 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 	}
 }
 
-func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
+	return nil, b.rotateRootCredential(ctx, req)
+}
+
+func (b *backend) rotateRootCredential(ctx context.Context, req *logical.Request) error {
+
 	if _, hasTimeout := ctx.Deadline(); !hasTimeout {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, defaultCtxTimeout)
@@ -78,15 +83,15 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 
 	config, err := readConfig(ctx, req.Storage)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if config == nil {
-		return nil, errors.New("the config is currently unset")
+		return errors.New("the config is currently unset")
 	}
 
 	newPassword, err := b.GeneratePassword(ctx, config)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	oldPassword := config.LDAP.BindPassword
 
@@ -96,7 +101,7 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 
 	// Update the password remotely.
 	if err := b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, newPassword); err != nil {
-		return nil, err
+		return err
 	}
 	config.LDAP.BindPassword = newPassword
 	config.LDAP.LastBindPassword = oldPassword
@@ -108,14 +113,14 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 		// to roll any passwords, including our own to get back into a state of working. So, we need to roll back to
 		// the last password we successfully got into storage.
 		if rollbackErr := b.rollbackPassword(ctx, config, oldPassword); rollbackErr != nil {
-			return nil, fmt.Errorf(`unable to store new password due to %s and unable to return to previous password
+			return fmt.Errorf(`unable to store new password due to %s and unable to return to previous password
 due to %s, configure a new binddn and bindpass to restore ldap function`, pwdStoringErr, rollbackErr)
 		}
-		return nil, fmt.Errorf("unable to update password due to storage err: %s", pwdStoringErr)
+		return fmt.Errorf("unable to update password due to storage err: %s", pwdStoringErr)
 	}
 
 	// Respond with a 204.
-	return nil, nil
+	return nil
 }
 
 func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {

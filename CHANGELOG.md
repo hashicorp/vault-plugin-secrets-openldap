@@ -1,5 +1,7 @@
 ## Unreleased
 
+## v0.14.4
+
 BUG FIXES:
 
 * Update static role rotation to generate a new password after 2 failed attempts (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/125)
@@ -36,6 +38,15 @@ BUG FIXES:
   * `golang.org/x/text` v0.14.0 -> v0.18.0
   * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
 * bump .go-version to 1.22.6
+
+## v0.13.4
+
+BUG FIXES:
+
+* Fix a bug where static role passwords are erroneously rotated across backend restarts when using skip import rotation. (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140)
+
+## v0.13.3
+
 
 ## v0.13.2
 

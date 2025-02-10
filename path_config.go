@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
+	"github.com/hashicorp/vault/sdk/rotation"
 	"time"
 
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
@@ -22,6 +23,8 @@ const (
 	defaultSchema         = client.SchemaOpenLDAP
 	defaultTLSVersion     = "tls12"
 	defaultCtxTimeout     = 1 * time.Minute
+
+	rootRotationJobName = "openldap-secrets-root-creds"
 )
 
 func (b *backend) pathConfig() []*framework.Path {
@@ -196,6 +199,34 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	conf.SkipStaticRoleImportRotation = staticSkip
 	conf.LDAP.ConfigEntry = ldapConf
 	conf.LDAP.Schema = schema
+
+	// set up rotation after everything is fine
+	if conf.ShouldDeregisterRotationJob() {
+		// Ensure de-registering only occurs on updates and if
+		// a credential has actually been registered (rotation_period or rotation_schedule is set)
+		deregisterReq := &rotation.RotationJobDeregisterRequest{
+			MountPoint: req.MountPoint,
+			ReqPath:    req.Path,
+		}
+		err := b.System().DeregisterRotationJob(ctx, deregisterReq)
+		if err != nil {
+			return logical.ErrorResponse("error de-registering rotation job: %s", err), nil
+		}
+	} else if conf.ShouldRegisterRotationJob() {
+		req := &rotation.RotationJobConfigureRequest{
+			Name:             rootRotationJobName,
+			MountPoint:       req.MountPoint,
+			ReqPath:          req.Path,
+			RotationSchedule: conf.RotationSchedule,
+			RotationWindow:   conf.RotationWindow,
+			RotationPeriod:   conf.RotationPeriod,
+		}
+
+		_, err := b.System().RegisterRotationJob(ctx, req)
+		if err != nil {
+			return logical.ErrorResponse("error registering rotation job: %s", err), nil
+		}
+	}
 
 	err = writeConfig(ctx, req.Storage, *conf)
 	if err != nil {

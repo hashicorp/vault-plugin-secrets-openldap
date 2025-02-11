@@ -74,7 +74,6 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 }
 
 func (b *backend) rotateRootCredential(ctx context.Context, req *logical.Request) error {
-
 	if _, hasTimeout := ctx.Deadline(); !hasTimeout {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, defaultCtxTimeout)

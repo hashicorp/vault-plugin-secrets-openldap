@@ -8,6 +8,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/hashicorp/vault/sdk/rotation"
+
 	"github.com/go-ldap/ldif"
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
@@ -25,22 +27,30 @@ var (
 	testPasswordFromPolicy2 = "TestPolicy2Password"
 )
 
+type testSystemView struct {
+	logical.StaticSystemView
+}
+
+func (t testSystemView) DeregisterRotationJob(_ context.Context, _ *rotation.RotationJobDeregisterRequest) error {
+	return nil
+}
+
 func getBackend(throwsErr bool) (*backend, logical.Storage) {
+	sv := testSystemView{}
+	sv.DefaultLeaseTTLVal = defaultLeaseTTLVal
+	sv.MaxLeaseTTLVal = maxLeaseTTLVal
+	sv.PasswordPolicies = map[string]logical.PasswordGenerator{
+		testPasswordPolicy1: func() (string, error) {
+			return testPasswordFromPolicy1, nil
+		},
+		testPasswordPolicy2: func() (string, error) {
+			return testPasswordFromPolicy2, nil
+		},
+	}
 	config := &logical.BackendConfig{
 		Logger: logging.NewVaultLogger(log.Debug),
 
-		System: &logical.StaticSystemView{
-			DefaultLeaseTTLVal: defaultLeaseTTLVal,
-			MaxLeaseTTLVal:     maxLeaseTTLVal,
-			PasswordPolicies: map[string]logical.PasswordGenerator{
-				testPasswordPolicy1: func() (string, error) {
-					return testPasswordFromPolicy1, nil
-				},
-				testPasswordPolicy2: func() (string, error) {
-					return testPasswordFromPolicy2, nil
-				},
-			},
-		},
+		System:      sv,
 		StorageView: &logical.InmemStorage{},
 	}
 

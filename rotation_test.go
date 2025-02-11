@@ -56,13 +56,23 @@ func TestInitQueueHierarchicalPaths(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
+
+			sv := testSystemView{}
+			sv.DefaultLeaseTTLVal = defaultLeaseTTLVal
+			sv.MaxLeaseTTLVal = maxLeaseTTLVal
+			sv.PasswordPolicies = map[string]logical.PasswordGenerator{
+				testPasswordPolicy1: func() (string, error) {
+					return testPasswordFromPolicy1, nil
+				},
+				testPasswordPolicy2: func() (string, error) {
+					return testPasswordFromPolicy2, nil
+				},
+			}
+
 			config := &logical.BackendConfig{
 				Logger: logging.NewVaultLogger(log.Debug),
 
-				System: &logical.StaticSystemView{
-					DefaultLeaseTTLVal: defaultLeaseTTLVal,
-					MaxLeaseTTLVal:     maxLeaseTTLVal,
-				},
+				System:      sv,
 				StorageView: &logical.InmemStorage{},
 			}
 
@@ -382,13 +392,23 @@ func TestStoredWALsCorrectlyProcessed(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
+
+			sv := testSystemView{}
+			sv.DefaultLeaseTTLVal = defaultLeaseTTLVal
+			sv.MaxLeaseTTLVal = maxLeaseTTLVal
+			sv.PasswordPolicies = map[string]logical.PasswordGenerator{
+				testPasswordPolicy1: func() (string, error) {
+					return testPasswordFromPolicy1, nil
+				},
+				testPasswordPolicy2: func() (string, error) {
+					return testPasswordFromPolicy2, nil
+				},
+			}
+
 			config := &logical.BackendConfig{
 				Logger: logging.NewVaultLogger(log.Debug),
 
-				System: &logical.StaticSystemView{
-					DefaultLeaseTTLVal: defaultLeaseTTLVal,
-					MaxLeaseTTLVal:     maxLeaseTTLVal,
-				},
+				System:      sv,
 				StorageView: &logical.InmemStorage{},
 			}
 

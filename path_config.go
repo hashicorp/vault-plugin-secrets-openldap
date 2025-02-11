@@ -7,9 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
 	"github.com/hashicorp/vault/sdk/rotation"
-	"time"
 
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
@@ -102,14 +103,14 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 		Description: "Whether to skip the 'import' rotation.",
 	}
 
+	automatedrotationutil.AddAutomatedRotationFields(fields)
+
 	// Deprecated
 	fields["length"] = &framework.FieldSchema{
 		Type:        framework.TypeInt,
 		Description: "The desired length of passwords that Vault generates.",
 		Deprecated:  true,
 	}
-
-	automatedrotationutil.AddAutomatedRotationFields(fields)
 
 	return fields
 }

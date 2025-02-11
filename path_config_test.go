@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
+
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
@@ -575,6 +577,8 @@ func fieldData(raw map[string]interface{}) *framework.FieldData {
 		Deprecated:  true,
 	}
 
+	automatedrotationutil.AddAutomatedRotationFields(fields)
+
 	return &framework.FieldData{
 		Raw:    raw,
 		Schema: fields,
@@ -612,6 +616,11 @@ func ldapResponseData(vals ...interface{}) map[string]interface{} {
 		"userdn":                           "",
 		"userfilter":                       "({{.UserAttr}}={{.Username}})",
 		"username_as_alias":                false,
+		"rotation_period":                  0,
+		"rotation_schedule":                "",
+		"rotation_window":                  0,
+		"disable_automated_rotation":       false,
+		"enable_samaccountname_login":      false,
 	}
 
 	for i := 0; i < len(vals); i += 2 {

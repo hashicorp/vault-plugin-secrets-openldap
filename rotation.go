@@ -403,6 +403,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	// lvr is the known LastVaultRotation
 	lvr := time.Now()
 	input.Role.StaticAccount.LastVaultRotation = lvr
+	input.Role.StaticAccount.SetNextVaultRotation(lvr)
 	input.Role.StaticAccount.LastPassword = input.Role.StaticAccount.Password
 	input.Role.StaticAccount.Password = newPassword
 	output.RotationTime = lvr

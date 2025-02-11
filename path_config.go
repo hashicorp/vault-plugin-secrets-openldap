@@ -202,9 +202,9 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	conf.LDAP.Schema = schema
 
 	// set up rotation after everything is fine
+	var rotOp string
 	if conf.ShouldDeregisterRotationJob() {
-		// Ensure de-registering only occurs on updates and if
-		// a credential has actually been registered (rotation_period or rotation_schedule is set)
+		rotOp = "deregistration"
 		deregisterReq := &rotation.RotationJobDeregisterRequest{
 			MountPoint: req.MountPoint,
 			ReqPath:    req.Path,
@@ -214,6 +214,7 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 			return logical.ErrorResponse("error de-registering rotation job: %s", err), nil
 		}
 	} else if conf.ShouldRegisterRotationJob() {
+		rotOp = "registration"
 		req := &rotation.RotationJobConfigureRequest{
 			Name:             rootRotationJobName,
 			MountPoint:       req.MountPoint,
@@ -231,7 +232,12 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 
 	err = writeConfig(ctx, req.Storage, *conf)
 	if err != nil {
-		return nil, err
+		wrappedError := err
+		if rotOp != "" {
+			wrappedError = fmt.Errorf("write to storage failed but the rotation manager still succeeded; "+
+				"operation=%s, mount=%s, path=%s, storageError=%s", rotOp, req.MountPoint, req.Path, err)
+		}
+		return nil, wrappedError
 	}
 
 	// Respond with a 204.

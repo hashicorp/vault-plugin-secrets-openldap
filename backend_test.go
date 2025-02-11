@@ -34,8 +34,42 @@ type testSystemView struct {
 func (t testSystemView) DeregisterRotationJob(_ context.Context, _ *rotation.RotationJobDeregisterRequest) error {
 	return nil
 }
-
+// getBackend returns an initialized test backend with InmemStorage
 func getBackend(throwsErr bool) (*backend, logical.Storage) {
+	b, config := getBackendWithConfig(testBackendConfig(), throwsErr)
+	return b, config.StorageView
+}
+
+// getBackendWithConfig returns an initialized test backend for the given
+// config
+func getBackendWithConfig(c *logical.BackendConfig, throwsErr bool) (*backend, *logical.BackendConfig) {
+	b := Backend(&fakeLdapClient{throwErrs: throwsErr})
+	b.Setup(context.Background(), c)
+
+	b.credRotationQueue = queue.New()
+	// Create a context with a cancel method for processing any WAL entries and
+	// populating the queue
+	initCtx := context.Background()
+	ictx, cancel := context.WithCancel(initCtx)
+	b.cancelQueue = cancel
+
+	// Load managed LDAP users into memory from storage
+	staticRoles, err := b.loadManagedUsers(ictx, c.StorageView)
+	if err != nil {
+		// TODO: make this fatal? Requires refactoring all tests to pass in a testing.T
+		b.Logger().Error("error configuring backend: could not read roles from storage")
+	}
+
+	// Load queue and kickoff new periodic ticker
+	b.initQueue(ictx, &logical.InitializationRequest{
+		Storage: c.StorageView,
+	}, staticRoles)
+
+	return b, c
+}
+
+// testBackendConfig returns a backend config with inmem storage
+func testBackendConfig() *logical.BackendConfig {
 	sv := testSystemView{}
 	sv.DefaultLeaseTTLVal = defaultLeaseTTLVal
 	sv.MaxLeaseTTLVal = maxLeaseTTLVal
@@ -47,29 +81,19 @@ func getBackend(throwsErr bool) (*backend, logical.Storage) {
 			return testPasswordFromPolicy2, nil
 		},
 	}
+
+	return &logical.BackendConfig{
+		Logger: logging.NewVaultLogger(log.Debug),
+
+		System: sv,
+		},
+	}
 	config := &logical.BackendConfig{
 		Logger: logging.NewVaultLogger(log.Debug),
 
 		System:      sv,
 		StorageView: &logical.InmemStorage{},
 	}
-
-	b := Backend(&fakeLdapClient{throwErrs: throwsErr})
-	b.Setup(context.Background(), config)
-
-	b.credRotationQueue = queue.New()
-	// Create a context with a cancel method for processing any WAL entries and
-	// populating the queue
-	initCtx := context.Background()
-	ictx, cancel := context.WithCancel(initCtx)
-	b.cancelQueue = cancel
-
-	// Load queue and kickoff new periodic ticker
-	b.initQueue(ictx, &logical.InitializationRequest{
-		Storage: config.StorageView,
-	}, nil)
-
-	return b, config.StorageView
 }
 
 var _ ldapClient = (*fakeLdapClient)(nil)

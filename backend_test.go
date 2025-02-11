@@ -34,6 +34,7 @@ type testSystemView struct {
 func (t testSystemView) DeregisterRotationJob(_ context.Context, _ *rotation.RotationJobDeregisterRequest) error {
 	return nil
 }
+
 // getBackend returns an initialized test backend with InmemStorage
 func getBackend(throwsErr bool) (*backend, logical.Storage) {
 	b, config := getBackendWithConfig(testBackendConfig(), throwsErr)
@@ -83,14 +84,7 @@ func testBackendConfig() *logical.BackendConfig {
 	}
 
 	return &logical.BackendConfig{
-		Logger: logging.NewVaultLogger(log.Debug),
-
-		System: sv,
-		},
-	}
-	config := &logical.BackendConfig{
-		Logger: logging.NewVaultLogger(log.Debug),
-
+		Logger:      logging.NewVaultLogger(log.Debug),
 		System:      sv,
 		StorageView: &logical.InmemStorage{},
 	}

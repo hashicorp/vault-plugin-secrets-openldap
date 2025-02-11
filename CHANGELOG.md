@@ -39,11 +39,17 @@ BUG FIXES:
   * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
 * bump .go-version to 1.22.6
 
-## v0.13.4
+## v0.13.5
 
 BUG FIXES:
 
 * Fix a bug where static role passwords are erroneously rotated across backend restarts when using skip import rotation. (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140)
+
+## v0.13.4
+
+IMPROVEMENTS:
+
+* Update dependencies (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/133)
 
 ## v0.13.3
 

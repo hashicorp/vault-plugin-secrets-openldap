@@ -49,7 +49,7 @@ BUG FIXES:
   * `github.com/hashicorp/go-retryablehttp` v0.7.1 -> v0.7.7
 * bump .go-version to 1.22.6
 
-## v0.13.4
+## v0.13.5
 
 BUG FIXES:
 

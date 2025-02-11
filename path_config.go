@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
+	"github.com/hashicorp/vault/sdk/rotation"
+
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
@@ -21,6 +24,8 @@ const (
 	defaultSchema         = client.SchemaOpenLDAP
 	defaultTLSVersion     = "tls12"
 	defaultCtxTimeout     = 1 * time.Minute
+
+	rootRotationJobName = "openldap-secrets-root-creds"
 )
 
 func (b *backend) pathConfig() []*framework.Path {
@@ -98,12 +103,15 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 		Description: "Whether to skip the 'import' rotation.",
 	}
 
+	automatedrotationutil.AddAutomatedRotationFields(fields)
+
 	// Deprecated
 	fields["length"] = &framework.FieldSchema{
 		Type:        framework.TypeInt,
 		Description: "The desired length of passwords that Vault generates.",
 		Deprecated:  true,
 	}
+
 	return fields
 }
 
@@ -181,6 +189,11 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 		staticSkip = conf.SkipStaticRoleImportRotation // use existing value if not set
 	}
 
+	err = conf.ParseAutomatedRotationFields(fieldData)
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+
 	// Update config field values
 	conf.PasswordPolicy = passPolicy
 	conf.PasswordLength = passLength
@@ -188,9 +201,45 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	conf.LDAP.ConfigEntry = ldapConf
 	conf.LDAP.Schema = schema
 
+	// set up rotation after everything is fine
+	var rotOp string
+	if conf.ShouldDeregisterRotationJob() {
+		rotOp = "deregistration"
+		deregisterReq := &rotation.RotationJobDeregisterRequest{
+			MountPoint: req.MountPoint,
+			ReqPath:    req.Path,
+		}
+		err := b.System().DeregisterRotationJob(ctx, deregisterReq)
+		if err != nil {
+			return logical.ErrorResponse("error de-registering rotation job: %s", err), nil
+		}
+	} else if conf.ShouldRegisterRotationJob() {
+		rotOp = "registration"
+		req := &rotation.RotationJobConfigureRequest{
+			Name:             rootRotationJobName,
+			MountPoint:       req.MountPoint,
+			ReqPath:          req.Path,
+			RotationSchedule: conf.RotationSchedule,
+			RotationWindow:   conf.RotationWindow,
+			RotationPeriod:   conf.RotationPeriod,
+		}
+
+		_, err := b.System().RegisterRotationJob(ctx, req)
+		if err != nil {
+			return logical.ErrorResponse("error registering rotation job: %s", err), nil
+		}
+	}
+
 	err = writeConfig(ctx, req.Storage, *conf)
 	if err != nil {
-		return nil, err
+		wrappedError := err
+		if rotOp != "" {
+			b.Logger().Error("write to storage failed but the rotation manager still succeeded.",
+				"operation", rotOp, "mount", req.MountPoint, "path", req.Path)
+			wrappedError = fmt.Errorf("write to storage failed but the rotation manager still succeeded; "+
+				"operation=%s, mount=%s, path=%s, storageError=%s", rotOp, req.MountPoint, req.Path, err)
+		}
+		return nil, wrappedError
 	}
 
 	// Respond with a 204.
@@ -264,6 +313,8 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 		configMap["schema"] = config.LDAP.Schema
 	}
 
+	config.PopulateAutomatedRotationData(configMap)
+
 	resp := &logical.Response{
 		Data: configMap,
 	}
@@ -281,6 +332,8 @@ type config struct {
 	LDAP                         *client.Config
 	PasswordPolicy               string `json:"password_policy,omitempty"`
 	SkipStaticRoleImportRotation bool   `json:"skip_static_role_import_rotation"`
+
+	automatedrotationutil.AutomatedRotationParams
 
 	// Deprecated
 	PasswordLength int `json:"length,omitempty"`

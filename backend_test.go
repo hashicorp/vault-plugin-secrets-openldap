@@ -6,7 +6,10 @@ package openldap
 import (
 	"context"
 	"errors"
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
 	"time"
+
+	"github.com/hashicorp/vault/sdk/rotation"
 
 	"github.com/go-ldap/ldif"
 	log "github.com/hashicorp/go-hclog"
@@ -24,6 +27,18 @@ var (
 	testPasswordFromPolicy1 = "TestPolicy1Password"
 	testPasswordFromPolicy2 = "TestPolicy2Password"
 )
+
+type testSystemView struct {
+	logical.StaticSystemView
+}
+
+func (t testSystemView) RegisterRotationJob(_ context.Context, _ *rotation.RotationJobConfigureRequest) (string, error) {
+	return "", automatedrotationutil.ErrRotationManagerUnsupported
+}
+
+func (t testSystemView) DeregisterRotationJob(_ context.Context, _ *rotation.RotationJobDeregisterRequest) error {
+	return nil
+}
 
 // getBackend returns an initialized test backend with InmemStorage
 func getBackend(throwsErr bool) (*backend, logical.Storage) {
@@ -61,21 +76,21 @@ func getBackendWithConfig(c *logical.BackendConfig, throwsErr bool) (*backend, *
 
 // testBackendConfig returns a backend config with inmem storage
 func testBackendConfig() *logical.BackendConfig {
-	return &logical.BackendConfig{
-		Logger: logging.NewVaultLogger(log.Debug),
-
-		System: &logical.StaticSystemView{
-			DefaultLeaseTTLVal: defaultLeaseTTLVal,
-			MaxLeaseTTLVal:     maxLeaseTTLVal,
-			PasswordPolicies: map[string]logical.PasswordGenerator{
-				testPasswordPolicy1: func() (string, error) {
-					return testPasswordFromPolicy1, nil
-				},
-				testPasswordPolicy2: func() (string, error) {
-					return testPasswordFromPolicy2, nil
-				},
-			},
+	sv := testSystemView{}
+	sv.DefaultLeaseTTLVal = defaultLeaseTTLVal
+	sv.MaxLeaseTTLVal = maxLeaseTTLVal
+	sv.PasswordPolicies = map[string]logical.PasswordGenerator{
+		testPasswordPolicy1: func() (string, error) {
+			return testPasswordFromPolicy1, nil
 		},
+		testPasswordPolicy2: func() (string, error) {
+			return testPasswordFromPolicy2, nil
+		},
+	}
+
+	return &logical.BackendConfig{
+		Logger:      logging.NewVaultLogger(log.Debug),
+		System:      sv,
 		StorageView: &logical.InmemStorage{},
 	}
 }

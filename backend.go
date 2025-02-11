@@ -82,6 +82,8 @@ func Backend(client ldapClient) *backend {
 		},
 		Clean:       b.clean,
 		BackendType: logical.TypeLogical,
+
+		RotateCredential: b.rotateRootCredential,
 	}
 
 	return b

@@ -6,6 +6,7 @@ package openldap
 import (
 	"context"
 	"errors"
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
 	"time"
 
 	"github.com/hashicorp/vault/sdk/rotation"
@@ -29,6 +30,10 @@ var (
 
 type testSystemView struct {
 	logical.StaticSystemView
+}
+
+func (t testSystemView) RegisterRotationJob(_ context.Context, _ *rotation.RotationJobConfigureRequest) (string, error) {
+	return "", automatedrotationutil.ErrRotationManagerUnsupported
 }
 
 func (t testSystemView) DeregisterRotationJob(_ context.Context, _ *rotation.RotationJobDeregisterRequest) error {

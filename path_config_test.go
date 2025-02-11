@@ -251,6 +251,34 @@ func TestConfig_Create(t *testing.T) {
 	}
 }
 
+func TestConfigRotation(t *testing.T) {
+	configData := map[string]interface{}{
+		"binddn":          "tester",
+		"bindpass":        "pa$$w0rd",
+		"url":             "ldap://138.91.247.105",
+		"rotation_period": 10,
+	}
+
+	b, s := getBackend(false)
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      configPath,
+		Storage:   s,
+		Data:      configData,
+	}
+
+	response, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fail()
+	}
+	if v, ok := response.Data["error"]; ok {
+		if v != "error registering rotation job: rotation manager capabilities not supported in Vault community edition" {
+			t.Fail()
+		}
+	}
+}
+
 func TestConfig_Update(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		b, storage := getBackend(false)

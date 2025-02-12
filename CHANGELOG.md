@@ -1,5 +1,9 @@
 ## Unreleased
 
+IMPROVEMENTS:
+
+* Add api fields to allow for scheduled rotation of root credentials. (https://github.com/vault-plugin-secrets-openldap/pull/141)
+
 BUG FIXES:
 
 * Fix a bug where static role passwords are erroneously rotated across backend restarts when using skip import rotation. (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140)

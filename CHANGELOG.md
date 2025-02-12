@@ -2,7 +2,7 @@
 
 IMPROVEMENTS:
 
-* Add api fields to allow for scheduled rotation of root credentials. (https://github.com/vault-plugin-secrets-openldap/pull/141)
+* (Enterprise feature) Add api fields to allow for scheduled rotation of root credentials. (https://github.com/vault-plugin-secrets-openldap/pull/141)
 
 BUG FIXES:
 

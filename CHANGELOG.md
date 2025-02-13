@@ -3,6 +3,11 @@
 IMPROVEMENTS:
 
 * (Enterprise feature) Add api fields to allow for scheduled rotation of root credentials. (https://github.com/vault-plugin-secrets-openldap/pull/141)
+* Updated dependencies:
+  * `github.com/go-ldap/ldap/v3` v3.4.8 -> v3.4.10
+  * `github.com/hashicorp/vault/api` v1.15.0 -> v1.16.0
+  * `github.com/ory/dockertest/v3` v3.10.0 -> v3.11.0
+  * `golang.org/x/text` v0.21.0 -> v0.22.0
 
 BUG FIXES:
 

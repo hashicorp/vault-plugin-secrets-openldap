@@ -644,9 +644,9 @@ func ldapResponseData(vals ...interface{}) map[string]interface{} {
 		"userdn":                           "",
 		"userfilter":                       "({{.UserAttr}}={{.Username}})",
 		"username_as_alias":                false,
-		"rotation_period":                  0,
+		"rotation_period":                  float64(0),
 		"rotation_schedule":                "",
-		"rotation_window":                  0,
+		"rotation_window":                  float64(0),
 		"disable_automated_rotation":       false,
 		"enable_samaccountname_login":      false,
 	}

@@ -6,8 +6,9 @@ package openldap
 import (
 	"context"
 	"errors"
-	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
 	"time"
+
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
 
 	"github.com/hashicorp/vault/sdk/rotation"
 

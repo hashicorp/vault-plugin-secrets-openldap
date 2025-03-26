@@ -1,3 +1,8 @@
+## Unreleased
+
+BUG FIXES:
+* Forward Performance Secondary requests when configuring root credentials: [GH-154](https://github.com/vault-plugin-secrets-openldap/pull/154)
+
 ## v0.15.1
 ### February 26, 2025
 

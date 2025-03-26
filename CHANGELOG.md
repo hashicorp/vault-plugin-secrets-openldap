@@ -1,7 +1,7 @@
 ## Unreleased
 
 BUG FIXES:
-* Forward Performance Secondary requests when configuring root credentials: [GH-154](https://github.com/vault-plugin-secrets-openldap/pull/154)
+* Fix a panic when a performance standby node attempts to write/update config: [GH-154](https://github.com/vault-plugin-secrets-openldap/pull/154)
 
 ## v0.15.1
 ### February 26, 2025

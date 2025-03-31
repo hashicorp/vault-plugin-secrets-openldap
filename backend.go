@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/locksutil"
@@ -223,6 +224,23 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) (map[
 		entryExists := entry != nil && !strings.HasSuffix(roleName, "/")
 		if entryExists {
 			roles[roleName] = entry
+		}
+		// If an account's NextVaultRotation period is nil, it means that the
+		// role was created before we added the `NextVaultRotation` field. In this
+		// case, we need to calculate the next rotation time based on the
+		// LastVaultRotation and the RotationPeriod. However, if the role was
+		// created withskip_import_rotation set, we need to use the current time
+		// instead of LastVaultRotation because LastVaultRotation is 0
+		// This situation was fixed by https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140.
+		if entry.StaticAccount.NextVaultRotation.IsZero() {
+			log.Warn("NextVaultRotation is zero", roleName)
+			// Previously skipped import rotation roles had a LastVaultRotation value of zero
+			if entry.StaticAccount.LastVaultRotation.IsZero() {
+				entry.StaticAccount.SetNextVaultRotation(time.Now())
+			} else {
+				entry.StaticAccount.SetNextVaultRotation(entry.StaticAccount.LastVaultRotation)
+			}
+
 		}
 		return entryExists, nil
 	}

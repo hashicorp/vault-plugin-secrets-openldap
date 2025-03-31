@@ -249,7 +249,7 @@ func TestAutoRotate(t *testing.T) {
 		}
 	})
 
-	t.Run("nil NextVaultRotation does not cause rotate after backend reload", func(t *testing.T) {
+	t.Run("zero NextVaultRotation does not cause rotate after backend reload", func(t *testing.T) {
 		b, config := getBackendWithConfig(testBackendConfig(), false)
 		defer b.Cleanup(context.Background())
 		storage := config.StorageView

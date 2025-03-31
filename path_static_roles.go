@@ -464,10 +464,9 @@ func (s *staticAccount) NextRotationTime() time.Time {
 	// LastVaultRotation and the RotationPeriod. However, if the role was
 	// created withskip_import_rotation set, we need to use the current time
 	// instead of LastVaultRotation because LastVaultRotation is 0
-	// This situation was fixed in by https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140.
+	// This situation was fixed by https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140.
 	if s.NextVaultRotation.IsZero() {
-		// Previously skipped import rotation roles had a LastVaultRotation
-		// vault of zero
+		// Previously skipped import rotation roles had a LastVaultRotation value of zero
 		if s.LastVaultRotation.IsZero() {
 			s.SetNextVaultRotation(time.Now())
 		}

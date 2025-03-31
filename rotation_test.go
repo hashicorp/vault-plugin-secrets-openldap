@@ -248,6 +248,53 @@ func TestAutoRotate(t *testing.T) {
 			t.Fatal("expected last_password to be empty after backend reload, it wasn't")
 		}
 	})
+
+	t.Run("nil NextVaultRotation does not cause rotate after backend reload", func(t *testing.T) {
+		b, config := getBackendWithConfig(testBackendConfig(), false)
+		defer b.Cleanup(context.Background())
+		storage := config.StorageView
+
+		configureOpenLDAPMount(t, b, storage)
+
+		roleName := "hashicorp"
+		data := map[string]interface{}{
+			"username":             roleName,
+			"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period":      "10m",
+			"skip_import_rotation": false,
+		}
+
+		createStaticRoleWithData(t, b, storage, roleName, data)
+		resp := readStaticCred(t, b, storage, roleName)
+		firstRotation := resp.Data["last_vault_rotation"].(time.Time)
+
+		// force NextVaultRotation to zero to simulate roles before 0.14.5 fix
+		role, err := b.staticRole(context.Background(), storage, roleName)
+		if err != nil {
+			t.Fatal("failed to fetch static role", err)
+		}
+		role.StaticAccount.NextVaultRotation = time.Time{}
+		entry, err := logical.StorageEntryJSON(staticRolePath+roleName, role)
+		if err != nil {
+			t.Fatal("failed to build role for storage", err)
+		}
+		if err := storage.Put(context.Background(), entry); err != nil {
+			t.Fatal("failed to write role to storage", err)
+		}
+
+		// Reload backend to similate a Vault restart/startup memory state
+		getBackendWithConfig(config, false)
+
+		// TODO: this is hacky because the queue ticker runs every 5 seconds
+		time.Sleep(8 * time.Second)
+		resp = readStaticCred(t, b, storage, roleName)
+		secondRotation := resp.Data["last_vault_rotation"].(time.Time)
+
+		// check if first rotation is different from second rotation
+		if !firstRotation.Equal(secondRotation) {
+			t.Fatal("expected first rotation to be equal to second rotation to prove that credential wasnt rotated")
+		}
+	})
 }
 
 // TestPasswordPolicyModificationInvalidatesWAL tests that modification of the

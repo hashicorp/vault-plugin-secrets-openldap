@@ -458,6 +458,23 @@ type staticAccount struct {
 // NextRotationTime calculates the next rotation by adding the Rotation Period
 // to the last known vault rotation
 func (s *staticAccount) NextRotationTime() time.Time {
+	// If an account's NextVaultRotation period is nil, it means that the
+	// role was created before we added the `NextVaultRotation` field. In this
+	// case, we need to calculate the next rotation time based on the
+	// LastVaultRotation and the RotationPeriod. However, if the role was
+	// created withskip_import_rotation set, we need to use the current time
+	// instead of LastVaultRotation because LastVaultRotation is 0
+	// This situation was fixed in by https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140.
+	if s.NextVaultRotation.IsZero() {
+		// Previously skipped import rotation roles had a LastVaultRotation
+		// vault of zero
+		if s.LastVaultRotation.IsZero() {
+			s.SetNextVaultRotation(time.Now())
+		}
+
+		s.SetNextVaultRotation(s.LastVaultRotation)
+	}
+
 	return s.NextVaultRotation
 }
 

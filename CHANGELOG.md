@@ -1,3 +1,20 @@
+## Unreleased
+
+## v0.15.2
+### March 27, 2025
+
+BUG FIXES:
+* Fix a panic when a performance standby node attempts to write/update config: [GH-154](https://github.com/vault-plugin-secrets-openldap/pull/154)
+
+## v0.15.1
+### February 26, 2025
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * `github.com/hashicorp/vault/sdk` v0.15.0 -> v0.15.2
+  * `golang.org/x/crypto` v0.33.0 -> v0.35.0
+  * `github.com/jose/go-jose` v4.0.4 -> v4.0.5
+
 ## v0.15.0
 
 FEATURES:

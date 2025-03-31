@@ -42,12 +42,16 @@ func (b *backend) pathConfig() []*framework.Path {
 					DisplayAttrs: &framework.DisplayAttributes{
 						OperationVerb: "configure",
 					},
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
 				},
 				logical.UpdateOperation: &framework.PathOperation{
 					Callback: b.configCreateUpdateOperation,
 					DisplayAttrs: &framework.DisplayAttributes{
 						OperationVerb: "configure",
 					},
+					ForwardPerformanceSecondary: true,
+					ForwardPerformanceStandby:   true,
 				},
 				logical.ReadOperation: &framework.PathOperation{
 					Callback: b.configReadOperation,
@@ -204,7 +208,7 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	// set up rotation after everything is fine
 	var rotOp string
 	if conf.ShouldDeregisterRotationJob() {
-		rotOp = "deregistration"
+		rotOp = rotation.PerformedDeregistration
 		deregisterReq := &rotation.RotationJobDeregisterRequest{
 			MountPoint: req.MountPoint,
 			ReqPath:    req.Path,
@@ -214,7 +218,7 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 			return logical.ErrorResponse("error de-registering rotation job: %s", err), nil
 		}
 	} else if conf.ShouldRegisterRotationJob() {
-		rotOp = "registration"
+		rotOp = rotation.PerformedRegistration
 		req := &rotation.RotationJobConfigureRequest{
 			Name:             rootRotationJobName,
 			MountPoint:       req.MountPoint,

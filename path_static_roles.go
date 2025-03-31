@@ -458,7 +458,7 @@ type staticAccount struct {
 // NextRotationTime calculates the next rotation by adding the Rotation Period
 // to the last known vault rotation
 func (s *staticAccount) NextRotationTime() time.Time {
-	// If an account's NextVaultRotation period is nil, it means that the
+	// If an account's NextVaultRotation period is zero, it means that the
 	// role was created before we added the `NextVaultRotation` field. In this
 	// case, we need to calculate the next rotation time based on the
 	// LastVaultRotation and the RotationPeriod. However, if the role was

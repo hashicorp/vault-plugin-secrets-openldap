@@ -469,9 +469,10 @@ func (s *staticAccount) NextRotationTime() time.Time {
 		// Previously skipped import rotation roles had a LastVaultRotation value of zero
 		if s.LastVaultRotation.IsZero() {
 			s.SetNextVaultRotation(time.Now())
+		} else {
+			s.SetNextVaultRotation(s.LastVaultRotation)
 		}
 
-		s.SetNextVaultRotation(s.LastVaultRotation)
 	}
 
 	return s.NextVaultRotation

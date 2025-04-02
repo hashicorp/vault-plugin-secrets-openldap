@@ -224,7 +224,6 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) (map[
 		if entryExists {
 			roles[roleName] = entry
 		}
-
 		return entryExists, nil
 	}
 	err := walkStoragePath(ctx, s, staticRolePath, roleFunc)

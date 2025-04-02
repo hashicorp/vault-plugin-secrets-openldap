@@ -252,6 +252,50 @@ func TestAutoRotate(t *testing.T) {
 		}
 	})
 
+	t.Run("NextVaultRotation is properly persisted on update", func(t *testing.T) {
+		b, config := getBackendWithConfig(testBackendConfig(), false)
+		defer b.Cleanup(context.Background())
+		storage := config.StorageView
+
+		configureOpenLDAPMount(t, b, storage)
+
+		roleName := "hashicorp"
+		data := map[string]interface{}{
+			"username":             roleName,
+			"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period":      "1h",
+			"skip_import_rotation": true,
+		}
+
+		createStaticRoleWithData(t, b, storage, roleName, data)
+
+		originalRole, err := b.staticRole(context.Background(), storage, roleName)
+		if err != nil {
+			t.Fatal("failed to fetch static role", err)
+		}
+
+		// Update static role's rotation period to 1h
+		_, err = b.HandleRequest(context.Background(), &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      staticRolePath + roleName,
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"rotation_period": "5m",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		updatedRole, err := b.staticRole(context.Background(), storage, roleName)
+		if err != nil {
+			t.Fatal("failed to fetch static role", err)
+		}
+
+		if originalRole.StaticAccount.NextVaultRotation.Equal(updatedRole.StaticAccount.NextVaultRotation) {
+			t.Fatal("expected nextVaultRotation1 to be different from nextVaultRotation2")
+		}
+	})
+
 	// This is to test static roles created before 0.14.5
 	// In 0.14.5, vault started persisting `NextVaultRotation`
 	t.Run("zero NextVaultRotation does not cause rotate after backend reload", func(t *testing.T) {

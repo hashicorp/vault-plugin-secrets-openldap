@@ -222,7 +222,7 @@ func TestAutoRotate(t *testing.T) {
 			"username":             "hashicorp",
 			"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 			"rotation_period":      "10m",
-			"skip_import_rotation": false,
+			"skip_import_rotation": true,
 		}
 
 		roleName := "hashicorp"

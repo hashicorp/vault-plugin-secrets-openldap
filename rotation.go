@@ -59,7 +59,7 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage, roles ma
 		// role was created before we added the `NextVaultRotation` field. In this
 		// case, we need to calculate the next rotation time based on the
 		// LastVaultRotation and the RotationPeriod. However, if the role was
-		// created withskip_import_rotation set, we need to use the current time
+		// created with skip_import_rotation set, we need to use the current time
 		// instead of LastVaultRotation because LastVaultRotation is 0
 		// This situation was fixed by https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140.
 		if role.StaticAccount.NextVaultRotation.IsZero() {

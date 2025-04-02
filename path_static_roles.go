@@ -390,6 +390,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			}
 		}
 	case logical.UpdateOperation:
+		// if lastVaultRotation is zero, the role had `skip_import_rotation` set
+		if lastVaultRotation.IsZero() {
+			lastVaultRotation = time.Now()
+		}
+
 		// Ensure that NextVaultRotation is recalculated in case the rotation period changed
 		role.StaticAccount.SetNextVaultRotation(lastVaultRotation)
 

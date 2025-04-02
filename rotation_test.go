@@ -252,6 +252,47 @@ func TestAutoRotate(t *testing.T) {
 		}
 	})
 
+	t.Run("skip_import_rotation is true and update does not rotate", func(t *testing.T) {
+		b, config := getBackendWithConfig(testBackendConfig(), false)
+		defer b.Cleanup(context.Background())
+		storage := config.StorageView
+
+		configureOpenLDAPMount(t, b, storage)
+
+		data := map[string]interface{}{
+			"username":             "hashicorp",
+			"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period":      "10m",
+			"skip_import_rotation": true,
+		}
+
+		roleName := "hashicorp"
+		fmt.Println(">>> creating static role")
+		_, err := createStaticRoleWithData(t, b, storage, roleName, data)
+		require.NoError(t, err)
+
+		data = map[string]interface{}{
+			"rotation_period": "5m",
+		}
+
+		time.Sleep(time.Second * 6)
+		fmt.Println(">>> updating static role")
+		_, err = updateStaticRoleWithData(t, b, storage, roleName, data)
+		require.NoError(t, err)
+
+		// Wait for auto rotation (5s) + 1 second for breathing room
+		time.Sleep(time.Second * 6)
+
+		resp := readStaticCred(t, b, storage, roleName)
+
+		if resp.Data["password"] != "" {
+			t.Fatal("expected password to be empty after backend reload, it wasn't: skip_import_rotation was enabled, password should not be rotated yet")
+		}
+		if resp.Data["last_password"] != "" {
+			t.Fatal("expected last_password to be empty after backend reload, it wasn't")
+		}
+	})
+
 	t.Run("NextVaultRotation is properly persisted on update", func(t *testing.T) {
 		b, config := getBackendWithConfig(testBackendConfig(), false)
 		defer b.Cleanup(context.Background())
@@ -267,7 +308,8 @@ func TestAutoRotate(t *testing.T) {
 			"skip_import_rotation": true,
 		}
 
-		createStaticRoleWithData(t, b, storage, roleName, data)
+		_, err := createStaticRoleWithData(t, b, storage, roleName, data)
+		require.NoError(t, err)
 
 		originalRole, err := b.staticRole(context.Background(), storage, roleName)
 		if err != nil {
@@ -275,14 +317,12 @@ func TestAutoRotate(t *testing.T) {
 		}
 
 		// Update static role's rotation period to 1h
-		_, err = b.HandleRequest(context.Background(), &logical.Request{
-			Operation: logical.UpdateOperation,
-			Path:      staticRolePath + roleName,
-			Storage:   storage,
-			Data: map[string]interface{}{
-				"rotation_period": "5m",
-			},
-		})
+		data = map[string]interface{}{
+			"rotation_period": "5m",
+		}
+		_, err = updateStaticRoleWithData(t, b, storage, roleName, data)
+		require.NoError(t, err)
+
 		if err != nil {
 			t.Fatal(err)
 		}

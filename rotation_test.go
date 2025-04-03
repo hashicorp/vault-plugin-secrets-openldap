@@ -316,7 +316,7 @@ func TestAutoRotate(t *testing.T) {
 			t.Fatal("failed to fetch static role", err)
 		}
 
-		// Update static role's rotation period to 1h
+		// Update static role's rotation period to 5m
 		data = map[string]interface{}{
 			"rotation_period": "5m",
 		}

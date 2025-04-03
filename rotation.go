@@ -63,7 +63,7 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage, roles ma
 		// instead of LastVaultRotation because LastVaultRotation is 0
 		// This situation was fixed by https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140.
 		if role.StaticAccount.NextVaultRotation.IsZero() {
-			log.Warn("NextVaultRotation is zero", roleName)
+			log.Debug("NextVaultRotation is zero", roleName)
 			// Previously skipped import rotation roles had a LastVaultRotation value of zero
 			if role.StaticAccount.LastVaultRotation.IsZero() {
 				role.StaticAccount.SetNextVaultRotation(time.Now())

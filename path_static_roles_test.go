@@ -792,6 +792,19 @@ func createStaticRoleWithData(t *testing.T, b *backend, s logical.Storage, name 
 	return b.HandleRequest(context.Background(), req)
 }
 
+func updateStaticRoleWithData(t *testing.T, b *backend, s logical.Storage, name string, d map[string]interface{}) (*logical.Response, error) {
+	t.Helper()
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      staticRolePath + name,
+		Storage:   s,
+		Data:      d,
+	}
+
+	return b.HandleRequest(context.Background(), req)
+}
+
 func readStaticRole(t *testing.T, b *backend, storage logical.Storage, roleName string) (*logical.Response, error) {
 	req := &logical.Request{
 		Operation: logical.ReadOperation,

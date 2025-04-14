@@ -1,6 +1,6 @@
 module github.com/hashicorp/vault-plugin-secrets-openldap
 
-go 1.23.6
+go 1.23.8
 
 require (
 	github.com/go-ldap/ldap/v3 v3.4.10

@@ -988,3 +988,60 @@ func createStaticRoleWithData(t *testing.T, b *backend, s logical.Storage, name 
 
 	return b.HandleRequest(context.Background(), req)
 }
+
+func updateStaticRoleWithData(t *testing.T, b *backend, s logical.Storage, name string, d map[string]interface{}) (*logical.Response, error) {
+	t.Helper()
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      staticRolePath + name,
+		Storage:   s,
+		Data:      d,
+	}
+
+	return b.HandleRequest(context.Background(), req)
+}
+
+func readStaticRole(t *testing.T, b *backend, storage logical.Storage, roleName string) (*logical.Response, error) {
+	req := &logical.Request{
+		Operation: logical.ReadOperation,
+		Path:      staticRolePath + roleName,
+		Storage:   storage,
+		Data:      nil,
+	}
+
+	return b.HandleRequest(context.Background(), req)
+}
+
+func assertReadStaticRole(t *testing.T, b *backend, storage logical.Storage, roleName string, data map[string]interface{}) {
+	t.Helper()
+	resp, err := readStaticRole(t, b, storage, roleName)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	if resp.Data["dn"] != data["dn"] {
+		t.Fatalf("expected dn to be %s but got %s", data["dn"], resp.Data["dn"])
+	}
+
+	if resp.Data["username"] != data["username"] {
+		t.Fatalf("expected username to be %s but got %s", data["username"], resp.Data["username"])
+	}
+
+	expected := data["rotation_period"].(float64)
+	if resp.Data["rotation_period"] != expected {
+		t.Fatalf("expected rotation_period to be %f but got %s", expected, resp.Data["rotation_period"])
+	}
+
+	if resp.Data["last_vault_rotation"] == nil {
+		t.Fatal("expected last_vault_rotation to not be empty")
+	}
+}
+
+func getTestStaticRoleConfig(name string) map[string]interface{} {
+	return map[string]interface{}{
+		"username":        name,
+		"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+		"rotation_period": float64(5),
+	}
+}

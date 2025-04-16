@@ -4,9 +4,9 @@ BUG FIXES:
 
 * Fix issue where roles created before 0.14.5 had a nil NextVaultRotation value: [GH-156](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/156)
 
-## v0.15.3
+## v0.15.4
 
-### April 15, 2025
+### April 16, 2025
 
 BUG FIXES:
 

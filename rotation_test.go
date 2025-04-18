@@ -267,7 +267,6 @@ func TestAutoRotate(t *testing.T) {
 		}
 
 		roleName := "hashicorp"
-		fmt.Println(">>> creating static role")
 		_, err := createStaticRoleWithData(t, b, storage, roleName, data)
 		require.NoError(t, err)
 
@@ -276,7 +275,6 @@ func TestAutoRotate(t *testing.T) {
 		}
 
 		time.Sleep(time.Second * 6)
-		fmt.Println(">>> updating static role")
 		_, err = updateStaticRoleWithData(t, b, storage, roleName, data)
 		require.NoError(t, err)
 

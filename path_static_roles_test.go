@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/require"
@@ -847,4 +848,325 @@ func getTestStaticRoleConfig(name string) map[string]interface{} {
 		"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
 		"rotation_period": float64(5),
 	}
+}
+
+func TestStaticRole_NextVaultRotation(t *testing.T) {
+	t.Run("creating/updating static role properly sets queue and storage values", func(t *testing.T) {
+		ctx := context.Background()
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+		start := time.Now()
+
+		// Create static role
+		roleName := "hashicorp"
+		data1 := map[string]interface{}{
+			"username":        "hashicorp",
+			"db_name":         "mockv5",
+			"rotation_period": "10m",
+		}
+		createStaticRoleWithData(t, b, storage, roleName, data1)
+
+		// Check role's storage values
+		role1, _ := b.staticRole(ctx, storage, roleName)
+		require.True(t, role1.StaticAccount.LastVaultRotation.After(start), "LastVaultRotation should be set on role create")
+		require.True(t, role1.StaticAccount.NextVaultRotation.After(role1.StaticAccount.LastVaultRotation), "NextVaultRotation should be after LastVaultRotation")
+
+		// Check role's priority queue value is the same as what is in storage
+		item1, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Equal(t, item1.Priority, role1.StaticAccount.NextVaultRotation.Unix(), "queue's priority should be the same as NextVaultRotation in storage")
+		err = b.credRotationQueue.Push(item1)
+		require.NoError(t, err)
+
+		// Update static role
+		data2 := map[string]interface{}{
+			"rotation_period": "2h",
+			"username":        "hashicorp",
+		}
+		_, err = updateStaticRoleWithData(t, b, storage, roleName, data2)
+		require.NoError(t, err)
+
+		// Check role's storage values
+		role2, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.Equal(t, role1.StaticAccount.LastVaultRotation, role2.StaticAccount.LastVaultRotation, "static role's LastVaultRotation should not change on update")
+		require.True(t, role2.StaticAccount.NextVaultRotation.After(role1.StaticAccount.NextVaultRotation), "NextVaultRotation should be adjusted because rotation period changed")
+
+		// Check priority queue value is the same as what is in storage
+		item2, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Greater(t, item2.Priority, item1.Priority, "priority queue's priority should be adjusted because rotation period changed")
+		require.Equal(t, item2.Priority, role2.StaticAccount.NextVaultRotation.Unix(), "queue's priority should be the same as NextVaultRotation in storage")
+	})
+
+	t.Run("creating/updating static role properly sets queue and storage values when skip_import_rotation is true", func(t *testing.T) {
+		ctx := context.Background()
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+		start := time.Now()
+
+		// Create static role
+		roleName := "hashicorp"
+		data1 := map[string]interface{}{
+			"username":             "hashicorp",
+			"db_name":              "mockv5",
+			"rotation_period":      "10m",
+			"skip_import_rotation": true,
+		}
+		createStaticRoleWithData(t, b, storage, roleName, data1)
+
+		// Check role's storage values
+		role1, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+
+		// Check that LastVaultRotation is zero value
+		require.Equal(t, role1.StaticAccount.LastVaultRotation, time.Time{}, "LastVaultRotation should be 0 on role create when skip_import_rotation is true")
+		require.True(t, role1.StaticAccount.NextVaultRotation.After(start), "NextVaultRotation should be set on role create")
+
+		// Check role's priority queue value is the same as what is in storage
+		require.Equal(t, b.credRotationQueue.Len(), 1)
+		item1, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Equal(t, item1.Priority, role1.StaticAccount.NextVaultRotation.Unix(), "queue's priority should be the same as NextVaultRotation in storage")
+
+		// Push item back onto queue
+		err = b.credRotationQueue.Push(item1)
+		require.NoError(t, err)
+
+		// Update static role
+		data2 := map[string]interface{}{
+			"rotation_period": "2h",
+			"username":        "hashicorp",
+		}
+		_, err = updateStaticRoleWithData(t, b, storage, roleName, data2)
+		require.NoError(t, err)
+
+		// Check role's storage values
+		role2, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.Equal(t, role2.StaticAccount.LastVaultRotation, time.Time{}, "updating should not change LastVaultRotation")
+		require.Equal(t, role1.StaticAccount.LastVaultRotation, role2.StaticAccount.LastVaultRotation)
+		require.True(t, role2.StaticAccount.NextVaultRotation.After(role1.StaticAccount.NextVaultRotation), "updating rotation_period should increase NextVaultRotation")
+
+		// Check priority queue value is the same as what is in storage
+		require.Equal(t, b.credRotationQueue.Len(), 1)
+		item2, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Greater(t, item2.Priority, item1.Priority, "priority should increase after updating rotation_period")
+		require.Equal(t, item2.Priority, role2.StaticAccount.NextVaultRotation.Unix(), "queue's priority should be the same as NextVaultRotation in storage")
+	})
+
+	t.Run("automatic rotation of static role properly sets queue and storage values", func(t *testing.T) {
+		ctx := context.Background()
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+		start := time.Now()
+
+		// Create static role
+		roleName := "hashicorp"
+
+		data1 := map[string]interface{}{
+			"username":        "hashicorp",
+			"db_name":         "mockv5",
+			"rotation_period": "5s",
+		}
+		createStaticRoleWithData(t, b, storage, roleName, data1)
+
+		// Check role's storage values
+		role1, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.True(t, role1.StaticAccount.LastVaultRotation.After(start))
+		require.True(t, role1.StaticAccount.NextVaultRotation.After(role1.StaticAccount.LastVaultRotation))
+
+		// Check role's priority queue value is the same as what is in storage
+		require.Equal(t, b.credRotationQueue.Len(), 1)
+		item1, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Equal(t, item1.Priority, role1.StaticAccount.NextVaultRotation.Unix())
+		// Push item back onto queue
+		err = b.credRotationQueue.Push(item1)
+
+		// Wait until ticker has run
+		time.Sleep(6 * time.Second)
+
+		// Ensure the item's priority has changed indicating an autorotation
+		item2, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Greater(t, item2.Priority, item1.Priority)
+
+		// Check role's storage values
+		role2, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.Greater(t, role2.StaticAccount.LastVaultRotation, role1.StaticAccount.LastVaultRotation, "LastVaultRotation should be greater after auto rotation")
+		require.True(t, role2.StaticAccount.NextVaultRotation.After(role1.StaticAccount.NextVaultRotation), "NextVaultRotation should be greater after auto rotation")
+
+		// Check priority queue value is the same as what is in storage
+		require.Greater(t, item2.Priority, item1.Priority, "items priority should be greater after auto rotation")
+		require.Equal(t, item2.Priority, role2.StaticAccount.NextVaultRotation.Unix(), "queue's priority should be the same as NextVaultRotation in storage")
+	})
+
+	t.Run("automatic rotation of static role properly sets queue and storage values when skip_import_rotation is true", func(t *testing.T) {
+		ctx := context.Background()
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+		start := time.Now()
+
+		// Create static role
+		roleName := "hashicorp"
+
+		data1 := map[string]interface{}{
+			"username":             "hashicorp",
+			"db_name":              "mockv5",
+			"rotation_period":      "5s",
+			"skip_import_rotation": true,
+		}
+		createStaticRoleWithData(t, b, storage, roleName, data1)
+
+		// Check role's storage values
+		role1, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.Equal(t, role1.StaticAccount.LastVaultRotation, time.Time{})
+		require.True(t, role1.StaticAccount.NextVaultRotation.After(start))
+
+		// Check role's priority queue value is the same as what is in storage
+		require.Equal(t, b.credRotationQueue.Len(), 1)
+		item1, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Equal(t, item1.Priority, role1.StaticAccount.NextVaultRotation.Unix())
+		// Push item back onto queue
+		err = b.credRotationQueue.Push(item1)
+
+		// Wait until ticker has run
+		time.Sleep(6 * time.Second)
+
+		// Check role's storage values
+		role2, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.NotEqual(t, role2.StaticAccount.LastVaultRotation, time.Time{}, "LastVaultRotation should be set after auto rotation")
+		require.True(t, role2.StaticAccount.NextVaultRotation.After(role1.StaticAccount.NextVaultRotation), "NextVaultRotation should be increased after auto rotation")
+
+		// Check priority queue value is the same as what is in storage
+		item2, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Greater(t, item2.Priority, item1.Priority, "item's priority should be greater after auto rotation")
+		require.Equal(t, item2.Priority, role2.StaticAccount.NextVaultRotation.Unix(), "")
+	})
+
+	t.Run("manual rotation of static role properly sets queue and storage values", func(t *testing.T) {
+		ctx := context.Background()
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+		start := time.Now()
+
+		// Create static role
+		roleName := "hashicorp"
+
+		data1 := map[string]interface{}{
+			"username":        "hashicorp",
+			"db_name":         "mockv5",
+			"rotation_period": "10m",
+		}
+		createStaticRoleWithData(t, b, storage, roleName, data1)
+
+		// Check role's storage values
+		role1, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.True(t, role1.StaticAccount.LastVaultRotation.After(start))
+		require.True(t, role1.StaticAccount.NextVaultRotation.After(role1.StaticAccount.LastVaultRotation))
+
+		// Check role's priority queue value is the same as what is in storage
+		require.Equal(t, b.credRotationQueue.Len(), 1)
+		item1, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Equal(t, item1.Priority, role1.StaticAccount.NextVaultRotation.Unix())
+
+		// Add sleep so that we can see the difference in priority timestamps (measured in seconds)
+		time.Sleep(1 * time.Second)
+
+		data := map[string]interface{}{"name": roleName}
+
+		_, err = b.HandleRequest(context.Background(), &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      "rotate-role/" + roleName,
+			Storage:   storage,
+			Data:      data,
+		})
+		require.NoError(t, err)
+		// Check role's storage values
+
+		role2, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.True(t, role2.StaticAccount.LastVaultRotation.After(role1.StaticAccount.LastVaultRotation))
+		require.True(t, role2.StaticAccount.NextVaultRotation.After(role1.StaticAccount.NextVaultRotation))
+
+		// Check priority queue value is the same as what is in storage
+		require.Equal(t, b.credRotationQueue.Len(), 1)
+		item2, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Greater(t, item2.Priority, item1.Priority)
+		require.Equal(t, item2.Priority, role2.StaticAccount.NextVaultRotation.Unix())
+	})
+
+	t.Run("manual rotation of static role properly sets queue and storage values when skip_import_rotation is true", func(t *testing.T) {
+		ctx := context.Background()
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+		start := time.Now()
+
+		// Create static role
+		roleName := "hashicorp"
+
+		data1 := map[string]interface{}{
+			"username":             "hashicorp",
+			"db_name":              "mockv5",
+			"rotation_period":      "10m",
+			"skip_import_rotation": true,
+		}
+		createStaticRoleWithData(t, b, storage, roleName, data1)
+
+		// Check role's storage values
+		role1, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.Equal(t, role1.StaticAccount.LastVaultRotation, time.Time{})
+		require.True(t, role1.StaticAccount.NextVaultRotation.After(start))
+
+		// Check role's priority queue value is the same as what is in storage
+		require.Equal(t, b.credRotationQueue.Len(), 1)
+		item1, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Equal(t, item1.Priority, role1.StaticAccount.NextVaultRotation.Unix())
+		err = b.credRotationQueue.Push(item1)
+
+		// Add sleep so that we can see the difference in priority timestamps (measured in seconds)
+		time.Sleep(1 * time.Second)
+
+		data := map[string]interface{}{"name": roleName}
+
+		_, err = b.HandleRequest(context.Background(), &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      "rotate-role/" + roleName,
+			Storage:   storage,
+			Data:      data,
+		})
+		require.NoError(t, err)
+
+		// Check role's storage values
+		role2, err := b.staticRole(ctx, storage, roleName)
+		require.NoError(t, err)
+		require.NotEqual(t, role2.StaticAccount.LastVaultRotation, time.Time{}, "LastVaultRotation should be set after auto rotation")
+		require.True(t, role2.StaticAccount.NextVaultRotation.After(role1.StaticAccount.NextVaultRotation), "NextVaultRotation should increase after auto rotation")
+
+		// Check priority queue value is the same as what is in storage
+		require.Equal(t, b.credRotationQueue.Len(), 1)
+		item2, err := b.credRotationQueue.Pop()
+		require.NoError(t, err)
+		require.Greater(t, item2.Priority, item1.Priority, "item's priority should be greater after auto rotation")
+		require.Equal(t, item2.Priority, role2.StaticAccount.NextVaultRotation.Unix(), "queue's priority should be the same as NextVaultRotation in storage")
+	})
 }

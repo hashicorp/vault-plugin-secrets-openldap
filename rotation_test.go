@@ -828,3 +828,58 @@ func Test_backend_findStaticWAL_DecodeWALMissingField(t *testing.T) {
 	// Assert that any missing fields take the zero value after decoding
 	require.Equal(t, "", got.PasswordPolicy)
 }
+
+func Test_staticRolesAutoRotation(t *testing.T) {
+	tests := []struct {
+		name               string
+		skipImportRotation bool
+	}{
+		{
+			name:               "skip_import_rotation is true",
+			skipImportRotation: true,
+		},
+		{
+			name:               "skip_import_rotation is false",
+			skipImportRotation: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			b, storage := getBackend(false)
+			defer b.Cleanup(ctx)
+			configureOpenLDAPMount(t, b, storage)
+			var start time.Time
+			if !tt.skipImportRotation {
+				start = time.Now()
+			}
+			// Create static role
+			roleName := "hashicorp"
+
+			d1 := map[string]interface{}{
+				"username":        "hashicorp",
+				"db_name":         "mockv5",
+				"rotation_period": "5s",
+			}
+			createStaticRoleWithData(t, b, storage, roleName, d1)
+
+			role1, err := b.staticRole(ctx, storage, roleName)
+			require.NoError(t, err)
+			checkLVRandNVRAfterCreate(t, role1, start)
+			item1, err := b.credRotationQueue.Pop()
+			require.NoError(t, err)
+			checkPriority(t, item1, role1.StaticAccount.NextVaultRotation)
+			b.credRotationQueue.Push(item1)
+
+			// Wait until ticker has run triggering the auto rotation (ticker is 5 seconds)
+			time.Sleep(6 * time.Second)
+
+			role2, err := b.staticRole(ctx, storage, roleName)
+			require.NoError(t, err)
+			compareLVRandNVRAfterUpdate(t, role1, role2, true)
+			item2, err := b.credRotationQueue.Pop()
+			require.NoError(t, err)
+			checkPriority(t, item2, role2.StaticAccount.NextVaultRotation)
+		})
+	}
+}

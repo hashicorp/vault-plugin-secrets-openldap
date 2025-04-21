@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestManualRotateRoot(t *testing.T) {
@@ -277,6 +278,71 @@ func TestRollbackPassword(t *testing.T) {
 			}
 			assert.Equal(t, testCase.expectedPassword, fclient.password)
 			assert.Equal(t, testCase.expectedRollbackCalls, fclient.count)
+		})
+	}
+}
+
+func Test_staticRoleManualRotation(t *testing.T) {
+	tests := []struct {
+		name               string
+		skipImportRotation bool
+	}{
+		{
+			name:               "skip_import_rotation is true",
+			skipImportRotation: true,
+		},
+		{
+			name:               "skip_import_rotation is false",
+			skipImportRotation: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			b, storage := getBackend(false)
+			defer b.Cleanup(ctx)
+			configureOpenLDAPMount(t, b, storage)
+			var start time.Time
+			if !tt.skipImportRotation {
+				start = time.Now()
+			}
+			// Create static role
+			roleName := "hashicorp"
+
+			d1 := map[string]interface{}{
+				"username":        "hashicorp",
+				"db_name":         "mockv5",
+				"rotation_period": "5s",
+			}
+			createStaticRoleWithData(t, b, storage, roleName, d1)
+
+			role1, err := b.staticRole(ctx, storage, roleName)
+			require.NoError(t, err)
+			checkLVRandNVRAfterCreate(t, role1, start)
+			item1, err := b.credRotationQueue.Pop()
+			require.NoError(t, err)
+			checkPriority(t, item1, role1.StaticAccount.NextVaultRotation)
+			b.credRotationQueue.Push(item1)
+
+			// Add 1 second sleep so that we can see the difference in priority timestamps (measured in seconds)
+			time.Sleep(1 * time.Second)
+
+			data := map[string]interface{}{"name": roleName}
+
+			_, err = b.HandleRequest(context.Background(), &logical.Request{
+				Operation: logical.UpdateOperation,
+				Path:      rotateRolePath + roleName,
+				Storage:   storage,
+				Data:      data,
+			})
+			require.NoError(t, err)
+
+			role2, err := b.staticRole(ctx, storage, roleName)
+			require.NoError(t, err)
+			compareLVRandNVRAfterUpdate(t, role1, role2, true)
+			item2, err := b.credRotationQueue.Pop()
+			require.NoError(t, err)
+			checkPriority(t, item2, role2.StaticAccount.NextVaultRotation)
 		})
 	}
 }

@@ -1205,6 +1205,9 @@ func Test_staticRolesUpdateRotationPeriod(t *testing.T) {
 				"db_name":         "mockv5",
 				"rotation_period": "5s",
 			}
+			if tt.skipImportRotation {
+				d1["skip_import_rotation"] = true
+			}
 			createStaticRoleWithData(t, b, storage, roleName, d1)
 
 			role1, err := b.staticRole(ctx, storage, roleName)
@@ -1233,7 +1236,12 @@ func Test_staticRolesUpdateRotationPeriod(t *testing.T) {
 
 func checkLVRandNVRAfterCreate(t *testing.T, role *roleEntry, start time.Time) {
 	require.NotNil(t, role)
-	require.True(t, role.StaticAccount.LastVaultRotation.After(start))
+	if start.IsZero() {
+		require.Equal(t, role.StaticAccount.LastVaultRotation, time.Time{}, "LastVaultRotation should be 0 on role create when skip_import_rotation is true")
+	} else {
+		require.True(t, role.StaticAccount.LastVaultRotation.After(start))
+	}
+
 	require.True(t, role.StaticAccount.NextVaultRotation.After(role.StaticAccount.LastVaultRotation))
 }
 

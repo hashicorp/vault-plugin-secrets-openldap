@@ -314,6 +314,9 @@ func Test_staticRoleManualRotation(t *testing.T) {
 				"db_name":         "mockv5",
 				"rotation_period": "5s",
 			}
+			if tt.skipImportRotation {
+				d1["skip_import_rotation"] = true
+			}
 			createStaticRoleWithData(t, b, storage, roleName, d1)
 
 			role1, err := b.staticRole(ctx, storage, roleName)

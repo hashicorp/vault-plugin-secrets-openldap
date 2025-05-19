@@ -98,6 +98,11 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 		Default:     defaultSchema,
 		Description: "The desired LDAP schema used when modifying user account passwords.",
 	}
+	fields["use_racf_passphrase"] = &framework.FieldSchema{
+		Type:        framework.TypeBool,
+		Default:     false,
+		Description: "When using the RACF schema, whether to use passphrase instead of password.",
+	}
 	fields["password_policy"] = &framework.FieldSchema{
 		Type:        framework.TypeString,
 		Description: "Password policy to use to generate passwords",
@@ -193,6 +198,11 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 		staticSkip = conf.SkipStaticRoleImportRotation // use existing value if not set
 	}
 
+	useRACFPassphrase := fieldData.Get("use_racf_passphrase").(bool)
+	if _, set := fieldData.Raw["use_racf_passphrase"]; existing != nil && !set {
+		useRACFPassphrase = conf.UseRACFPassphrase // use existing value if not set
+	}
+
 	err = conf.ParseAutomatedRotationFields(fieldData)
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), nil
@@ -202,6 +212,7 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	conf.PasswordPolicy = passPolicy
 	conf.PasswordLength = passLength
 	conf.SkipStaticRoleImportRotation = staticSkip
+	conf.UseRACFPassphrase = useRACFPassphrase
 	conf.LDAP.ConfigEntry = ldapConf
 	conf.LDAP.Schema = schema
 
@@ -310,6 +321,7 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 		configMap["password_policy"] = config.PasswordPolicy
 	}
 	configMap["skip_static_role_import_rotation"] = config.SkipStaticRoleImportRotation
+	configMap["use_racf_passphrase"] = config.UseRACFPassphrase
 	if !config.LDAP.LastBindPasswordRotation.IsZero() {
 		configMap["last_bind_password_rotation"] = config.LDAP.LastBindPasswordRotation
 	}
@@ -336,6 +348,7 @@ type config struct {
 	LDAP                         *client.Config
 	PasswordPolicy               string `json:"password_policy,omitempty"`
 	SkipStaticRoleImportRotation bool   `json:"skip_static_role_import_rotation"`
+	UseRACFPassphrase           bool   `json:"use_racf_passphrase"`
 
 	automatedrotationutil.AutomatedRotationParams
 

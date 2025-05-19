@@ -23,6 +23,7 @@ type Config struct {
 	LastBindPassword         string    `json:"last_bind_password"`
 	LastBindPasswordRotation time.Time `json:"last_bind_password_rotation"`
 	Schema                   string    `json:"schema"`
+	UseRACFPassphrase       bool      `json:"use_racf_passphrase"`
 }
 
 func New(logger hclog.Logger) Client {

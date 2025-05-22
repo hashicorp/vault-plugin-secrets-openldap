@@ -83,7 +83,7 @@ func Backend(client ldapClient) *backend {
 		Clean:       b.clean,
 		BackendType: logical.TypeLogical,
 
-		RotateCredential: b.rotateRootCredential,
+		RotateCredential: b.autoRotateCredential,
 	}
 
 	return b
@@ -91,18 +91,10 @@ func Backend(client ldapClient) *backend {
 
 func (b *backend) initialize(ctx context.Context, initRequest *logical.InitializationRequest) error {
 	// Load managed LDAP users into memory from storage
-	staticRoles, err := b.loadManagedUsers(ctx, initRequest.Storage)
+	_, err := b.loadManagedUsers(ctx, initRequest.Storage)
 	if err != nil {
 		return err
 	}
-
-	// Create a context with a cancel method for processing any WAL entries and
-	// populating the queue
-	ictx, cancel := context.WithCancel(context.Background())
-	b.cancelQueue = cancel
-
-	// Load static role queue and kickoff new periodic ticker
-	go b.initQueue(ictx, initRequest, staticRoles)
 
 	return nil
 }

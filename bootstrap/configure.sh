@@ -42,7 +42,7 @@ vault read ${PLUGIN_PATH}/config
 vault write ${PLUGIN_PATH}/static-role/mary \
     dn="uid=mary.smith,ou=users,dc=example,dc=com" \
     username="mary.smith" \
-    rotation_period="5m"
+    rotation_period="10s"
 
 vault read ${PLUGIN_PATH}/static-role/mary
 # Read the current password for mary

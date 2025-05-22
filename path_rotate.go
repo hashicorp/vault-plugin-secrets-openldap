@@ -73,6 +73,16 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 	return nil, b.rotateRootCredential(ctx, req)
 }
 
+func (b *backend) autoRotateCredential(ctx context.Context, req *logical.Request) error {
+	b.Logger().Debug("autoRotateCredential", "req.Path", req.Path)
+	if strings.HasPrefix(req.Path, "static-role/") {
+		b.Logger().Debug("autoRotateCredential static")
+		return nil
+	}
+	b.Logger().Debug("autoRotateCredential root")
+	return b.rotateRootCredential(ctx, req)
+}
+
 func (b *backend) rotateRootCredential(ctx context.Context, req *logical.Request) error {
 	if _, hasTimeout := ctx.Deadline(); !hasTimeout {
 		var cancel func()

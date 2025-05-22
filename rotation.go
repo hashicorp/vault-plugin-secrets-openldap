@@ -386,7 +386,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 			LastVaultRotation: input.Role.StaticAccount.LastVaultRotation,
 			PasswordPolicy:    config.PasswordPolicy,
 		})
-		b.Logger().Debug("wrote WAL", "role", input.RoleName, "WAL ID", output.WALID)
+		// b.Logger().Debug("wrote WAL", "role", input.RoleName, "WAL ID", output.WALID)
 		if err != nil {
 			return output, fmt.Errorf("error writing WAL entry: %w", err)
 		}
@@ -445,7 +445,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		b.Logger().Warn("error deleting WAL", "WAL ID", output.WALID, "error", err)
 		return output, err
 	}
-	b.Logger().Debug("deleted WAL", "WAL ID", output.WALID)
+	// b.Logger().Debug("deleted WAL", "WAL ID", output.WALID)
 
 	// The WAL has been deleted, return new setStaticAccountOutput without it
 	return &setStaticAccountOutput{RotationTime: lvr}, nil

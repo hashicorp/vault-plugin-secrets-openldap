@@ -35,7 +35,6 @@ bootstrap:
         go mod edit -module github.com/hashicorp/$(REPO_DIR); \
 	fi
 
-
 .PHONY: test
 test: fmtcheck
 	CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
@@ -48,6 +47,15 @@ fmtcheck:
 fmt:
 	gofumpt -l -w .
 
+.PHONY: setup-env
+setup-env:
+	cd bootstrap && ./setup-openldap.sh
+
+.PHONY: teardown-env
+teardown-env:
+	docker rm -f ldap
+
+.PHONY: configure
 configure: dev
 	./bootstrap/configure.sh \
 	$(PLUGIN_DIR) \

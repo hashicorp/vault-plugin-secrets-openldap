@@ -38,17 +38,16 @@ func GetSchemaFieldRegistry(schema string, newPassword string) (map[*Field][]str
 		return fields, nil
 	case SchemaRACF:
 		fields := map[*Field][]string{}
-		// if isPassphrase {
-		// 	fields = map[*Field][]string{
-		// 		FieldRegistry.RACFPassphrase: {newPassword},
-		// 		FieldRegistry.RACFAttributes: {"noexpired"},
-		// 	}
-		// } else {
-		// 	fields = map[*Field][]string{
-		// 		FieldRegistry.RACFPassword:   {newPassword},
-		// 		FieldRegistry.RACFAttributes: {"noexpired"},
-		// 	}
-		// }
+
+		// passphrase is used instead when the password string is longer than 8 characters
+		if len(newPassword) > 8 {
+			fields[FieldRegistry.RACFPassphrase] = []string{newPassword}
+		} else {
+			fields[FieldRegistry.RACFPassword] = []string{newPassword}
+		}
+
+		fields[FieldRegistry.RACFAttributes] = []string{"noexpired"}
+
 		return fields, nil
 	case SchemaAD:
 		pwdEncoded, err := formatPassword(newPassword)

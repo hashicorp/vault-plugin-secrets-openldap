@@ -132,42 +132,61 @@ func TestUpdatePasswordOpenLDAP(t *testing.T) {
 }
 
 func TestUpdatePasswordRACF(t *testing.T) {
-	testPass := "hell0$catz*"
-
-	config := emptyConfig()
-	config.BindDN = "cats"
-	config.BindPassword = "dogs"
-
-	conn := &ldapifc.FakeLDAPConnection{
-		SearchRequestToExpect: testSearchRequest(),
-		SearchResultToReturn:  testSearchResult(),
+	tests := []struct {
+		name        string
+		password    string
+		expectField string
+	}{
+		{
+			name:        "short password",
+			password:    "pass123",
+			expectField: "racfPassword",
+		},
+		{
+			name:        "long passphrase",
+			password:    "this is a longer passphrase that should use racfPassphrase",
+			expectField: "racfPassphrase",
+		},
 	}
 
-	dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
-	conn.ModifyRequestToExpect = &ldap.ModifyRequest{
-		DN: dn,
-	}
-	conn.ModifyRequestToExpect.Replace("racfPassword", []string{testPass})
-	conn.ModifyRequestToExpect.Replace("racfAttributes", []string{"noexpired"})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := emptyConfig()
+			config.BindDN = "cats"
+			config.BindPassword = "dogs"
 
-	ldapClient := &ldaputil.Client{
-		Logger: hclog.NewNullLogger(),
-		LDAP:   &ldapifc.FakeLDAPClient{conn},
-	}
+			conn := &ldapifc.FakeLDAPConnection{
+				SearchRequestToExpect: testSearchRequest(),
+				SearchResultToReturn:  testSearchResult(),
+			}
 
-	client := &Client{ldapClient}
+			dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
+			conn.ModifyRequestToExpect = &ldap.ModifyRequest{
+				DN: dn,
+			}
+			conn.ModifyRequestToExpect.Replace(tt.expectField, []string{tt.password})
+			conn.ModifyRequestToExpect.Replace("racfAttributes", []string{"noexpired"})
 
-	filters := map[*Field][]string{
-		FieldRegistry.ObjectClass: {"*"},
-	}
+			ldapClient := &ldaputil.Client{
+				Logger: hclog.NewNullLogger(),
+				LDAP:   &ldapifc.FakeLDAPClient{conn},
+			}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaRACF, testPass)
-	if err != nil {
-		t.Fatal(err)
-	}
+			client := &Client{ldapClient}
 
-	if err := client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters); err != nil {
-		t.Fatal(err)
+			filters := map[*Field][]string{
+				FieldRegistry.ObjectClass: {"*"},
+			}
+
+			newValues, err := GetSchemaFieldRegistry(SchemaRACF, tt.password)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

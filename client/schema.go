@@ -31,24 +31,24 @@ func ValidSchema(schema string) bool {
 // GetSchemaFieldRegistry type switches field registries depending on the configured schema.
 // For example, IBM RACF has a custom LDAP schema so the password is stored in a different
 // attribute.
-func GetSchemaFieldRegistry(schema string, newPassword string, isPassphrase bool) (map[*Field][]string, error) {
+func GetSchemaFieldRegistry(schema string, newPassword string) (map[*Field][]string, error) {
 	switch schema {
 	case SchemaOpenLDAP:
 		fields := map[*Field][]string{FieldRegistry.UserPassword: {newPassword}}
 		return fields, nil
 	case SchemaRACF:
 		fields := map[*Field][]string{}
-		if isPassphrase {
-			fields = map[*Field][]string{
-				FieldRegistry.RACFPassphrase: {newPassword},
-				FieldRegistry.RACFAttributes: {"noexpired"},
-			}
-		} else {
-			fields = map[*Field][]string{
-				FieldRegistry.RACFPassword:   {newPassword},
-				FieldRegistry.RACFAttributes: {"noexpired"},
-			}
-		}
+		// if isPassphrase {
+		// 	fields = map[*Field][]string{
+		// 		FieldRegistry.RACFPassphrase: {newPassword},
+		// 		FieldRegistry.RACFAttributes: {"noexpired"},
+		// 	}
+		// } else {
+		// 	fields = map[*Field][]string{
+		// 		FieldRegistry.RACFPassword:   {newPassword},
+		// 		FieldRegistry.RACFAttributes: {"noexpired"},
+		// 	}
+		// }
 		return fields, nil
 	case SchemaAD:
 		pwdEncoded, err := formatPassword(newPassword)

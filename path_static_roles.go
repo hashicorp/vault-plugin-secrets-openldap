@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/locksutil"
 	"github.com/hashicorp/vault/sdk/logical"
-	"github.com/hashicorp/vault/sdk/queue"
 )
 
 const (
@@ -331,7 +330,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	lastVaultRotation := role.StaticAccount.LastVaultRotation
 
 	// Only call setStaticAccountPassword if we're creating the role for the first time
-	var item *queue.Item
 	switch req.Operation {
 	case logical.CreateOperation:
 		if skipRotation {
@@ -434,15 +432,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// Ensure that NextVaultRotation is recalculated in case the rotation period changed
 		role.StaticAccount.SetNextVaultRotation(lastVaultRotation)
 
-		// store updated Role
-		entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
-		if err != nil {
-			return nil, err
-		}
-		if err := req.Storage.Put(ctx, entry); err != nil {
-			return nil, err
-		}
-
 		if role.StaticAccount.isRotationManager {
 			if role.StaticAccount.ShouldRegisterRotationJob() {
 				rreq := &rotation.RotationJobConfigureRequest{
@@ -468,22 +457,42 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 				}
 			}
 		} else {
-			// In case this is an update, remove any previous version of the item from
-			// the queue. The existing item could be tracking a WAL ID for this role,
-			// so it's important to keep the existing item rather than recreate it.
-			// TODO: Add retry logic
+			if role.StaticAccount.ShouldRegisterRotationJob() {
+				// remove old rotation item
+				_, err = b.popFromRotationQueueByKey(name)
+				if err != nil {
+					return nil, err
+				}
 
-			item, err = b.popFromRotationQueueByKey(name)
-			if err != nil {
-				return nil, err
-			}
-			item.Priority = role.StaticAccount.NextVaultRotation.Unix()
+				rreq := &rotation.RotationJobConfigureRequest{
+					Name:             rootRotationJobName,
+					MountPoint:       req.MountPoint,
+					ReqPath:          req.Path,
+					RotationSchedule: role.StaticAccount.RotationSchedule,
+					RotationWindow:   role.StaticAccount.RotationWindow,
+					RotationPeriod:   role.StaticAccount.RotationPeriod,
+				}
+				_, err := b.System().RegisterRotationJob(ctx, rreq)
+				if err != nil {
+					return nil, err
+				}
 
-			// Add their rotation to the queue
-			if err := b.pushItem(item); err != nil {
-				return nil, err
+				role.StaticAccount.isRotationManager = true
 			}
+
+			// this branch only happens when we're not already using the rotation manager so we don't need to check for
+			// deregistration.
 		}
+
+		// store updated Role
+		entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
+		if err != nil {
+			return nil, err
+		}
+		if err := req.Storage.Put(ctx, entry); err != nil {
+			return nil, err
+		}
+
 	}
 	//item.Priority = role.StaticAccount.NextVaultRotation.Unix()
 	//

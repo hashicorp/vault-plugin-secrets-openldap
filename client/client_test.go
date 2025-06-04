@@ -142,12 +142,12 @@ func TestUpdatePasswordRACF(t *testing.T) {
 			name:        "short password",
 			password:    "pass123",
 			expectField: "racfPassword",
-			unsetField:  "racfPassphrase",
+			unsetField:  "racfPassPhrase",
 		},
 		{
 			name:        "long passphrase",
-			password:    "this is a longer passphrase that should use racfPassphrase",
-			expectField: "racfPassphrase",
+			password:    "this is a longer passphrase that should use racfPassPhrase",
+			expectField: "racfPassPhrase",
 			unsetField:  "racfPassword",
 		},
 	}

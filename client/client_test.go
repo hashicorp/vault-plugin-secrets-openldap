@@ -136,16 +136,19 @@ func TestUpdatePasswordRACF(t *testing.T) {
 		name        string
 		password    string
 		expectField string
+		unsetField  string
 	}{
 		{
 			name:        "short password",
 			password:    "pass123",
 			expectField: "racfPassword",
+			unsetField:  "racfPassphrase",
 		},
 		{
 			name:        "long passphrase",
 			password:    "this is a longer passphrase that should use racfPassphrase",
 			expectField: "racfPassphrase",
+			unsetField:  "racfPassword",
 		},
 	}
 
@@ -165,6 +168,7 @@ func TestUpdatePasswordRACF(t *testing.T) {
 				DN: dn,
 			}
 			conn.ModifyRequestToExpect.Replace(tt.expectField, []string{tt.password})
+			conn.ModifyRequestToExpect.Replace(tt.unsetField, nil)
 			conn.ModifyRequestToExpect.Replace("racfAttributes", []string{"noexpired"})
 
 			ldapClient := &ldaputil.Client{
@@ -181,6 +185,16 @@ func TestUpdatePasswordRACF(t *testing.T) {
 			newValues, err := GetSchemaFieldRegistry(SchemaRACF, tt.password)
 			if err != nil {
 				t.Fatal(err)
+			}
+
+			if tt.expectField == "racfPassword" {
+				if val, exists := newValues[FieldRegistry.RACFPassphrase]; !exists || val != nil {
+					t.Errorf("Expected RACFPassphrase to be nil, got %v", val)
+				}
+			} else {
+				if val, exists := newValues[FieldRegistry.RACFPassword]; !exists || val != nil {
+					t.Errorf("Expected RACFPassword to be nil, got %v", val)
+				}
 			}
 
 			if err := client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters); err != nil {

@@ -43,10 +43,10 @@ func GetSchemaFieldRegistry(schema string, newPassword string) (map[*Field][]str
 		// we need to unset the racfPassword field if the racfPassphrase is set and vice versa
 		if len(newPassword) > 8 {
 			fields[FieldRegistry.RACFPassphrase] = []string{newPassword}
-			fields[FieldRegistry.RACFPassword] = []string{}
+			fields[FieldRegistry.RACFPassword] = nil
 		} else {
 			fields[FieldRegistry.RACFPassword] = []string{newPassword}
-			fields[FieldRegistry.RACFPassphrase] = []string{}
+			fields[FieldRegistry.RACFPassphrase] = nil
 		}
 
 		fields[FieldRegistry.RACFAttributes] = []string{"noexpired"}

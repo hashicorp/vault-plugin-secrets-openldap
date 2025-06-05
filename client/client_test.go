@@ -133,22 +133,27 @@ func TestUpdatePasswordOpenLDAP(t *testing.T) {
 
 func TestUpdatePasswordRACF(t *testing.T) {
 	tests := []struct {
-		name        string
-		password    string
-		expectField string
-		unsetField  string
+		name           string
+		password       string
+		expectedFields map[*Field][]string
 	}{
 		{
-			name:        "short password",
-			password:    "pass123",
-			expectField: "racfPassword",
-			unsetField:  "racfPassPhrase",
+			name:     "short password (8 chars)",
+			password: "pass1234",
+			expectedFields: map[*Field][]string{
+				FieldRegistry.RACFPassword:   {"pass1234"},
+				FieldRegistry.RACFPassphrase: nil,
+				FieldRegistry.RACFAttributes: {"noexpired"},
+			},
 		},
 		{
-			name:        "long passphrase",
-			password:    "this is a longer passphrase that should use racfPassPhrase",
-			expectField: "racfPassPhrase",
-			unsetField:  "racfPassword",
+			name:     "very long passphrase",
+			password: "this is a much longer passphrase that should definitely use racfPassPhrase",
+			expectedFields: map[*Field][]string{
+				FieldRegistry.RACFPassword:   nil,
+				FieldRegistry.RACFPassphrase: {"this is a much longer passphrase that should definitely use racfPassPhrase"},
+				FieldRegistry.RACFAttributes: {"noexpired"},
+			},
 		},
 	}
 
@@ -167,9 +172,11 @@ func TestUpdatePasswordRACF(t *testing.T) {
 			conn.ModifyRequestToExpect = &ldap.ModifyRequest{
 				DN: dn,
 			}
-			conn.ModifyRequestToExpect.Replace(tt.expectField, []string{tt.password})
-			conn.ModifyRequestToExpect.Replace(tt.unsetField, nil)
-			conn.ModifyRequestToExpect.Replace("racfAttributes", []string{"noexpired"})
+
+			// Set up expected modifications based on the test case
+			for field, values := range tt.expectedFields {
+				conn.ModifyRequestToExpect.Replace(field.String(), values)
+			}
 
 			ldapClient := &ldaputil.Client{
 				Logger: hclog.NewNullLogger(),
@@ -187,13 +194,24 @@ func TestUpdatePasswordRACF(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if tt.expectField == "racfPassword" {
-				if val, exists := newValues[FieldRegistry.RACFPassphrase]; !exists || val != nil {
-					t.Errorf("Expected RACFPassphrase to be nil, got %v", val)
+			// verify that the fields are set correctly in newValues
+			for field, expectedValues := range tt.expectedFields {
+				actualValues, exists := newValues[field]
+				if !exists {
+					t.Errorf("Expected field %s to exist in newValues", field.String())
+					continue
 				}
-			} else {
-				if val, exists := newValues[FieldRegistry.RACFPassword]; !exists || val != nil {
-					t.Errorf("Expected RACFPassword to be nil, got %v", val)
+
+				if expectedValues == nil && actualValues != nil {
+					t.Errorf("Expected field %s to be nil, got %v", field.String(), actualValues)
+				} else if len(actualValues) != len(expectedValues) {
+					t.Errorf("Expected %d values for field %s, got %d", len(expectedValues), field.String(), len(actualValues))
+				} else {
+					for i, expected := range expectedValues {
+						if actualValues[i] != expected {
+							t.Errorf("Expected value %q for field %s, got %q", expected, field.String(), actualValues[i])
+						}
+					}
 				}
 			}
 

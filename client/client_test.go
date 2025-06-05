@@ -132,42 +132,93 @@ func TestUpdatePasswordOpenLDAP(t *testing.T) {
 }
 
 func TestUpdatePasswordRACF(t *testing.T) {
-	testPass := "hell0$catz*"
-
-	config := emptyConfig()
-	config.BindDN = "cats"
-	config.BindPassword = "dogs"
-
-	conn := &ldapifc.FakeLDAPConnection{
-		SearchRequestToExpect: testSearchRequest(),
-		SearchResultToReturn:  testSearchResult(),
+	tests := []struct {
+		name           string
+		password       string
+		expectedFields map[*Field][]string
+	}{
+		{
+			name:     "short password (8 chars)",
+			password: "pass1234",
+			expectedFields: map[*Field][]string{
+				FieldRegistry.RACFPassword:   {"pass1234"},
+				FieldRegistry.RACFPassphrase: nil,
+				FieldRegistry.RACFAttributes: {"noexpired"},
+			},
+		},
+		{
+			name:     "very long passphrase",
+			password: "this is a much longer passphrase that should definitely use racfPassPhrase",
+			expectedFields: map[*Field][]string{
+				FieldRegistry.RACFPassword:   nil,
+				FieldRegistry.RACFPassphrase: {"this is a much longer passphrase that should definitely use racfPassPhrase"},
+				FieldRegistry.RACFAttributes: {"noexpired"},
+			},
+		},
 	}
 
-	dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
-	conn.ModifyRequestToExpect = &ldap.ModifyRequest{
-		DN: dn,
-	}
-	conn.ModifyRequestToExpect.Replace("racfPassword", []string{testPass})
-	conn.ModifyRequestToExpect.Replace("racfAttributes", []string{"noexpired"})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := emptyConfig()
+			config.BindDN = "cats"
+			config.BindPassword = "dogs"
 
-	ldapClient := &ldaputil.Client{
-		Logger: hclog.NewNullLogger(),
-		LDAP:   &ldapifc.FakeLDAPClient{conn},
-	}
+			conn := &ldapifc.FakeLDAPConnection{
+				SearchRequestToExpect: testSearchRequest(),
+				SearchResultToReturn:  testSearchResult(),
+			}
 
-	client := &Client{ldapClient}
+			dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
+			conn.ModifyRequestToExpect = &ldap.ModifyRequest{
+				DN: dn,
+			}
 
-	filters := map[*Field][]string{
-		FieldRegistry.ObjectClass: {"*"},
-	}
+			// Set up expected modifications based on the test case
+			for field, values := range tt.expectedFields {
+				conn.ModifyRequestToExpect.Replace(field.String(), values)
+			}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaRACF, testPass)
-	if err != nil {
-		t.Fatal(err)
-	}
+			ldapClient := &ldaputil.Client{
+				Logger: hclog.NewNullLogger(),
+				LDAP:   &ldapifc.FakeLDAPClient{conn},
+			}
 
-	if err := client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters); err != nil {
-		t.Fatal(err)
+			client := &Client{ldapClient}
+
+			filters := map[*Field][]string{
+				FieldRegistry.ObjectClass: {"*"},
+			}
+
+			newValues, err := GetSchemaFieldRegistry(SchemaRACF, tt.password)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// verify that the fields are set correctly in newValues
+			for field, expectedValues := range tt.expectedFields {
+				actualValues, exists := newValues[field]
+				if !exists {
+					t.Errorf("Expected field %s to exist in newValues", field.String())
+					continue
+				}
+
+				if expectedValues == nil && actualValues != nil {
+					t.Errorf("Expected field %s to be nil, got %v", field.String(), actualValues)
+				} else if len(actualValues) != len(expectedValues) {
+					t.Errorf("Expected %d values for field %s, got %d", len(expectedValues), field.String(), len(actualValues))
+				} else {
+					for i, expected := range expectedValues {
+						if actualValues[i] != expected {
+							t.Errorf("Expected value %q for field %s, got %q", expected, field.String(), actualValues[i])
+						}
+					}
+				}
+			}
+
+			if err := client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

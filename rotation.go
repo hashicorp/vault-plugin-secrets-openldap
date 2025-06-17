@@ -142,6 +142,7 @@ func (b *backend) runTicker(ctx context.Context, s logical.Storage) {
 // credential setting or rotation in the event of partial failure.
 type setCredentialsWAL struct {
 	NewPassword       string    `json:"new_password" mapstructure:"new_password"`
+	NewPassPhrase     string    `json:"new_pass_phrase" mapstructure:"new_pass_phrase"`
 	RoleName          string    `json:"role_name" mapstructure:"role_name"`
 	Username          string    `json:"username" mapstructure:"username"`
 	DN                string    `json:"dn" mapstructure:"dn"`
@@ -344,7 +345,10 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		return output, errors.New("the config is currently unset")
 	}
 
-	var newPassword string
+	// Determine if this role uses passphrase or password
+	isPassPhrase := input.Role.StaticAccount.PassPhrase != ""
+
+	var newCredential string
 	var usedCredentialFromPreviousRotation bool
 	if output.WALID != "" {
 		wal, err := b.findStaticWAL(ctx, s, output.WALID)
@@ -358,8 +362,13 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 
 			// Generate a new WAL entry and credential
 			output.WALID = ""
-		case wal.NewPassword != "" && wal.PasswordPolicy != config.PasswordPolicy:
-			b.Logger().Debug("password policy changed, generating new password", "role", input.RoleName, "WAL ID", output.WALID)
+		case (isPassPhrase && wal.NewPassPhrase != "" && wal.PasswordPolicy != config.PasswordPolicy) ||
+			(!isPassPhrase && wal.NewPassword != "" && wal.PasswordPolicy != config.PasswordPolicy):
+			credentialType := "password"
+			if isPassPhrase {
+				credentialType = "passphrase"
+			}
+			b.Logger().Debug("password policy changed, generating new "+credentialType, "role", input.RoleName, "WAL ID", output.WALID)
 			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
 				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
 			}
@@ -367,34 +376,55 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 			// Generate a new WAL entry and credential
 			output.WALID = ""
 		default:
-			// Reuse the password from the existing WAL entry
-			newPassword = wal.NewPassword
+			// Reuse the credential from the existing WAL entry
+			if isPassPhrase {
+				newCredential = wal.NewPassPhrase
+			} else {
+				newCredential = wal.NewPassword
+			}
 			usedCredentialFromPreviousRotation = true
 		}
 	}
 
 	if output.WALID == "" {
-		newPassword, err = b.GeneratePassword(ctx, config)
+		newCredential, err = b.GeneratePassword(ctx, config)
 		if err != nil {
 			return output, err
 		}
-		output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, &setCredentialsWAL{
+
+		walEntry := &setCredentialsWAL{
 			RoleName:          input.RoleName,
 			Username:          input.Role.StaticAccount.Username,
 			DN:                input.Role.StaticAccount.DN,
-			NewPassword:       newPassword,
 			LastVaultRotation: input.Role.StaticAccount.LastVaultRotation,
 			PasswordPolicy:    config.PasswordPolicy,
-		})
-		b.Logger().Debug("wrote WAL", "role", input.RoleName, "WAL ID", output.WALID)
+		}
+
+		// Set the appropriate credential field in WAL
+		if isPassPhrase {
+			walEntry.NewPassPhrase = newCredential
+		} else {
+			walEntry.NewPassword = newCredential
+		}
+
+		output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, walEntry)
+		credentialType := "password"
+		if isPassPhrase {
+			credentialType = "passphrase"
+		}
+		b.Logger().Debug("wrote WAL", "role", input.RoleName, "WAL ID", output.WALID, "credential_type", credentialType)
 		if err != nil {
 			return output, fmt.Errorf("error writing WAL entry: %w", err)
 		}
 	}
 
-	if newPassword == "" {
-		b.Logger().Error("newPassword was empty, re-generating based on the password policy")
-		newPassword, err = b.GeneratePassword(ctx, config)
+	if newCredential == "" {
+		credentialType := "password"
+		if isPassPhrase {
+			credentialType = "passphrase"
+		}
+		b.Logger().Error("new credential was empty, re-generating based on the password policy", "credential_type", credentialType)
+		newCredential, err = b.GeneratePassword(ctx, config)
 		if err != nil {
 			return output, err
 		}
@@ -405,13 +435,17 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	// and username. UserDN-based search targets the object by searching the whole
 	// subtree rooted at the userDN.
 	if input.Role.StaticAccount.DN != "" {
-		err = b.client.UpdateDNPassword(config.LDAP, input.Role.StaticAccount.DN, newPassword)
+		err = b.client.UpdateDNPassword(config.LDAP, input.Role.StaticAccount.DN, newCredential)
 	} else {
-		err = b.client.UpdateUserPassword(config.LDAP, input.Role.StaticAccount.Username, newPassword)
+		err = b.client.UpdateUserPassword(config.LDAP, input.Role.StaticAccount.Username, newCredential)
 	}
 	if err != nil {
 		if usedCredentialFromPreviousRotation {
-			b.Logger().Debug("password stored in WAL failed, deleting WAL", "role", input.RoleName, "WAL ID", output.WALID)
+			credentialType := "password"
+			if isPassPhrase {
+				credentialType = "passphrase"
+			}
+			b.Logger().Debug(credentialType+" stored in WAL failed, deleting WAL", "role", input.RoleName, "WAL ID", output.WALID)
 			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
 				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
 			}
@@ -428,8 +462,22 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	lvr := time.Now()
 	input.Role.StaticAccount.LastVaultRotation = lvr
 	input.Role.StaticAccount.SetNextVaultRotation(lvr)
-	input.Role.StaticAccount.LastPassword = input.Role.StaticAccount.Password
-	input.Role.StaticAccount.Password = newPassword
+
+	// Update the appropriate credential fields based on type
+	if isPassPhrase {
+		input.Role.StaticAccount.LastPassPhrase = input.Role.StaticAccount.PassPhrase
+		input.Role.StaticAccount.PassPhrase = newCredential
+		// Clear password fields when using passphrase
+		input.Role.StaticAccount.Password = ""
+		input.Role.StaticAccount.LastPassword = ""
+	} else {
+		input.Role.StaticAccount.LastPassword = input.Role.StaticAccount.Password
+		input.Role.StaticAccount.Password = newCredential
+		// Clear passphrase fields when using password
+		input.Role.StaticAccount.PassPhrase = ""
+		input.Role.StaticAccount.LastPassPhrase = ""
+	}
+
 	output.RotationTime = lvr
 
 	entry, err := logical.StorageEntryJSON(staticRolePath+input.RoleName, input.Role)

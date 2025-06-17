@@ -50,16 +50,26 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 		return logical.ErrorResponse("unknown role: %s", name), nil
 	}
 
+	credData := map[string]any{
+		"dn":                  role.StaticAccount.DN,
+		"username":            role.StaticAccount.Username,
+		"ttl":                 role.StaticAccount.PasswordTTL().Seconds(),
+		"rotation_period":     role.StaticAccount.RotationPeriod.Seconds(),
+		"last_vault_rotation": role.StaticAccount.LastVaultRotation,
+	}
+
+	if role.StaticAccount.Password != "" {
+		credData["password"] = role.StaticAccount.Password
+		credData["last_password"] = role.StaticAccount.LastPassword
+		credData["last_pass_phrase"] = nil
+	} else if role.StaticAccount.PassPhrase != "" {
+		credData["pass_phrase"] = role.StaticAccount.PassPhrase
+		credData["last_pass_phrase"] = role.StaticAccount.LastPassPhrase
+		credData["last_password"] = nil
+	}
+
 	return &logical.Response{
-		Data: map[string]interface{}{
-			"dn":                  role.StaticAccount.DN,
-			"username":            role.StaticAccount.Username,
-			"password":            role.StaticAccount.Password,
-			"last_password":       role.StaticAccount.LastPassword,
-			"ttl":                 role.StaticAccount.PasswordTTL().Seconds(),
-			"rotation_period":     role.StaticAccount.RotationPeriod.Seconds(),
-			"last_vault_rotation": role.StaticAccount.LastVaultRotation,
-		},
+		Data: credData,
 	}, nil
 }
 
@@ -68,7 +78,7 @@ Request LDAP credentials for a certain static role. These credentials are
 rotated periodically.`
 
 const pathStaticCredsReadHelpDesc = `
-This path reads LDAP credentials for a certain static role. The LDAPs 
+This path reads LDAP credentials for a certain static role. The LDAPs
 credentials are rotated periodically according to their configuration, and will
 return the same password until they are rotated.
 `

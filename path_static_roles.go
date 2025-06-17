@@ -439,14 +439,23 @@ type staticAccount struct {
 	// Username to create or assume management for static accounts
 	Username string `json:"username"`
 
-	// Password is the current password for static accounts. As an input, this is
-	// used/required when trying to assume management of an existing static
-	// account. This is returned on credential requests if it exists.
+	// Password is the current authentication value used for static accounts when a Passphrase is not set.
+	// It is required when attempting to assume control of an existing static account.
+	// If available, Password will also be returned during credential requests.
 	Password string `json:"password"`
 
 	// LastPassword is the prior password after a rotation for static accounts.
 	// This is returned on credential requests if it exists.
 	LastPassword string `json:"last_password"`
+
+	// Passphrase is an optional authentication value that takes precedence over Password
+	// when the password string is longer than 8 characters. When set, Passphrase must be used
+	// instead of Password for authentication and credential retrieval.
+	PassPhrase string `json:"pass_phrase"`
+
+	// LastPassPhrase is the prior passphrase after a rotation for static accounts.
+	// This is returned on credential requests if it exists.
+	LastPassPhrase string `json:"last_pass_phrase"`
 
 	// LastVaultRotation represents the last time Vault rotated the password. A
 	// zero value indicates the the password has never been rotated by Vault.
@@ -527,17 +536,17 @@ This path lets you manage the static roles that can be created with this
 backend. Static Roles are associated with a single LDAP entry, and manage the
 password based on a rotation period, automatically rotating the password.
 
-The "username" parameter is required and configures the username for the LDAP entry. 
-This is helpful to provide a usable name when distinguished name (DN) isn't used 
-directly for authentication. If DN not provided, "username" will be used for LDAP 
-subtree search, rooted at the "userdn" configuration value. The name attribute to use 
+The "username" parameter is required and configures the username for the LDAP entry.
+This is helpful to provide a usable name when distinguished name (DN) isn't used
+directly for authentication. If DN not provided, "username" will be used for LDAP
+subtree search, rooted at the "userdn" configuration value. The name attribute to use
 when searching for the user can be configured with the "userattr" configuration value.
 
-The "dn" parameter is optional and configures the distinguished name to use 
-when managing the existing entry. If the "dn" parameter is set, it will take 
+The "dn" parameter is optional and configures the distinguished name to use
+when managing the existing entry. If the "dn" parameter is set, it will take
 precedence over the "username" when LDAP searches are performed.
 
-The "rotation_period' parameter is required and configures how often, in seconds, 
+The "rotation_period' parameter is required and configures how often, in seconds,
 the credentials should be automatically rotated by Vault.  The minimum is 5 seconds (5s).
 `
 

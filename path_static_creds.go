@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/rotation"
 	"strings"
+	"time"
 )
 
 const staticCredPath = "static-cred/"
@@ -66,6 +67,7 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 		})
 		if err != nil {
 			dt["next_expected_rotation"] = rmTime.NextRotationTime
+			dt["ttl"] = rmTime.NextRotationTime.Sub(time.Now()).Seconds()
 		}
 	}
 

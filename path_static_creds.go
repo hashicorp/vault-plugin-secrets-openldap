@@ -5,10 +5,10 @@ package openldap
 
 import (
 	"context"
-	"strings"
-
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/hashicorp/vault/sdk/rotation"
+	"strings"
 )
 
 const staticCredPath = "static-cred/"
@@ -50,16 +50,28 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 		return logical.ErrorResponse("unknown role: %s", name), nil
 	}
 
+	dt := map[string]interface{}{
+		"dn":                  role.StaticAccount.DN,
+		"username":            role.StaticAccount.Username,
+		"password":            role.StaticAccount.Password,
+		"last_password":       role.StaticAccount.LastPassword,
+		"ttl":                 role.StaticAccount.PasswordTTL().Seconds(),
+		"rotation_period":     role.StaticAccount.RotationPeriod.Seconds(),
+		"last_vault_rotation": role.StaticAccount.LastVaultRotation,
+		//"next_expected_rotation": rmTime,
+	}
+
+	if role.StaticAccount.HasRotationParams() {
+		rmTime, err := b.System().GetRotationInformation(ctx, &rotation.RotationInfoRequest{
+			ReqPath: req.Path,
+		})
+		if err != nil {
+			dt["next_expected_rotation"] = rmTime
+		}
+	}
+
 	return &logical.Response{
-		Data: map[string]interface{}{
-			"dn":                  role.StaticAccount.DN,
-			"username":            role.StaticAccount.Username,
-			"password":            role.StaticAccount.Password,
-			"last_password":       role.StaticAccount.LastPassword,
-			"ttl":                 role.StaticAccount.PasswordTTL().Seconds(),
-			"rotation_period":     role.StaticAccount.RotationPeriod.Seconds(),
-			"last_vault_rotation": role.StaticAccount.LastVaultRotation,
-		},
+		Data: dt,
 	}, nil
 }
 

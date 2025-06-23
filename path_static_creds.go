@@ -58,7 +58,6 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 		"ttl":                 role.StaticAccount.PasswordTTL().Seconds(),
 		"rotation_period":     role.StaticAccount.RotationPeriod.Seconds(),
 		"last_vault_rotation": role.StaticAccount.LastVaultRotation,
-		//"next_expected_rotation": rmTime,
 	}
 
 	if role.StaticAccount.HasRotationParams() {
@@ -66,7 +65,7 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 			ReqPath: req.Path,
 		})
 		if err != nil {
-			dt["next_expected_rotation"] = rmTime
+			dt["next_expected_rotation"] = rmTime.NextRotationTime
 		}
 	}
 

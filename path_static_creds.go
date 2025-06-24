@@ -63,7 +63,7 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 
 	if role.StaticAccount.HasRotationParams() {
 		rmTime, err := b.System().GetRotationInformation(ctx, &rotation.RotationInfoRequest{
-			ReqPath: req.Path,
+			ReqPath: staticRolePath + name,
 		})
 		if err == nil {
 			dt["next_expected_rotation"] = rmTime.NextRotationTime

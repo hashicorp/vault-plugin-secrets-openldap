@@ -7,8 +7,47 @@ ifndef $(GOPATH)
     GOPATH=$(shell go env GOPATH)
     export GOPATH
 endif
-PLUGIN_DIR ?= $$GOPATH/vault-plugins
+PLUGIN_DIR ?= $(GOPATH)/vault-plugins
 PLUGIN_PATH ?= local-secrets-ldap
+
+# env vars
+
+#setup ldap server:
+LDAP_DOMAIN ?= example.com
+LDAP_ORG ?= example
+LDAP_ADMIN_PW ?= adminpassword
+LDAP_VERSION ?= 1.3.0
+LDAP_PORT ?= 389
+LDIF_PATH ?= $(PWD)/bootstrap/ldif/seed.ldif
+
+#configure ldap plugin
+PLUGIN_DEST_DIR ?= $(PLUGIN_DIR)
+MAKEFILE_DIR ?= $(PWD)
+PLUGIN_SOURCE_TYPE ?= local_build
+PLUGIN_DIR_VAULT ?= /etc/vault/plugins
+LDAP_URL ?= ldap://127.0.0.1:389
+LDAP_BIND_DN ?= cn=admin,dc=example,dc=com
+LDAP_BIND_PASS ?= adminpassword
+LDAP_USER_DN ?= ou=users,dc=example,dc=com
+LDAP_SCHEMA ?= openldap
+
+export LDAP_DOMAIN
+export LDAP_ORG
+export LDAP_ADMIN_PW
+export LDAP_VERSION
+export LDAP_PORT
+export PLUGIN_NAME
+export PLUGIN_PATH
+export PLUGIN_DEST_DIR
+export PLUGIN_SOURCE_TYPE
+export MAKEFILE_DIR
+export PLUGIN_DIR_VAULT
+export LDAP_URL
+export LDAP_BIND_DN
+export LDAP_BIND_PASS
+export LDAP_USER_DN
+export LDAP_SCHEMA
+export LDIF_PATH
 
 .PHONY: default
 default: dev
@@ -48,8 +87,31 @@ fmtcheck:
 fmt:
 	gofumpt -l -w .
 
-configure: dev
-	./bootstrap/configure.sh \
-	$(PLUGIN_DIR) \
-	$(PLUGIN_NAME) \
-	$(PLUGIN_PATH)
+.PHONY: setup-env
+setup-env:
+	cd bootstrap && ./setup-docker.sh
+	cd bootstrap && ./setup-openldap.sh
+
+.PHONY: plugin-build
+plugin-build:
+	cd enos/modules/configure_plugin && ./scripts/plugin-build.sh
+
+.PHONY: plugin-register
+plugin-register:
+	cd enos/modules/configure_plugin && \
+	PLUGIN_BINARY_SRC="$(PLUGIN_DEST_DIR)/$(PLUGIN_NAME)" ./scripts/plugin-register.sh
+
+.PHONY: plugin-enable
+plugin-enable:
+	cd enos/modules/configure_plugin && ./scripts/plugin-enable.sh
+
+.PHONY: plugin-configure
+plugin-configure:
+	cd enos/modules/configure_plugin && ./scripts/plugin-configure.sh
+
+.PHONY: configure
+configure: plugin-build plugin-register plugin-enable plugin-configure
+
+.PHONY: teardown-env
+teardown-env:
+	cd bootstrap && ./teardown-env.sh

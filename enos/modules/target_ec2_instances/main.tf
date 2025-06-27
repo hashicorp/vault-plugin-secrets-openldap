@@ -94,14 +94,17 @@ data "aws_iam_policy_document" "target_instance_role" {
 data "enos_environment" "localhost" {}
 
 locals {
-  cluster_name  = coalesce(var.cluster_name, random_string.cluster_name.result)
+  cluster_name = coalesce(var.cluster_name, random_string.cluster_name.result)
   instance_type = local.instance_types[data.aws_ami.ami.architecture]
   instance_types = {
     "arm64"  = var.instance_types["arm64"]
     "x86_64" = var.instance_types["amd64"]
   }
-  instances   = toset([for idx in range(var.instance_count) : tostring(idx)])
+  instances = toset([for idx in range(var.instance_count) : tostring(idx)])
   name_prefix = "${var.project_name}-${local.cluster_name}-${random_string.unique_id.result}"
+  ami_arch = data.aws_ami.ami.architecture                  # "x86_64" or "arm64"
+  go_arch     = local.ami_arch == "x86_64" ? "amd64" : local.ami_arch
+  go_os       = "linux"
 }
 
 resource "random_string" "cluster_name" {
@@ -164,6 +167,17 @@ resource "aws_security_group" "target" {
     to_port   = 0
     protocol  = "-1"
     self      = true
+  }
+
+  # LDAP PORT
+  ingress {
+    from_port = 389
+    to_port   = 389
+    protocol  = "tcp"
+    cidr_blocks = [
+      "0.0.0.0/0"
+    ]
+    ipv6_cidr_blocks = ["::/0"]
   }
 
   # External traffic

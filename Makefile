@@ -31,6 +31,9 @@ LDAP_BIND_PASS ?= adminpassword
 LDAP_USER_DN ?= ou=users,dc=example,dc=com
 LDAP_SCHEMA ?= openldap
 
+GOOS ?= linux # Set default OS to linux for ec2 instances
+GOARCH ?= amd64 # Set default architecture to amd64 for ec2 instances
+
 export LDAP_DOMAIN
 export LDAP_ORG
 export LDAP_ADMIN_PW
@@ -48,6 +51,9 @@ export LDAP_BIND_PASS
 export LDAP_USER_DN
 export LDAP_SCHEMA
 export LDIF_PATH
+
+export GOOS
+export GOARCH
 
 .PHONY: default
 default: dev
@@ -115,3 +121,7 @@ configure: plugin-build plugin-register plugin-enable plugin-configure
 .PHONY: teardown-env
 teardown-env:
 	cd bootstrap && ./teardown-env.sh
+
+.PHONY: demo
+demo:
+	cd demo && ./static-role-demo.sh

@@ -184,6 +184,8 @@ scenario "openldap" {
       common_tags     = global.tags
       seal_key_names  = step.create_seal_key.resource_names
       vpc_id          = step.create_vpc.id
+
+      instance_count  = 1
     }
   }
 
@@ -492,6 +494,20 @@ scenario "openldap" {
       go_os = step.create_vault_cluster_targets.plugin_os
       go_arch = step.create_vault_cluster_targets.plugin_arch
 
+      plugin_name         = "vault-plugin-secrets-openldap"
+      plugin_dest_dir     = "/Users/USER/go/vault-plugins" #placeholder for user home directory
+      plugin_source_type  = "local_build"
+      makefile_dir        = "/Users/USER/hashicorp/plugins/vault-plugin-secrets-openldap/" #placeholder for user home directory
+      plugin_registry_url = "URL Placeholder"
+      plugin_local_path   = "Local Path Placeholder"
+      plugin_dir_vault    = "/etc/vault/plugins"
+      plugin_mount_path   = "local-secrets-ldap"
+      ldap_url            = step.create_ldap_server.ldap_url
+      ldap_bind_dn        = "cn=admin,dc=example,dc=com"
+      ldap_bind_pass      = "adminpassword"
+      ldap_user_dn        = "ou=users,dc=example,dc=com"
+      ldap_schema         = "openldap"
+
       # plugin_name        = var.plugin_name
       # plugin_dest_dir    = var.plugin_dest_dir
       # plugin_source_type = var.plugin_source_type
@@ -505,21 +521,6 @@ scenario "openldap" {
       # ldap_bind_pass      = var.ldap_bind_pass
       # ldap_user_dn        = var.ldap_user_dn
       # ldap_schema         = var.ldap_schema
-
-
-      plugin_name         = "vault-plugin-secrets-openldap"
-      plugin_dest_dir     = "/Users/USER/go/vault-plugins"
-      plugin_source_type  = "local_build"
-      makefile_dir        = "/Users/USER/hashicorp/plugins/vault-plugin-secrets-openldap/"
-      plugin_registry_url = "URL Placeholder"
-      plugin_local_path   = "Local Path Placeholder"
-      plugin_dir_vault    = "/etc/vault/plugins"
-      plugin_mount_path   = "local-secrets-ldap"
-      ldap_url            = step.create_ldap_server.ldap_url
-      ldap_bind_dn        = "cn=admin,dc=example,dc=com"
-      ldap_bind_pass      = "adminpassword"
-      ldap_user_dn        = "ou=users,dc=example,dc=com"
-      ldap_schema         = "openldap"
 
     }
   }

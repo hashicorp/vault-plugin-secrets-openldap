@@ -508,9 +508,9 @@ scenario "openldap" {
 
 
       plugin_name         = "vault-plugin-secrets-openldap"
-      plugin_dest_dir     = "/Users/USER/go/vault-plugins"
+      plugin_dest_dir     = "/Users/hamzaelmokhtarshili/go/vault-plugins"
       plugin_source_type  = "local_build"
-      makefile_dir        = "/Users/USER/hashicorp/plugins/vault-plugin-secrets-openldap/"
+      makefile_dir        = "/Users/hamzaelmokhtarshili/hashicorp/plugins/vault-plugin-secrets-openldap/"
       plugin_registry_url = "URL Placeholder"
       plugin_local_path   = "Local Path Placeholder"
       plugin_dir_vault    = "/etc/vault/plugins"
@@ -521,6 +521,30 @@ scenario "openldap" {
       ldap_user_dn        = "ou=users,dc=example,dc=com"
       ldap_schema         = "openldap"
 
+    }
+  }
+
+  step "test_static_role_crud_api" {
+    description = global.description.static_role_crud_api
+    module      = module.static_role_crud_api
+    depends_on  = [step.setup_plugin]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
+      vault_addr       = step.create_vault_cluster.api_addr_localhost
+      vault_root_token = step.create_vault_cluster.root_token
+
+      plugin_mount_path = "local-secrets-ldap"
+      ldap_host = step.create_ldap_server.ldap_ip_address
+      ldap_port = step.create_ldap_server.ldap_port
+      ldap_dn = "uid=mary.smith,ou=users,dc=example,dc=com"
+      ldap_username = "mary.smith"
+      ldap_old_password = "defaultpassword"
+      ldap_role_name = "mary"
     }
   }
 

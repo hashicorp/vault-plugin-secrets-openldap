@@ -118,6 +118,10 @@ globals {
       start the Vault agent.
     EOF
 
+      static_role_crud_api = <<-EOF
+      Tests the lifecycle of a static role via the Vault CRUD API.
+    EOF
+
     stop_vault = <<-EOF
       Stop the Vault cluster by stopping the vault service via systemctl.
     EOF

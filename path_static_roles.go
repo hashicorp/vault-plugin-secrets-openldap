@@ -308,12 +308,12 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		return logical.ErrorResponse(err.Error()), nil
 	}
 
-	if role.StaticAccount.RotationPeriod < queueTickInterval {
-		// If rotation frequency is specified the value must be at least
-		// that of the constant queueTickSeconds (5 seconds at time of writing),
-		// otherwise we won't be able to rotate in time
-		return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil
-	}
+	//if role.StaticAccount.RotationPeriod < queueTickInterval {
+	//	// If rotation frequency is specified the value must be at least
+	//	// that of the constant queueTickSeconds (5 seconds at time of writing),
+	//	// otherwise we won't be able to rotate in time
+	//	return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil
+	//}
 
 	lastVaultRotation := role.StaticAccount.LastVaultRotation
 

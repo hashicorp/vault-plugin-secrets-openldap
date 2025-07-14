@@ -62,6 +62,10 @@ module "choose_follower_host" {
   source = "./modules/choose_follower_host"
 }
 
+module "dynamic_role_crud_api" {
+  source = "./modules/dynamic_role_crud_api"
+}
+
 module "ec2_info" {
   source = "./modules/ec2_info"
 }

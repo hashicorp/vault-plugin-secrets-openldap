@@ -112,6 +112,10 @@ plugin-configure:
 .PHONY: configure
 configure: plugin-build plugin-register plugin-enable plugin-configure
 
+.PHONY: static-role-test
+static-role-test:
+	cd enos/modules/static_role_crud_api && ./scripts/static-role.sh
+
 .PHONY: teardown-env
 teardown-env:
 	cd bootstrap && ./teardown-env.sh

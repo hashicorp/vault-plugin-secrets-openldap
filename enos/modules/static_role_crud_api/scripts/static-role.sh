@@ -3,18 +3,34 @@
 # SPDX-License-Identifier: BUSL-1.1
 set -e
 
-# Required ENV vars:
-#   PLUGIN_PATH      - Path to the mounted plugin secrets engine (e.g., ldap-secrets/)
-#   LDAP_HOST        - LDAP server hostname or IP (e.g., 127.0.0.1)
-#   LDAP_PORT        - LDAP server port (e.g., 389)
-#   LDAP_DN          - User DN (e.g., uid=mary.smith,ou=users,dc=example,dc=com)
-#   LDAP_USERNAME    - LDAP username (e.g., mary.smith)
-#   LDAP_OLD_PASSWORD - The original LDAP password for testing (before Vault rotation)
+# Test Vault LDAP Static Role CRUD and credential lifecycle using provided LDIFs.
+# Assumptions:
+# - Vault CLI is authenticated and VAULT_ADDR and VAULT_TOKEN are set.
+# - Required ENV vars:
+#     PLUGIN_PATH      - Path to the mounted plugin secrets engine (e.g., ldap-secrets/)
+#     LDAP_HOST        - LDAP server hostname or IP (e.g., 127.0.0.1)
+#     LDAP_PORT        - LDAP server port (e.g., 389)
+#     LDAP_DN          - User DN (e.g., uid=mary.smith,ou=users,dc=example,dc=com)
+#     LDAP_USERNAME    - LDAP username (e.g., mary.smith)
+#     LDAP_OLD_PASSWORD - The original LDAP password for testing (before Vault rotation)
+#     ROLE_NAME       - Name of the static role to create (e.g., mary)
+
+fail() {
+  echo "$1" 1>&2
+  exit 1
+}
+
+[[ -z "$PLUGIN_PATH" ]] && fail "PLUGIN_PATH env variable has not been set"
+[[ -z "$LDAP_HOST" ]] && fail "LDAP_HOST env variable has not been set"
+[[ -z "$LDAP_PORT" ]] && fail "LDAP_PORT env variable has not been set"
+[[ -z "$LDAP_DN" ]] && fail "LDAP_DN env variable has not been set"
+[[ -z "$LDAP_USERNAME" ]] && fail "LDAP_USERNAME env variable has not been set"
+[[ -z "$LDAP_OLD_PASSWORD" ]] && fail "LDAP_OLD_PASSWORD env variable has not been set"
+[[ -z "$ROLE_NAME" ]] && fail "ROLE_NAME env variable has not been set"
 
 export VAULT_ADDR
 export VAULT_TOKEN
 
-ROLE_NAME="mary"
 ROLE_PATH="${PLUGIN_PATH}/static-role/${ROLE_NAME}"
 CRED_PATH="${PLUGIN_PATH}/static-cred/${ROLE_NAME}"
 

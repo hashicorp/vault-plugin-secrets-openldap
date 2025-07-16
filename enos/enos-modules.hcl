@@ -152,6 +152,10 @@ module "start_vault" {
   log_level   = var.vault_log_level
 }
 
+module "static_role_crud_api" {
+  source = "./modules/static_role_crud_api"
+}
+
 module "stop_vault" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/stop_vault?ref=main"
 }

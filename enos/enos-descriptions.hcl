@@ -64,6 +64,10 @@ globals {
       egress traffic via the internet gateway.
     EOF
 
+    dynamic_role_crud_api = <<-EOF
+      Tests the lifecycle of a dynamic role via the Vault CRUD API.
+    EOF
+
     ec2_info = <<-EOF
       Query various endpoints in AWS Ec2 to gather metadata we'll use later in our run when creating
       infrastructure for the Vault cluster. This metadata includes:
@@ -116,6 +120,10 @@ globals {
     start_vault_agent = <<-EOF
       Create an agent approle in the auth engine, generate a Vault Agent configuration file, and
       start the Vault agent.
+    EOF
+
+    static_role_crud_api = <<-EOF
+      Tests the lifecycle of a static role via the Vault CRUD API.
     EOF
 
     stop_vault = <<-EOF

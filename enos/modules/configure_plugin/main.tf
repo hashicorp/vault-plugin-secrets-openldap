@@ -16,7 +16,7 @@ resource "enos_local_exec" "plugin_local_build" {
   environment = {
     PLUGIN_SOURCE_TYPE = var.plugin_source_type
     PLUGIN_NAME = var.plugin_name
-    PLUGIN_DEST_DIR = var.plugin_dest_dir
+    PLUGIN_DIR = var.plugin_dest_dir
     MAKEFILE_DIR = var.makefile_dir
     PLUGIN_REGISTRY_URL = var.plugin_registry_url
     PLUGIN_LOCAL_PATH = var.plugin_local_path

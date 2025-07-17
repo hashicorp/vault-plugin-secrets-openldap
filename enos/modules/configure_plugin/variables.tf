@@ -42,13 +42,11 @@ variable "makefile_dir" {
 variable "plugin_registry_url" {
   type        = string
   description = "Plugin Releases URL"
-  default     = "URL Placeholder"
 }
 
 variable "plugin_local_path" {
   type        = string
   description = "Plugin Binary local path"
-  default     = "Local Path Placeholder"
 }
 
 

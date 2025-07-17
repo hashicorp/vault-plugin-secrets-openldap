@@ -21,8 +21,6 @@ detect_goos() {
   case "$uname_os" in
     Linux*)   echo "linux" ;;
     Darwin*)  echo "darwin" ;;
-    FreeBSD*) echo "freebsd" ;;
-    CYGWIN*|MINGW*|MSYS*) echo "windows" ;;
     *)        echo "unknown" ;;
   esac
 }
@@ -34,8 +32,6 @@ detect_goarch() {
   case "$arch" in
     x86_64)   echo "amd64" ;;
     arm64|aarch64) echo "arm64" ;;
-    armv7l)   echo "arm" ;;
-    i386|i686) echo "386" ;;
     *)        echo "unknown" ;;
   esac
 }
@@ -47,11 +43,11 @@ fail() {
 
 [[ -z "$PLUGIN_SOURCE_TYPE" ]] && fail "PLUGIN_SOURCE_TYPE env variable has not been set"
 [[ -z "$PLUGIN_NAME" ]] && fail "PLUGIN_NAME env variable has not been set"
-[[ -z "$PLUGIN_DEST_DIR" ]] && fail "PLUGIN_DEST_DIR env variable has not been set"
+[[ -z "$PLUGIN_DIR" ]] && fail "PLUGIN_DIR env variable has not been set"
 
 echo "[build] PLUGIN_SOURCE_TYPE=${PLUGIN_SOURCE_TYPE:-}"
 echo "[build] PLUGIN_NAME=${PLUGIN_NAME:-}"
-echo "[build] PLUGIN_DEST_DIR=${PLUGIN_DEST_DIR:-}"
+echo "[build] PLUGIN_DIR=${PLUGIN_DIR:-}"
 
 # Remove from project .bin directory if it exists
 PROJECT_BIN_DIR="${MAKEFILE_DIR}/bin"
@@ -61,12 +57,12 @@ if [ -f "${PROJECT_BIN_DIR}/${PLUGIN_NAME}" ]; then
 fi
 
 # Ensure destination directory exists
-mkdir -p "${PLUGIN_DEST_DIR}"
+mkdir -p "${PLUGIN_DIR}"
 
 # Remove existing plugin (if present) before copying new one
-if [ -f "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}" ]; then
-  echo "[build] Removing existing plugin at ${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
-  rm -f "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
+if [ -f "${PLUGIN_DIR}/${PLUGIN_NAME}" ]; then
+  echo "[build] Removing existing plugin at ${PLUGIN_DIR}/${PLUGIN_NAME}"
+  rm -f "${PLUGIN_DIR}/${PLUGIN_NAME}"
 fi
 
 case "${PLUGIN_SOURCE_TYPE}" in
@@ -84,22 +80,22 @@ case "${PLUGIN_SOURCE_TYPE}" in
     echo "[build] Using GOOS=$GOOS GOARCH=$GOARCH"
     GOOS="$GOOS" GOARCH="$GOARCH" make dev
     popd
-    cp "${PROJECT_BIN_DIR}/${PLUGIN_NAME}" "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
-    chmod +x "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
+    cp "${PROJECT_BIN_DIR}/${PLUGIN_NAME}" "${PLUGIN_DIR}/${PLUGIN_NAME}"
+    chmod +x "${PLUGIN_DIR}/${PLUGIN_NAME}"
     ;;
 
   registry)
     : "${PLUGIN_REGISTRY_URL:?PLUGIN_REGISTRY_URL is required for registry source}"
     echo "[build] Downloading from registry: $PLUGIN_REGISTRY_URL"
-    curl -fLo "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}" "$PLUGIN_REGISTRY_URL"
-    chmod +x "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
+    curl -fLo "${PLUGIN_DIR}/${PLUGIN_NAME}" "$PLUGIN_REGISTRY_URL"
+    chmod +x "${PLUGIN_DIR}/${PLUGIN_NAME}"
     ;;
 
   local_path)
     : "${PLUGIN_LOCAL_PATH:?PLUGIN_LOCAL_PATH is required for local_path source}"
     echo "[build] Copying from local path: $PLUGIN_LOCAL_PATH"
-    cp "${PLUGIN_LOCAL_PATH}" "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
-    chmod +x "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
+    cp "${PLUGIN_LOCAL_PATH}" "${PLUGIN_DIR}/${PLUGIN_NAME}"
+    chmod +x "${PLUGIN_DIR}/${PLUGIN_NAME}"
     ;;
 
   *)
@@ -108,4 +104,4 @@ case "${PLUGIN_SOURCE_TYPE}" in
     ;;
 esac
 
-echo "[build] Plugin binary is at ${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
+echo "[build] Plugin binary is at ${PLUGIN_DIR}/${PLUGIN_NAME}"

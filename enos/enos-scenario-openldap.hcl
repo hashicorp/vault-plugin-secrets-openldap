@@ -458,6 +458,8 @@ scenario "openldap" {
       common_tags     = global.tags
       vpc_id          = step.create_vpc.id
       instance_count  = 1
+      from_port       = 389
+      to_port         = 389
     }
   }
 
@@ -472,7 +474,7 @@ scenario "openldap" {
 
     variables {
       hosts        = step.create_ldap_server_target.hosts
-      ldap_version = "1.5.0"
+      ldap_version = var.ldap_version
     }
   }
 
@@ -489,38 +491,22 @@ scenario "openldap" {
       vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
       vault_addr       = step.create_vault_cluster.api_addr_localhost
       vault_root_token = step.create_vault_cluster.root_token
-      go_os = step.create_vault_cluster_targets.plugin_os
-      go_arch = step.create_vault_cluster_targets.plugin_arch
+      go_os            = step.create_vault_cluster_targets.plugin_os
+      go_arch          = step.create_vault_cluster_targets.plugin_arch
 
-      # plugin_name        = var.plugin_name
-      # plugin_dest_dir    = var.plugin_dest_dir
-      # plugin_source_type = var.plugin_source_type
-      # makefile_dir        = var.plugin_source_type == "local_build" ? var.makefile_dir : null
-      # plugin_registry_url = var.plugin_source_type == "registry" ? var.plugin_registry_url : null
-      # plugin_local_path   = var.plugin_source_type == "local_path" ? var.plugin_local_path : null
-      # plugin_dir_vault    = var.plugin_dir_vault
-      # plugin_mount_path   = var.plugin_mount_path
-      # ldap_url            = step.create_ldap_server.ldap_url
-      # ldap_bind_dn        = var.ldap_bind_dn
-      # ldap_bind_pass      = var.ldap_bind_pass
-      # ldap_user_dn        = var.ldap_user_dn
-      # ldap_schema         = var.ldap_schema
-
-
-      plugin_name         = "vault-plugin-secrets-openldap"
-      plugin_dest_dir     = "/Users/USER/go/vault-plugins"
-      plugin_source_type  = "local_build"
-      makefile_dir        = "/Users/USER/hashicorp/plugins/vault-plugin-secrets-openldap/"
-      plugin_registry_url = "URL Placeholder"
-      plugin_local_path   = "Local Path Placeholder"
-      plugin_dir_vault    = "/etc/vault/plugins"
-      plugin_mount_path   = "local-secrets-ldap"
+      plugin_name         = var.plugin_name
+      plugin_dest_dir     = var.plugin_dest_dir
+      plugin_source_type  = var.plugin_source_type
+      makefile_dir        = var.plugin_source_type == "local_build" ? var.makefile_dir : null
+      plugin_registry_url = var.plugin_source_type == "registry" ? var.plugin_registry_url : null
+      plugin_local_path   = var.plugin_source_type == "local_path" ? var.plugin_local_path : null
+      plugin_dir_vault    = var.plugin_dir_vault
+      plugin_mount_path   = var.plugin_mount_path
       ldap_url            = step.create_ldap_server.ldap_url
-      ldap_bind_dn        = "cn=admin,dc=example,dc=com"
-      ldap_bind_pass      = "adminpassword"
-      ldap_user_dn        = "ou=users,dc=example,dc=com"
-      ldap_schema         = "openldap"
-
+      ldap_bind_dn        = var.ldap_bind_dn
+      ldap_bind_pass      = var.ldap_bind_pass
+      ldap_user_dn        = var.ldap_user_dn
+      ldap_schema         = var.ldap_schema
     }
   }
 

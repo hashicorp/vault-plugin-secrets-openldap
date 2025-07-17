@@ -105,6 +105,90 @@ variable "distro_version_ubuntu" {
   default     = "24.04" // or "20.04", "22.04"
 }
 
+variable "ldap_bind_dn" {
+  description = "LDAP bind DN"
+  type        = string
+  default     = null
+}
+
+variable "ldap_bind_pass" {
+  description = "LDAP bind password"
+  type        = string
+  default     = null
+}
+
+variable "ldap_schema" {
+  description = "LDAP schema type"
+  type        = string
+  default     = "openldap"
+}
+
+variable "ldap_version" {
+  description = "LDAP image tag version"
+  type        = string
+  default     = null
+}
+
+variable "ldap_url" {
+  description = "LDAP server URL"
+  type        = string
+  default     = null
+}
+
+variable "ldap_user_dn" {
+  description = "LDAP user DN"
+  type        = string
+  default     = null
+}
+
+variable "makefile_dir" {
+  description = "Directory containing the Makefile for plugin build"
+  type        = string
+  default     = null
+}
+
+variable "plugin_dest_dir" {
+  description = "Destination directory for the plugin binary"
+  type        = string
+  default     = null
+}
+
+variable "plugin_dir_vault" {
+  description = "Vault server plugin directory"
+  type        = string
+  default     = "/etc/vault/plugins"
+}
+
+variable "plugin_local_path" {
+  description = "Local path to an existing plugin binary"
+  type        = string
+  default     = null
+}
+
+variable "plugin_mount_path" {
+  description = "Mount path for the plugin in Vault"
+  type        = string
+  default     = null
+}
+
+variable "plugin_name" {
+  description = "Name of the Vault plugin to use"
+  type        = string
+  default     = null
+}
+
+variable "plugin_registry_url" {
+  description = "URL for downloading the plugin from a registry"
+  type        = string
+  default     = null
+}
+
+variable "plugin_source_type" {
+  description = "Source type for the plugin (e.g., local_build, registry, local_path)"
+  type        = string
+  default     = "local_build"
+}
+
 variable "tags" {
   description = "Tags that will be applied to infrastructure resources that support tagging"
   type        = map(string)

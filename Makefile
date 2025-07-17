@@ -16,12 +16,11 @@ PLUGIN_PATH ?= local-secrets-ldap
 LDAP_DOMAIN ?= example.com
 LDAP_ORG ?= example
 LDAP_ADMIN_PW ?= adminpassword
-LDAP_VERSION ?= 1.3.0
+IMAGE_TAG ?= 1.3.0
 LDAP_PORT ?= 389
 LDIF_PATH ?= $(PWD)/bootstrap/ldif/seed.ldif
 
 #configure ldap plugin
-PLUGIN_DEST_DIR ?= $(PLUGIN_DIR)
 MAKEFILE_DIR ?= $(PWD)
 PLUGIN_SOURCE_TYPE ?= local_build
 PLUGIN_DIR_VAULT ?= /etc/vault/plugins
@@ -34,11 +33,11 @@ LDAP_SCHEMA ?= openldap
 export LDAP_DOMAIN
 export LDAP_ORG
 export LDAP_ADMIN_PW
-export LDAP_VERSION
+export IMAGE_TAG
 export LDAP_PORT
+export PLUGIN_DIR
 export PLUGIN_NAME
 export PLUGIN_PATH
-export PLUGIN_DEST_DIR
 export PLUGIN_SOURCE_TYPE
 export MAKEFILE_DIR
 export PLUGIN_DIR_VAULT

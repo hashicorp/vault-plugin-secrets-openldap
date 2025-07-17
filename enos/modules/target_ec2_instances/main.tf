@@ -171,8 +171,8 @@ resource "aws_security_group" "target" {
 
   # LDAP PORT
   ingress {
-    from_port = 389
-    to_port   = 389
+    from_port = var.from_port
+    to_port   = var.to_port
     protocol  = "tcp"
     cidr_blocks = [
       "0.0.0.0/0"
@@ -230,7 +230,7 @@ resource "aws_instance" "targets" {
 
 module "disable_selinux" {
   depends_on = [aws_instance.targets]
-  source     = "../disable_selinux"
+  source     = "git::https://github.com/hashicorp/vault.git//enos/modules/disable_selinux?ref=main"
   count      = var.disable_selinux == true ? 1 : 0
 
   hosts = local.hosts

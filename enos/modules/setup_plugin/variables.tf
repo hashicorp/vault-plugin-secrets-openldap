@@ -60,32 +60,6 @@ variable "plugin_mount_path" {
   description = "Mount path for the plugin"
 }
 
-# LDAP variables for configuration
-variable "ldap_url" {
-  type        = string
-  description = "LDAP URL, e.g., ldap://<ip>:389"
-}
-
-variable "ldap_bind_dn" {
-  type        = string
-  description = "LDAP Bind DN"
-}
-
-variable "ldap_bind_pass" {
-  type        = string
-  description = "LDAP Bind password"
-}
-
-variable "ldap_user_dn" {
-  type        = string
-  description = "LDAP User DN"
-}
-
-variable "ldap_schema" {
-  type        = string
-  description = "LDAP schema type, e.g., openldap"
-}
-
 variable "go_os" {
   type        = string
   description = "target machine os, e.g., linux"

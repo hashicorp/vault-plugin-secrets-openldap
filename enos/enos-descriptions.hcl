@@ -13,6 +13,10 @@ globals {
       build from Artifactory, or use a local artifact that was built in CI via CRT.
     EOF
 
+    configure_plugin = <<-EOF
+      Configure the Vault plugin.
+    EOF
+
     create_backend_cluster = <<-EOF
       Create a storage backend cluster if necessary. When configured to use Consul it will
       install, configure, and start the Consul cluster on the target hosts and wait for the Consul
@@ -105,7 +109,7 @@ globals {
     EOF
 
     setup_plugin = <<-EOF
-      Build, register, enable, and configure the Vault plugin.
+      Build, register, and enable the Vault plugin.
     EOF
 
     shutdown_nodes = <<-EOF

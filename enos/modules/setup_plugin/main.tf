@@ -73,24 +73,3 @@ resource "enos_remote_exec" "plugin_enable" {
     }
   }
 }
-
-# Step 5: Configure the plugin
-resource "enos_remote_exec" "plugin_configure" {
-  depends_on = [enos_remote_exec.plugin_enable]
-  scripts = [abspath("${path.module}/scripts/plugin-configure.sh")]
-  environment = {
-    PLUGIN_PATH = var.plugin_mount_path
-    VAULT_ADDR        = var.vault_addr
-    VAULT_TOKEN       = var.vault_root_token
-    LDAP_URL          = var.ldap_url
-    LDAP_BIND_DN      = var.ldap_bind_dn
-    LDAP_BIND_PASS    = var.ldap_bind_pass
-    LDAP_USER_DN      = var.ldap_user_dn
-    LDAP_SCHEMA       = var.ldap_schema
-  }
-  transport = {
-    ssh = {
-      host = var.vault_leader_ip
-    }
-  }
-}

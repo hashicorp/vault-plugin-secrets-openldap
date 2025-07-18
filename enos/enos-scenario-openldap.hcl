@@ -480,7 +480,7 @@ scenario "openldap" {
 
   step "setup_plugin" {
     description = global.description.setup_plugin
-    module      = module.plugin_setup
+    module      = module.setup_plugin
     depends_on  = [step.get_leader_ip, step.create_ldap_server, step.verify_vault_unsealed]
 
     providers = {
@@ -497,10 +497,28 @@ scenario "openldap" {
       plugin_name         = var.plugin_name
       plugin_dest_dir     = var.plugin_dest_dir
       plugin_source_type  = var.plugin_source_type
-      makefile_dir        = var.plugin_source_type == "local_build" ? var.makefile_dir : null
-      plugin_registry_url = var.plugin_source_type == "registry" ? var.plugin_registry_url : null
-      plugin_local_path   = var.plugin_source_type == "local_path" ? var.plugin_local_path : null
+      makefile_dir        = var.makefile_dir
+      plugin_registry_url = var.plugin_registry_url
+      plugin_local_path   = var.plugin_local_path
       plugin_dir_vault    = var.plugin_dir_vault
+      plugin_mount_path   = var.plugin_mount_path
+    }
+  }
+
+  step "configure_plugin" {
+    description = global.description.configure_plugin
+    module      = module.configure_plugin
+    depends_on  = [step.setup_plugin]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
+      vault_addr       = step.create_vault_cluster.api_addr_localhost
+      vault_root_token = step.create_vault_cluster.root_token
+
       plugin_mount_path   = var.plugin_mount_path
       ldap_url            = step.create_ldap_server.ldap_url
       ldap_bind_dn        = var.ldap_bind_dn

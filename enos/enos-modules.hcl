@@ -46,6 +46,11 @@ module "build_local" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_local?ref=main"
 }
 
+// Configure the Vault plugin
+module "configure_plugin" {
+  source = "./modules/configure_plugin/ldap"
+}
+
 // Setup Docker and OpenLDAP on backend server with seed data
 module "create_backend_server" {
   source = "./modules/backend_servers_setup"
@@ -98,11 +103,6 @@ module "install_packages" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/install_packages?ref=main"
 }
 
-// Build, register, enable, and configure the Vault plugin
-module "plugin_setup" {
-  source = "./modules/configure_plugin"
-}
-
 module "read_license" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/read_license?ref=main"
 }
@@ -135,6 +135,11 @@ module "seal_pkcs11" {
 
   cluster_ssh_keypair = var.aws_ssh_keypair_name
   common_tags         = var.tags
+}
+
+// Build, register, and enable the Vault plugin
+module "setup_plugin" {
+  source = "./modules/setup_plugin"
 }
 
 module "shutdown_node" {

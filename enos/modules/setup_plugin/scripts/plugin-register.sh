@@ -32,7 +32,7 @@ sudo rm -f "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}" || true
 sudo cp "${PLUGIN_BINARY_SRC}" "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
 
 # Set permissions to ensure Vault can execute the plugin binary
-chmod 755 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
+sudo chmod 755 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
 
 # Calculate shasum
 SHASUM="$(shasum -a 256 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}" | awk '{print $1}')"

@@ -10,7 +10,7 @@ fail() {
 }
 
 [[ -z "$PLUGIN_NAME" ]] && fail "PLUGIN_NAME env variable has not been set"
-[[ -z "$PLUGIN_DEST_DIR" ]] && fail "PLUGIN_DEST_DIR env variable has not been set"
+[[ -z "$PLUGIN_DIR" ]] && fail "PLUGIN_DIR env variable has not been set"
 
 MAKEFILE_DIR="${MAKEFILE_DIR:-$(pwd)}"
 PROJECT_BIN_DIR="${MAKEFILE_DIR}/bin"
@@ -25,9 +25,9 @@ if [ -f "${PROJECT_BIN_DIR}/${PLUGIN_NAME}" ]; then
 fi
 
 # Remove from destination directory
-if [ -f "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}" ]; then
-  echo "[teardown] Removing existing plugin at ${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
-  rm -f "${PLUGIN_DEST_DIR}/${PLUGIN_NAME}"
+if [ -f "${PLUGIN_DIR}/${PLUGIN_NAME}" ]; then
+  echo "[teardown] Removing existing plugin at ${PLUGIN_DIR}/${PLUGIN_NAME}"
+  rm -f "${PLUGIN_DIR}/${PLUGIN_NAME}"
 fi
 
 echo "[teardown] Teardown complete."

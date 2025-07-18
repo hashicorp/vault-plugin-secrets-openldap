@@ -98,7 +98,7 @@ plugin-build:
 .PHONY: plugin-register
 plugin-register:
 	cd enos/modules/configure_plugin && \
-	PLUGIN_BINARY_SRC="$(PLUGIN_DEST_DIR)/$(PLUGIN_NAME)" ./scripts/plugin-register.sh
+	PLUGIN_BINARY_SRC="$(PLUGIN_DIR)/$(PLUGIN_NAME)" ./scripts/plugin-register.sh
 
 .PHONY: plugin-enable
 plugin-enable:

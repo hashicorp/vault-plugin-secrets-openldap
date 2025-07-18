@@ -411,5 +411,3 @@ module "vault_verify_billing_start_date" {
   vault_instance_count    = var.vault_instance_count
   vault_cluster_addr_port = global.ports["vault_cluster"]["port"]
 }
-
-

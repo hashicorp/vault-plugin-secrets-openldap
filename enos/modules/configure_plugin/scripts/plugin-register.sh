@@ -23,7 +23,7 @@ fail() {
 echo "[register] Registering plugin: $PLUGIN_NAME"
 
 # Ensure the Vault plugin directory exists
-sudo mkdir -p "${PLUGIN_DIR_VAULT}"
+mkdir -p "${PLUGIN_DIR_VAULT}"
 
 # Clean up any previous plugin binary
 sudo rm -f "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}" || true
@@ -32,7 +32,7 @@ sudo rm -f "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}" || true
 sudo cp "${PLUGIN_BINARY_SRC}" "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
 
 # Set permissions to ensure Vault can execute the plugin binary
-sudo chmod 755 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
+chmod 755 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
 
 # Calculate shasum
 SHASUM="$(shasum -a 256 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}" | awk '{print $1}')"

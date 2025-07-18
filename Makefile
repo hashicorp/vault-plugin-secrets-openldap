@@ -93,20 +93,20 @@ setup-env:
 
 .PHONY: plugin-build
 plugin-build:
-	cd enos/modules/configure_plugin && ./scripts/plugin-build.sh
+	cd enos/modules/setup_plugin && ./scripts/plugin-build.sh
 
 .PHONY: plugin-register
 plugin-register:
-	cd enos/modules/configure_plugin && \
+	cd enos/modules/setup_plugin && \
 	PLUGIN_BINARY_SRC="$(PLUGIN_DIR)/$(PLUGIN_NAME)" ./scripts/plugin-register.sh
 
 .PHONY: plugin-enable
 plugin-enable:
-	cd enos/modules/configure_plugin && ./scripts/plugin-enable.sh
+	cd enos/modules/setup_plugin && ./scripts/plugin-enable.sh
 
 .PHONY: plugin-configure
 plugin-configure:
-	cd enos/modules/configure_plugin && ./scripts/plugin-configure.sh
+	cd enos/modules/configure_plugin/ldap && ./scripts/plugin-configure.sh
 
 .PHONY: configure
 configure: plugin-build plugin-register plugin-enable plugin-configure

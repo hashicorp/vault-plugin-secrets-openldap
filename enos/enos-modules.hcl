@@ -16,6 +16,11 @@ module "backend_raft" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/backend_raft?ref=main"
 }
 
+// Bootstrap Vault cluster targets
+module "bootstrap_vault_cluster_targets" {
+  source = "./modules/ec2_bootstrap_tools"
+}
+
 // Find any artifact in Artifactory. Requires the version, revision, and edition.
 module "build_artifactory" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_artifactory_artifact?ref=main"
@@ -39,6 +44,16 @@ module "build_crt" {
 // and bundle path.
 module "build_local" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_local?ref=main"
+}
+
+// Configure the Vault plugin
+module "configure_plugin" {
+  source = "./modules/configure_plugin/ldap"
+}
+
+// Setup Docker and OpenLDAP on backend server with seed data
+module "create_backend_server" {
+  source = "./modules/backend_servers_setup"
 }
 
 module "create_vpc" {
@@ -120,6 +135,11 @@ module "seal_pkcs11" {
 
   cluster_ssh_keypair = var.aws_ssh_keypair_name
   common_tags         = var.tags
+}
+
+// Build, register, and enable the Vault plugin
+module "setup_plugin" {
+  source = "./modules/setup_plugin"
 }
 
 module "shutdown_node" {
@@ -396,4 +416,3 @@ module "vault_verify_billing_start_date" {
   vault_instance_count    = var.vault_instance_count
   vault_cluster_addr_port = global.ports["vault_cluster"]["port"]
 }
-

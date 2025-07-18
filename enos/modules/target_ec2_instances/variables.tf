@@ -39,6 +39,18 @@ variable "disable_selinux" {
   default     = true
 }
 
+variable "from_port" {
+  description = "LDAP from port to allow ingress"
+  type        = number
+  default     = 389
+}
+
+variable "to_port" {
+  description = "LDAP to port to allow ingress"
+  type        = number
+  default     = 389
+}
+
 variable "instance_count" {
   description = "The number of target instances to create"
   type        = number

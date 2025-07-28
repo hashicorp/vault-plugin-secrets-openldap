@@ -5,13 +5,6 @@ module "autopilot_upgrade_storageconfig" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/autopilot_upgrade_storageconfig?ref=main"
 }
 
-module "backend_consul" {
-  source = "git::https://github.com/hashicorp/vault.git//enos/modules/backend_consul?ref=main"
-
-  license   = var.backend_license_path == null ? null : file(abspath(var.backend_license_path))
-  log_level = var.backend_log_level
-}
-
 module "backend_raft" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/backend_raft?ref=main"
 }
@@ -221,7 +214,7 @@ module "vault_cluster" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/vault_cluster?ref=main"
 
   install_dir     = var.vault_install_dir
-  consul_license  = var.backend_license_path == null ? null : file(abspath(var.backend_license_path))
+  consul_license  = null
   cluster_tag_key = global.vault_tag_key
   log_level       = var.vault_log_level
 }

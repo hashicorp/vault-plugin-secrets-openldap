@@ -30,7 +30,6 @@ scenario "openldap" {
       - artifactory_username (if using `artifact_source:artifactory` in your filter)
       - artifactory_token (if using `artifact_source:artifactory` in your filter)
       - aws_region (if different from the default value in enos-variables.hcl)
-      - consul_license_path (if using an ENT edition of Consul)
       - distro_version_<distro> (if different from the default version for your target
       distro. See supported distros and default versions in the distro_version_<distro>
       definitions in enos-variables.hcl)
@@ -45,8 +44,6 @@ scenario "openldap" {
     artifact_type   = global.artifact_types
     backend         = global.backends
     config_mode     = global.config_modes
-    consul_edition  = global.consul_editions
-    consul_version  = global.consul_versions
     distro          = global.distros
     edition         = global.editions
     ip_version      = global.ip_versions
@@ -68,12 +65,6 @@ scenario "openldap" {
     exclude {
       seal   = ["pkcs11"]
       distro = ["leap", "sles"]
-    }
-
-    // Testing in IPV6 mode is currently implemented for integrated Raft storage only
-    exclude {
-      ip_version = ["6"]
-      backend    = ["consul"]
     }
   }
 
@@ -134,20 +125,10 @@ scenario "openldap" {
     }
   }
 
-  step "read_backend_license" {
-    description = global.description.read_backend_license
-    module      = module.read_license
-    skip_step   = matrix.backend == "raft" || matrix.consul_edition == "ce"
-
-    variables {
-      file_name = global.backend_license_path
-    }
-  }
-
   step "read_vault_license" {
     description = global.description.read_vault_license
     skip_step   = matrix.edition == "ce"
-    module      = module.read_license
+    module      = null
 
     variables {
       file_name = global.vault_license_path
@@ -187,69 +168,10 @@ scenario "openldap" {
     }
   }
 
-  step "create_vault_cluster_backend_targets" {
-    description = global.description.create_vault_cluster_targets
-    module      = matrix.backend == "consul" ? module.target_ec2_instances : module.target_ec2_shim
-    depends_on  = [step.create_vpc]
-
-    providers = {
-      enos = provider.enos.ubuntu
-    }
-
-    variables {
-      ami_id          = step.ec2_info.ami_ids["arm64"]["ubuntu"][global.distro_version["ubuntu"]]
-      cluster_tag_key = global.backend_tag_key
-      common_tags     = global.tags
-      seal_key_names  = step.create_seal_key.resource_names
-      vpc_id          = step.create_vpc.id
-    }
-  }
-
-  step "create_backend_cluster" {
-    description = global.description.create_backend_cluster
-    module      = "backend_${matrix.backend}"
-    depends_on = [
-      step.create_vault_cluster_backend_targets
-    ]
-
-    providers = {
-      enos = provider.enos.ubuntu
-    }
-
-    verifies = [
-      // verified in modules
-      quality.consul_autojoin_aws,
-      quality.consul_config_file,
-      quality.consul_ha_leader_election,
-      quality.consul_service_start_server,
-      // verified in enos_consul_start resource
-      quality.consul_api_agent_host_read,
-      quality.consul_api_health_node_read,
-      quality.consul_api_operator_raft_config_read,
-      quality.consul_cli_validate,
-      quality.consul_health_state_passing_read_nodes_minimum,
-      quality.consul_operator_raft_configuration_read_voters_minimum,
-      quality.consul_service_systemd_notified,
-      quality.consul_service_systemd_unit,
-    ]
-
-    variables {
-      cluster_name    = step.create_vault_cluster_backend_targets.cluster_name
-      cluster_tag_key = global.backend_tag_key
-      hosts           = step.create_vault_cluster_backend_targets.hosts
-      license         = (matrix.backend == "consul" && matrix.consul_edition == "ent") ? step.read_backend_license.license : null
-      release = {
-        edition = matrix.consul_edition
-        version = matrix.consul_version
-      }
-    }
-  }
-
   step "create_vault_cluster" {
     description = global.description.create_vault_cluster
     module      = module.vault_cluster
     depends_on = [
-      step.create_backend_cluster,
       step.build_vault,
       step.create_vault_cluster_targets,
     ]
@@ -260,7 +182,6 @@ scenario "openldap" {
 
     verifies = [
       // verified in modules
-      quality.consul_service_start_client,
       quality.vault_artifact_bundle,
       quality.vault_artifact_deb,
       quality.vault_artifact_rpm,
@@ -276,7 +197,6 @@ scenario "openldap" {
       quality.vault_listener_ipv4,
       quality.vault_listener_ipv6,
       quality.vault_service_start,
-      quality.vault_storage_backend_consul,
       quality.vault_storage_backend_raft,
       // verified in enos_vault_start resource
       quality.vault_api_sys_config_read,
@@ -295,26 +215,21 @@ scenario "openldap" {
 
     variables {
       artifactory_release     = matrix.artifact_source == "artifactory" ? step.build_vault.vault_artifactory_release : null
-      backend_cluster_name    = step.create_vault_cluster_backend_targets.cluster_name
+      backend_cluster_name    = null
       backend_cluster_tag_key = global.backend_tag_key
       cluster_name            = step.create_vault_cluster_targets.cluster_name
       config_mode             = matrix.config_mode
-      consul_license          = (matrix.backend == "consul" && matrix.consul_edition == "ent") ? step.read_backend_license.license : null
-      consul_release = matrix.backend == "consul" ? {
-        edition = matrix.consul_edition
-        version = matrix.consul_version
-      } : null
-      enable_audit_devices = var.vault_enable_audit_devices
-      hosts                = step.create_vault_cluster_targets.hosts
-      install_dir          = global.vault_install_dir[matrix.artifact_type]
-      ip_version           = matrix.ip_version
-      license              = matrix.edition != "ce" ? step.read_vault_license.license : null
-      local_artifact_path  = local.artifact_path
-      manage_service       = local.manage_service
-      packages             = concat(global.packages, global.distro_packages[matrix.distro][global.distro_version[matrix.distro]])
-      seal_attributes      = step.create_seal_key.attributes
-      seal_type            = matrix.seal
-      storage_backend      = matrix.backend
+      enable_audit_devices    = var.vault_enable_audit_devices
+      hosts                   = step.create_vault_cluster_targets.hosts
+      install_dir             = global.vault_install_dir[matrix.artifact_type]
+      ip_version              = matrix.ip_version
+      license                 = matrix.edition != "ce" ? step.read_vault_license.license : null
+      local_artifact_path     = local.artifact_path
+      manage_service          = local.manage_service
+      packages                = concat(global.packages, global.distro_packages[matrix.distro][global.distro_version[matrix.distro]])
+      seal_attributes         = step.create_seal_key.attributes
+      seal_type               = matrix.seal
+      storage_backend         = matrix.backend
     }
   }
 

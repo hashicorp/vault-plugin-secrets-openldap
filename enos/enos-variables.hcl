@@ -57,12 +57,6 @@ variable "backend_instance_type" {
   default     = "t4g.small"
 }
 
-variable "backend_license_path" {
-  description = "The license for the backend if applicable (Consul Enterprise)"
-  type        = string
-  default     = null
-}
-
 variable "backend_log_level" {
   description = "The server log level for the backend. Supported values include 'trace', 'debug', 'info', 'warn', 'error'"
   type        = string

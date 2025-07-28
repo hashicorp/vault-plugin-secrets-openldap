@@ -5,8 +5,7 @@ globals {
   archs                = ["amd64", "arm64"]
   artifact_sources     = ["local", "crt", "artifactory"]
   artifact_types       = ["bundle", "package"]
-  backends             = ["consul", "raft"]
-  backend_license_path = abspath(var.backend_license_path != null ? var.backend_license_path : joinpath(path.root, "./support/consul.hclic"))
+  backends             = ["raft"]
   backend_tag_key      = "VaultStorage"
   build_tags = {
     "ce"               = ["ui"]
@@ -16,8 +15,6 @@ globals {
     "ent.hsm.fips1403" = ["ui", "enterprise", "cgo", "hsm", "fips", "fips_140_3", "ent.hsm.fips1403"]
   }
   config_modes    = ["env", "file"]
-  consul_editions = ["ce", "ent"]
-  consul_versions = ["1.14.11", "1.15.7", "1.16.3", "1.17.0"]
   distros         = ["amzn", "leap", "rhel", "sles", "ubuntu"]
   // Different distros may require different packages, or use different aliases for the same package
   distro_packages = {
@@ -89,61 +86,6 @@ globals {
       description = "Vault Cluster listener"
       port        = 8201
       protocol    = "tcp"
-    },
-    consul_rpc : {
-      description = "Consul internal communication"
-      port        = 8300
-      protocol    = "tcp"
-    },
-    consul_serf_lan_tcp : {
-      description = "Consul Serf LAN TCP"
-      port        = 8301
-      protocol    = "tcp"
-    },
-    consul_serf_lan_udp : {
-      description = "Consul Serf LAN UDP"
-      port        = 8301
-      protocol    = "udp"
-    },
-    consul_serf_wan_tcp : {
-      description = "Consul Serf WAN TCP"
-      port        = 8302
-      protocol    = "tcp"
-    },
-    consul_serf_wan_udp : {
-      description = "Consul Serf WAN UDP"
-      port        = 8302
-      protocol    = "udp"
-    },
-    consul_http : {
-      description = "Consul HTTP API"
-      port        = 8500
-      protocol    = "tcp"
-    },
-    consul_https : {
-      description = "Consul HTTPS API"
-      port        = 8501
-      protocol    = "tcp"
-    },
-    consul_grpc : {
-      description = "Consul gRPC API"
-      port        = 8502
-      protocol    = "tcp"
-    },
-    consul_grpc_tls : {
-      description = "Consul gRPC TLS API"
-      port        = 8503
-      protocol    = "tcp"
-    },
-    consul_dns_tcp : {
-      description = "Consul TCP DNS Server"
-      port        = 8600
-      protocol    = "tcp"
-    },
-    consul_dns_udp : {
-      description = "Consul UDP DNS Server"
-      port        = 8600
-      protocol    = "udp"
     },
   }
   seals = ["awskms", "pkcs11", "shamir"]

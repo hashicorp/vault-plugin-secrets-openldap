@@ -17,13 +17,6 @@ globals {
       Configure the Vault plugin.
     EOF
 
-    create_backend_cluster = <<-EOF
-      Create a storage backend cluster if necessary. When configured to use Consul it will
-      install, configure, and start the Consul cluster on the target hosts and wait for the Consul
-      cluster to become healthy. When using integrated raft storage this step is a no-op as the
-      Vault cluster nodes will provide their own integrated storage.
-    EOF
-
     create_ldap_server = <<-EOF
       Sets up the docker container and ldap server.
     EOF
@@ -46,21 +39,13 @@ globals {
       unseal all the nodes in the Vault. After initialization it also enables various audit engines.
     EOF
 
-    create_vault_cluster_backend_targets = <<-EOF
-      Create the target machines that we'll install Consul onto when using Consul for storage. We
-      also handle creating AWS instance profiles and security groups that allow for auto-discovery
-      via the retry_join functionality in Consul. The security group firewall rules will
-      automatically allow SSH access from the host external IP address of the machine executing
-      Enos, in addition to all of the required ports for Consul to function and be accessible in the
-      VPC.
-    EOF
-
     create_vault_cluster_targets = <<-EOF
       Create the target machines that we'll install Vault onto. We also handle creating AWS instance
       profiles and security groups that allow for auto-discovery via the retry_join functionality in
       Consul. The security group firewall rules will automatically allow SSH access from the host
       external IP address of the machine executing Enos, in addition to all of the required ports
       for Vault to function and be accessible in the VPC.
+      Note: Consul is not supported for plugin testing with enos.
     EOF
 
     create_vpc = <<-EOF
@@ -94,12 +79,6 @@ globals {
       Map the public and private IP addresses of the Vault cluster nodes and segregate them by
       their leader status. This allows us to easily determine the public IP addresses of the leader
       and follower nodes.
-    EOF
-
-    read_backend_license = <<-EOF
-      When using Consul Enterprise as a storage backend, ensure that a Consul Enterprise license is
-      present on disk and read its contents so that we can utilize it when configuring the storage
-      cluster. Must have the 'backend:consul' and 'consul_edition:ent' variants.
     EOF
 
     read_vault_license = <<-EOF

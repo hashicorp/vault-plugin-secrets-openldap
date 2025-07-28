@@ -1,66 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-quality "consul_api_agent_host_read" {
-  description = "The /v1/agent/host Consul API returns host info for each node in the cluster"
-}
-
-quality "consul_api_health_node_read" {
-  description = <<-EOF
-    The /v1/health/node/<node> Consul API returns health info for each node in the cluster
-  EOF
-}
-
-quality "consul_api_operator_raft_config_read" {
-  description = "The /v1/operator/raft/configuration Consul API returns raft info for the cluster"
-}
-
-quality "consul_autojoin_aws" {
-  description = "The Consul cluster auto-joins with AWS tag discovery"
-}
-
-quality "consul_cli_validate" {
-  description = "The 'consul validate' command validates the Consul configuration"
-}
-
-quality "consul_config_file" {
-  description = "Consul starts when configured with a configuration file"
-}
-
-quality "consul_ha_leader_election" {
-  description = "The Consul cluster elects a leader node on start up"
-}
-
-quality "consul_health_state_passing_read_nodes_minimum" {
-  description = <<-EOF
-    The Consul cluster meets the minimum of number of healthy nodes according to the
-    /v1/health/state/passing Consul API
-  EOF
-}
-
-quality "consul_operator_raft_configuration_read_voters_minimum" {
-  description = <<-EOF
-    The Consul cluster meets the minimum number of raft voters according to the
-    /v1/operator/raft/configuration Consul API
-  EOF
-}
-
-quality "consul_service_start_client" {
-  description = "The Consul service starts in client mode"
-}
-
-quality "consul_service_start_server" {
-  description = "The Consul service starts in server mode"
-}
-
-quality "consul_service_systemd_notified" {
-  description = "The Consul binary notifies systemd when the service is active"
-}
-
-quality "consul_service_systemd_unit" {
-  description = "The 'consul.service' systemd unit starts the service"
-}
-
 quality "vault_agent_auto_auth_approle" {
   description = <<-EOF
     Vault running in Agent mode utilizes the approle auth method to do auto-auth via a role and
@@ -625,10 +565,6 @@ quality "vault_service_systemd_unit" {
 
 quality "vault_status_seal_type" {
   description = global.description.verify_seal_type
-}
-
-quality "vault_storage_backend_consul" {
-  description = "Vault operates using Consul for storage"
 }
 
 quality "vault_storage_backend_raft" {

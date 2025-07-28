@@ -369,7 +369,7 @@ scenario "openldap" {
 
     variables {
       ami_id          = step.ec2_info.ami_ids[matrix.arch][matrix.distro][global.distro_version[matrix.distro]]
-      cluster_tag_key = global.vault_tag_key
+      cluster_tag_key = global.ldap_tag_key
       common_tags     = global.tags
       vpc_id          = step.create_vpc.id
       instance_count  = 1

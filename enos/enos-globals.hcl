@@ -4,6 +4,7 @@
 globals {
   archs                = ["amd64", "arm64"]
   artifact_sources     = ["local", "crt", "artifactory"]
+  ldap_artifact_sources = ["local", "artifactory", "releases"]
   artifact_types       = ["bundle", "package"]
   backends             = ["raft"]
   backend_tag_key      = "VaultStorage"

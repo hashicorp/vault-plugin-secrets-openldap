@@ -1,13 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-variable "artifactory_username" {
-  type        = string
-  description = "The username to use when testing an artifact from artifactory"
-  default     = null
-  sensitive   = true
-}
-
 variable "artifactory_token" {
   type        = string
   description = "The token to use when authenticating to artifactory"
@@ -218,6 +211,12 @@ variable "vault_artifact_path" {
   default     = "/tmp/vault.zip"
 }
 
+variable "ldap_artifact_path" {
+  description = "Path to CRT generated or local vault.zip bundle"
+  type        = string
+  default     = "/tmp/vault-plugin-secrets-openldap.zip"
+}
+
 variable "vault_build_date" {
   description = "The build date for Vault artifact"
   type        = string
@@ -266,6 +265,12 @@ variable "vault_product_version" {
   default     = null
 }
 
+variable "ldap_product_version" {
+  description = "The version of LDAP secrets engine plugin we are testing"
+  type        = string
+  default     = null
+}
+
 variable "vault_radar_license_path" {
   description = "The license for vault-radar which is used to verify the audit log"
   type        = string
@@ -274,6 +279,12 @@ variable "vault_radar_license_path" {
 
 variable "vault_revision" {
   description = "The git sha of Vault artifact we are testing"
+  type        = string
+  default     = null
+}
+
+variable "ldap_revision" {
+  description = "The git sha of LDAP plugin artifact we are testing"
   type        = string
   default     = null
 }

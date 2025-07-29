@@ -15,28 +15,39 @@ module "bootstrap_vault_cluster_targets" {
 }
 
 // Find any artifact in Artifactory. Requires the version, revision, and edition.
-module "build_artifactory" {
+module "build_vault_artifactory" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_artifactory_artifact?ref=main"
+}
+
+// Find any artifact in Artifactory. Requires the version, revision, and edition.
+module "build_ldap_artifactory" {
+  source = "./modules/build_artifactory_artifact"
 }
 
 // Find any released RPM or Deb in Artifactory. Requires the version, edition, distro, and distro
 // version.
-module "build_artifactory_package" {
+module "build_vault_artifactory_package" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_artifactory_package?ref=main"
+}
+
+// Find any released RPM or Deb in Artifactory. Requires the version, edition, distro, and distro
+// version.
+module "build_ldap_artifactory_package" {
+  source = "./modules/build_artifactory_package"
 }
 
 // A shim "build module" suitable for use when using locally pre-built artifacts or a zip bundle
 // from releases.hashicorp.com. When using a local pre-built artifact it requires the local
 // artifact path. When using a release zip it does nothing as you'll need to configure the
 // vault_cluster module with release info instead.
-module "build_crt" {
+module "build_vault_crt" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_crt?ref=main"
 }
 
 // Build the local branch and package it into a zip artifact. Requires the goarch, goos, build tags,
 // and bundle path.
-module "build_local" {
-  source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_local?ref=main"
+module "build_ldap_local" {
+  source = "./modules/build_local"
 }
 
 // Configure the Vault plugin
@@ -130,7 +141,7 @@ module "seal_pkcs11" {
   common_tags         = var.tags
 }
 
-// Build, register, and enable the Vault plugin
+// Register, and enable the Vault plugin
 module "setup_plugin" {
   source = "./modules/setup_plugin"
 }

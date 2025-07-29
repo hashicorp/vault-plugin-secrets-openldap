@@ -93,7 +93,7 @@ setup-env:
 
 .PHONY: plugin-build
 plugin-build:
-	cd enos/modules/setup_plugin && ./scripts/plugin-build.sh
+	cd enos/modules/build_local && ./scripts/plugin-build.sh
 
 .PHONY: plugin-register
 plugin-register:

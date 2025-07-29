@@ -12,7 +12,7 @@ terraform {
 # Install Shasum on EC2 targets
 resource "enos_remote_exec" "install-shasum" {
   for_each = var.hosts
-  scripts = [abspath("${path.module}/scripts/install-shasum.sh")]
+  scripts  = [abspath("${path.module}/scripts/install-shasum.sh")]
 
   transport = {
     ssh = {
@@ -77,9 +77,9 @@ resource "enos_remote_exec" "unseal_vault" {
   scripts = [abspath("${path.module}/scripts/vault-unseal.sh")]
 
   environment = {
-    VAULT_ADDR= var.vault_addr
-    UNSEAL_KEYS= join(",", var.unseal_keys)
-    THRESHOLD= tostring(var.threshold)
+    VAULT_ADDR  = var.vault_addr
+    UNSEAL_KEYS = join(",", var.unseal_keys)
+    THRESHOLD   = tostring(var.threshold)
   }
 
   transport = {

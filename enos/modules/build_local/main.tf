@@ -52,11 +52,11 @@ resource "enos_local_exec" "build" {
   scripts = ["${path.module}/scripts/plugin-build.sh"]
 
   environment = {
-    PLUGIN_NAME = var.plugin_name
-    PLUGIN_DIR = var.plugin_dest_dir
+    PLUGIN_NAME  = var.plugin_name
+    PLUGIN_DIR   = var.plugin_dest_dir
     MAKEFILE_DIR = var.makefile_dir
-    GOARCH             = var.goarch
-    GOOS               = var.goos
+    GOARCH       = var.goarch
+    GOOS         = var.goos
   }
 
 }

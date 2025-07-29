@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 globals {
-  archs                = ["amd64", "arm64"]
-  artifact_sources     = ["local", "crt", "artifactory"]
+  archs                 = ["amd64", "arm64"]
+  artifact_sources      = ["local", "crt", "artifactory"]
   ldap_artifact_sources = ["local", "artifactory", "releases"]
-  artifact_types       = ["bundle", "package"]
-  backends             = ["raft"]
-  backend_tag_key      = "VaultStorage"
+  artifact_types        = ["bundle", "package"]
+  backends              = ["raft"]
+  backend_tag_key       = "VaultStorage"
   build_tags = {
     "ce"               = ["ui"]
     "ent"              = ["ui", "enterprise", "ent"]
@@ -15,8 +15,8 @@ globals {
     "ent.hsm"          = ["ui", "enterprise", "cgo", "hsm", "venthsm"]
     "ent.hsm.fips1403" = ["ui", "enterprise", "cgo", "hsm", "fips", "fips_140_3", "ent.hsm.fips1403"]
   }
-  config_modes    = ["env", "file"]
-  distros         = ["amzn", "leap", "rhel", "sles", "ubuntu"]
+  config_modes = ["env", "file"]
+  distros      = ["amzn", "leap", "rhel", "sles", "ubuntu"]
   // Different distros may require different packages, or use different aliases for the same package
   distro_packages = {
     amzn = {
@@ -101,6 +101,6 @@ globals {
   }
   vault_license_path  = abspath(var.vault_license_path != null ? var.vault_license_path : joinpath(path.root, "./support/vault.hclic"))
   vault_tag_key       = "vault-cluster"
-  ldap_tag_key       = "ldap-server-cluster"
+  ldap_tag_key        = "ldap-server-cluster"
   vault_disable_mlock = false
 }

@@ -18,7 +18,7 @@ locals {
     port       = "389"
     ip_address = var.hosts[0].public_ip
   }
-  ldif_path  = "/tmp/seed.ldif"
+  ldif_path = "/tmp/seed.ldif"
 }
 
 # Step 1: Install Docker
@@ -54,7 +54,7 @@ resource "enos_remote_exec" "setup_openldap" {
     LDAP_DOMAIN   = local.ldap_server.domain
     LDAP_ORG      = local.ldap_server.org
     LDAP_ADMIN_PW = local.ldap_server.admin_pw
-    IMAGE_TAG  = local.ldap_server.version
+    IMAGE_TAG     = local.ldap_server.version
     LDAP_PORT     = local.ldap_server.port
     LDIF_PATH     = local.ldif_path
   }

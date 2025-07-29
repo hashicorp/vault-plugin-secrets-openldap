@@ -38,22 +38,22 @@ scenario "openldap" {
   EOF
 
   matrix {
-    arch            = global.archs
-    artifact_source = global.artifact_sources
+    arch                 = global.archs
+    artifact_source      = global.artifact_sources
     ldap_artifact_source = global.ldap_artifact_sources
-    artifact_type   = global.artifact_types
-    backend         = global.backends
-    config_mode     = global.config_modes
-    distro          = global.distros
-    edition         = global.editions
-    ip_version      = global.ip_versions
-    seal            = global.seals
+    artifact_type        = global.artifact_types
+    backend              = global.backends
+    config_mode          = global.config_modes
+    distro               = global.distros
+    edition              = global.editions
+    ip_version           = global.ip_versions
+    seal                 = global.seals
 
     // Our local builder always creates bundles
     exclude {
-      artifact_source = ["local"]
+      artifact_source      = ["local"]
       ldap_artifact_source = ["local"]
-      artifact_type   = ["package"]
+      artifact_type        = ["package"]
     }
 
     // PKCS#11 can only be used on ent.hsm and ent.hsm.fips1403.
@@ -78,7 +78,7 @@ scenario "openldap" {
   ]
 
   locals {
-    artifact_path = matrix.artifact_source != "artifactory" ? abspath(var.vault_artifact_path) : null
+    artifact_path      = matrix.artifact_source != "artifactory" ? abspath(var.vault_artifact_path) : null
     ldap_artifact_path = matrix.ldap_artifact_source != "artifactory" ? abspath(var.ldap_artifact_path) : null
     enos_provider = {
       amzn   = provider.enos.ec2_user
@@ -95,19 +95,19 @@ scenario "openldap" {
     module      = "build_vault_${matrix.artifact_source}"
 
     variables {
-      build_tags           = var.vault_local_build_tags != null ? var.vault_local_build_tags : global.build_tags[matrix.edition]
-      artifact_path        = local.artifact_path
-      goarch               = matrix.arch
-      goos                 = "linux"
-      artifactory_host     = matrix.artifact_source == "artifactory" ? var.artifactory_host : null
-      artifactory_repo     = matrix.artifact_source == "artifactory" ? var.artifactory_repo : null
-      artifactory_token    = matrix.artifact_source == "artifactory" ? var.artifactory_token : null
-      arch                 = matrix.artifact_source == "artifactory" ? matrix.arch : null
-      product_version      = var.vault_product_version
-      artifact_type        = matrix.artifact_type
-      distro               = matrix.artifact_source == "artifactory" ? matrix.distro : null
-      edition              = matrix.artifact_source == "artifactory" ? matrix.edition : null
-      revision             = var.vault_revision
+      build_tags        = var.vault_local_build_tags != null ? var.vault_local_build_tags : global.build_tags[matrix.edition]
+      artifact_path     = local.artifact_path
+      goarch            = matrix.arch
+      goos              = "linux"
+      artifactory_host  = matrix.artifact_source == "artifactory" ? var.artifactory_host : null
+      artifactory_repo  = matrix.artifact_source == "artifactory" ? var.artifactory_repo : null
+      artifactory_token = matrix.artifact_source == "artifactory" ? var.artifactory_token : null
+      arch              = matrix.artifact_source == "artifactory" ? matrix.arch : null
+      product_version   = var.vault_product_version
+      artifact_type     = matrix.artifact_type
+      distro            = matrix.artifact_source == "artifactory" ? matrix.distro : null
+      edition           = matrix.artifact_source == "artifactory" ? matrix.edition : null
+      revision          = var.vault_revision
     }
   }
 
@@ -364,18 +364,18 @@ scenario "openldap" {
     module      = "build_ldap_${matrix.ldap_artifact_source}"
 
     variables {
-      plugin_dest_dir        = var.plugin_dest_dir
-      goarch               = matrix.arch
-      goos                 = "linux"
-      artifactory_host     = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_host : null
-      artifactory_repo     = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_repo : null
-      artifactory_token    = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_token : null
-      arch                 = matrix.ldap_artifact_source == "artifactory" ? matrix.arch : null
-      product_version      = var.ldap_product_version
-      artifact_type        = matrix.artifact_type
-      revision             = var.ldap_revision
-      plugin_name         = var.plugin_name
-      makefile_dir       = var.makefile_dir
+      plugin_dest_dir   = var.plugin_dest_dir
+      goarch            = matrix.arch
+      goos              = "linux"
+      artifactory_host  = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_host : null
+      artifactory_repo  = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_repo : null
+      artifactory_token = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_token : null
+      arch              = matrix.ldap_artifact_source == "artifactory" ? matrix.arch : null
+      product_version   = var.ldap_product_version
+      artifact_type     = matrix.artifact_type
+      revision          = var.ldap_revision
+      plugin_name       = var.plugin_name
+      makefile_dir      = var.makefile_dir
     }
   }
 
@@ -417,7 +417,7 @@ scenario "openldap" {
   step "setup_plugin" {
     description = global.description.setup_plugin
     module      = module.setup_plugin
-    depends_on  = [
+    depends_on = [
       step.get_leader_ip,
       step.create_ldap_server,
       step.verify_vault_unsealed,
@@ -429,19 +429,19 @@ scenario "openldap" {
     }
 
     variables {
-      artifactory_release     = null
+      artifactory_release = null
       //artifactory_release     = matrix.artifact_source == "artifactory" ? step.build_ldap.ldap_artifactory_release : null
-      hosts                   = step.create_vault_cluster_targets.hosts
-      local_artifact_path     = local.ldap_artifact_path
+      hosts               = step.create_vault_cluster_targets.hosts
+      local_artifact_path = local.ldap_artifact_path
 
 
       vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
       vault_addr       = step.create_vault_cluster.api_addr_localhost
       vault_root_token = step.create_vault_cluster.root_token
 
-      plugin_name         = var.plugin_name
-      plugin_dir_vault    = var.plugin_dir_vault
-      plugin_mount_path   = var.plugin_mount_path
+      plugin_name       = var.plugin_name
+      plugin_dir_vault  = var.plugin_dir_vault
+      plugin_mount_path = var.plugin_mount_path
     }
   }
 
@@ -459,12 +459,12 @@ scenario "openldap" {
       vault_addr       = step.create_vault_cluster.api_addr_localhost
       vault_root_token = step.create_vault_cluster.root_token
 
-      plugin_mount_path   = var.plugin_mount_path
-      ldap_url            = step.create_ldap_server.ldap_url
-      ldap_bind_dn        = var.ldap_bind_dn
-      ldap_bind_pass      = var.ldap_bind_pass
-      ldap_user_dn        = var.ldap_user_dn
-      ldap_schema         = var.ldap_schema
+      plugin_mount_path = var.plugin_mount_path
+      ldap_url          = step.create_ldap_server.ldap_url
+      ldap_bind_dn      = var.ldap_bind_dn
+      ldap_bind_pass    = var.ldap_bind_pass
+      ldap_user_dn      = var.ldap_user_dn
+      ldap_schema       = var.ldap_schema
     }
   }
 

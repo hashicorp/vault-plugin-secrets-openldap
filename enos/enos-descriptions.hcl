@@ -13,7 +13,7 @@ globals {
       build from Artifactory, or use a local artifact that was built in CI via CRT.
     EOF
 
-      build_ldap = <<-EOF
+    build_ldap = <<-EOF
       Determine which openldap plugin artifact we want to use for the scenario. Depending on the
       'artifact_source' variant we'll either build openldap secrets engine plugin from the local branch or
       fetch a candidate build from Artifactory.

@@ -306,3 +306,9 @@ variable "verify_log_secrets" {
   type        = bool
   default     = false
 }
+
+variable "vault_repo_ref" {
+  description = "The Git ref to use for external modules; can be pinned to a specific SHA"
+  type        = string
+  default     = "main"
+}

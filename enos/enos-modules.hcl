@@ -1,5 +1,5 @@
 // Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MPL-2.0
 
 module "autopilot_upgrade_storageconfig" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/autopilot_upgrade_storageconfig?ref=main"

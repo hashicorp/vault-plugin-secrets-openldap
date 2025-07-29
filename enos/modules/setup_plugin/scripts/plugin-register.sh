@@ -22,6 +22,13 @@ fail() {
 
 echo "[register] Registering plugin: $PLUGIN_NAME"
 
+# Determine plugin binary source path (handle directories)
+if [[ -d "$PLUGIN_BINARY_SRC" ]]; then
+  BINARY_PATH="$PLUGIN_BINARY_SRC/$PLUGIN_NAME"
+else
+  BINARY_PATH="$PLUGIN_BINARY_SRC"
+fi
+
 # Ensure the Vault plugin directory exists
 mkdir -p "${PLUGIN_DIR_VAULT}"
 
@@ -29,7 +36,7 @@ mkdir -p "${PLUGIN_DIR_VAULT}"
 sudo rm -f "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}" || true
 
 # Copy the binary to Vault's plugin directory
-sudo cp "${PLUGIN_BINARY_SRC}" "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
+sudo cp "${BINARY_PATH}" "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
 
 # Set permissions to ensure Vault can execute the plugin binary
 sudo chmod 755 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"

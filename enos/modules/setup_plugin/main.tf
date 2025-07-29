@@ -9,39 +9,25 @@ terraform {
   }
 }
 
-# Step 1: Build the plugin locally
-resource "enos_local_exec" "plugin_local_build" {
-  scripts = ["${path.module}/scripts/plugin-build.sh"]
+# Step 1: Install the plugin bundle to the target hosts
+resource "enos_bundle_install" "ldap" {
+  for_each = var.hosts
 
-  environment = {
-    PLUGIN_SOURCE_TYPE = var.plugin_source_type
-    PLUGIN_NAME = var.plugin_name
-    PLUGIN_DIR = var.plugin_dest_dir
-    MAKEFILE_DIR = var.makefile_dir
-    PLUGIN_REGISTRY_URL = var.plugin_registry_url
-    PLUGIN_LOCAL_PATH = var.plugin_local_path
-    GOOS = var.go_os
-    GOARCH = var.go_arch
-  }
-
-}
-
-# Step 2: Copy the plugin to the EC2 instance running the Vault leader
-resource "enos_file" "plugin_binary" {
-  depends_on = [enos_local_exec.plugin_local_build]
-  source      = "${var.plugin_dest_dir}/${var.plugin_name}"
   destination = "/tmp/${var.plugin_name}"
+  release     = var.release == null ? var.release : merge({ product = "vault-plugin-secrets-openldap" }, var.release)
+  artifactory = var.artifactory_release
+  path        = var.local_artifact_path
 
   transport = {
     ssh = {
-      host = var.vault_leader_ip
+      host = each.value.public_ip
     }
   }
 }
 
-# Step 3: Register the plugin
+# Step 2: Register the plugin
 resource "enos_remote_exec" "plugin_register" {
-  depends_on = [enos_file.plugin_binary]
+  depends_on = [enos_bundle_install.ldap]
   scripts = [abspath("${path.module}/scripts/plugin-register.sh")]
   environment = {
     PLUGIN_BINARY_SRC = "/tmp/${var.plugin_name}"
@@ -57,7 +43,7 @@ resource "enos_remote_exec" "plugin_register" {
   }
 }
 
-# Step 4: Enable the plugin
+# Step 3: Enable the plugin
 resource "enos_remote_exec" "plugin_enable" {
   depends_on = [enos_remote_exec.plugin_register]
   scripts = [abspath("${path.module}/scripts/plugin-enable.sh")]

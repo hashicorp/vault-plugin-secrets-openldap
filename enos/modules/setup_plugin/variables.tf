@@ -18,11 +18,6 @@ variable "plugin_name" {
   description = "Name of the plugin"
 }
 
-variable "plugin_dest_dir" {
-  type        = string
-  description = "Plugin local dir"
-}
-
 variable "plugin_source_type" {
   type        = string
   description = "Plugin Source"
@@ -32,23 +27,6 @@ variable "plugin_source_type" {
     error_message = "plugin_source_type must be one of: 'local_build', 'registry', 'local_path'."
   }
 }
-
-variable "makefile_dir" {
-  type        = string
-  description = "Plugin Project Makefile directory"
-  default     = "$(PWD)"
-}
-
-variable "plugin_registry_url" {
-  type        = string
-  description = "Plugin Releases URL"
-}
-
-variable "plugin_local_path" {
-  type        = string
-  description = "Plugin Binary local path"
-}
-
 
 variable "plugin_dir_vault" {
   type        = string
@@ -60,12 +38,37 @@ variable "plugin_mount_path" {
   description = "Mount path for the plugin"
 }
 
-variable "go_os" {
-  type        = string
-  description = "target machine os, e.g., linux"
+variable "artifactory_release" {
+  type = object({
+    username = string
+    token    = string
+    url      = string
+    sha256   = string
+  })
+  description = "The Artifactory release information to install Vault artifacts from Artifactory"
+  default     = null
 }
 
-variable "go_arch" {
+variable "hosts" {
+  description = "The target machines host addresses to use for the Vault cluster"
+  type = map(object({
+    ipv6       = string
+    private_ip = string
+    public_ip  = string
+  }))
+}
+
+variable "release" {
+  type = object({
+    version = string
+    edition = string
+  })
+  description = "LDAP release version and edition to install from releases.hashicorp.com"
+  default     = null
+}
+
+variable "local_artifact_path" {
   type        = string
-  description = "target machine architecture, e.g., amd64"
+  description = "The path to a locally built vault artifact to install. It can be a zip archive, RPM, or Debian package"
+  default     = null
 }

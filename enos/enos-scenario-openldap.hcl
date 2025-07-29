@@ -360,7 +360,7 @@ scenario "openldap" {
   }
 
   step "build_ldap" {
-    description = "" //global.description.build_ldap
+    description = global.description.build_ldap
     module      = "build_ldap_${matrix.ldap_artifact_source}"
 
     variables {

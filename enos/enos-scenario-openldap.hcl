@@ -27,7 +27,6 @@ scenario "openldap" {
     https://eng-handbook.hashicorp.services/internal-tools/enos/troubleshooting/#execution-error-expected-vs-got-for-vault-versioneditionrevisionbuild-date.
 
     Variables required for some scenario variants:
-      - artifactory_username (if using `artifact_source:artifactory` in your filter)
       - artifactory_token (if using `artifact_source:artifactory` in your filter)
       - aws_region (if different from the default value in enos-variables.hcl)
       - distro_version_<distro> (if different from the default version for your target
@@ -41,6 +40,7 @@ scenario "openldap" {
   matrix {
     arch            = global.archs
     artifact_source = global.artifact_sources
+    ldap_artifact_source = global.ldap_artifact_sources
     artifact_type   = global.artifact_types
     backend         = global.backends
     config_mode     = global.config_modes
@@ -52,6 +52,7 @@ scenario "openldap" {
     // Our local builder always creates bundles
     exclude {
       artifact_source = ["local"]
+      ldap_artifact_source = ["local"]
       artifact_type   = ["package"]
     }
 
@@ -78,6 +79,7 @@ scenario "openldap" {
 
   locals {
     artifact_path = matrix.artifact_source != "artifactory" ? abspath(var.vault_artifact_path) : null
+    ldap_artifact_path = matrix.ldap_artifact_source != "artifactory" ? abspath(var.ldap_artifact_path) : null
     enos_provider = {
       amzn   = provider.enos.ec2_user
       leap   = provider.enos.ec2_user
@@ -90,7 +92,7 @@ scenario "openldap" {
 
   step "build_vault" {
     description = global.description.build_vault
-    module      = "build_${matrix.artifact_source}"
+    module      = "build_vault_${matrix.artifact_source}"
 
     variables {
       build_tags           = var.vault_local_build_tags != null ? var.vault_local_build_tags : global.build_tags[matrix.edition]
@@ -99,7 +101,6 @@ scenario "openldap" {
       goos                 = "linux"
       artifactory_host     = matrix.artifact_source == "artifactory" ? var.artifactory_host : null
       artifactory_repo     = matrix.artifact_source == "artifactory" ? var.artifactory_repo : null
-      artifactory_username = matrix.artifact_source == "artifactory" ? var.artifactory_username : null
       artifactory_token    = matrix.artifact_source == "artifactory" ? var.artifactory_token : null
       arch                 = matrix.artifact_source == "artifactory" ? matrix.arch : null
       product_version      = var.vault_product_version
@@ -358,6 +359,26 @@ scenario "openldap" {
     }
   }
 
+  step "build_ldap" {
+    description = "" //global.description.build_ldap
+    module      = "build_ldap_${matrix.ldap_artifact_source}"
+
+    variables {
+      plugin_dest_dir        = var.plugin_dest_dir
+      goarch               = matrix.arch
+      goos                 = "linux"
+      artifactory_host     = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_host : null
+      artifactory_repo     = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_repo : null
+      artifactory_token    = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_token : null
+      arch                 = matrix.ldap_artifact_source == "artifactory" ? matrix.arch : null
+      product_version      = var.ldap_product_version
+      artifact_type        = matrix.artifact_type
+      revision             = var.ldap_revision
+      plugin_name         = var.plugin_name
+      makefile_dir       = var.makefile_dir
+    }
+  }
+
   step "create_ldap_server_target" {
     description = global.description.create_ldap_server_target
     module      = module.target_ec2_instances
@@ -396,25 +417,29 @@ scenario "openldap" {
   step "setup_plugin" {
     description = global.description.setup_plugin
     module      = module.setup_plugin
-    depends_on  = [step.get_leader_ip, step.create_ldap_server, step.verify_vault_unsealed]
+    depends_on  = [
+      step.get_leader_ip,
+      step.create_ldap_server,
+      step.verify_vault_unsealed,
+      step.build_ldap
+    ]
 
     providers = {
       enos = local.enos_provider[matrix.distro]
     }
 
     variables {
+      artifactory_release     = null
+      //artifactory_release     = matrix.artifact_source == "artifactory" ? step.build_ldap.ldap_artifactory_release : null
+      hosts                   = step.create_vault_cluster_targets.hosts
+      local_artifact_path     = local.ldap_artifact_path
+
+
       vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
       vault_addr       = step.create_vault_cluster.api_addr_localhost
       vault_root_token = step.create_vault_cluster.root_token
-      go_os            = step.create_vault_cluster_targets.plugin_os
-      go_arch          = step.create_vault_cluster_targets.plugin_arch
 
       plugin_name         = var.plugin_name
-      plugin_dest_dir     = var.plugin_dest_dir
-      plugin_source_type  = var.plugin_source_type
-      makefile_dir        = var.makefile_dir
-      plugin_registry_url = var.plugin_registry_url
-      plugin_local_path   = var.plugin_local_path
       plugin_dir_vault    = var.plugin_dir_vault
       plugin_mount_path   = var.plugin_mount_path
     }

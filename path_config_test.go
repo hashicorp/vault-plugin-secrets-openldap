@@ -6,10 +6,10 @@ package openldap
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
+	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
@@ -212,6 +212,57 @@ func TestConfig_Create(t *testing.T) {
 			createExpectErr:  true,
 			expectedReadResp: nil,
 		},
+		"default credential_type": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":   "tester",
+				"bindpass": "pa$$w0rd",
+				"url":      "ldap://138.91.247.105",
+			}),
+			expectedReadResp: &logical.Response{
+				Data: ldapResponseData(
+					"binddn", "tester",
+					"url", "ldap://138.91.247.105",
+					"credential_type", "password",
+					"request_timeout", 90,
+				),
+			},
+		},
+		"credential_type phrase": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":          "tester",
+				"bindpass":        "pa$$w0rd",
+				"url":             "ldap://138.91.247.105",
+				"credential_type": "phrase",
+			}),
+			expectedReadResp: &logical.Response{
+				Data: ldapResponseData(
+					"binddn", "tester",
+					"url", "ldap://138.91.247.105",
+					"credential_type", "phrase",
+					"request_timeout", 90,
+				),
+			},
+		},
+		"invalid credential_type": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":          "tester",
+				"bindpass":        "pa$$w0rd",
+				"url":             "ldap://138.91.247.105",
+				"credential_type": "foo",
+			}),
+			createExpectErr:  true,
+			expectedReadResp: nil,
+		},
+		"empty credential_type": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":          "tester",
+				"bindpass":        "pa$$w0rd",
+				"url":             "ldap://138.91.247.105",
+				"credential_type": "",
+			}),
+			createExpectErr:  true,
+			expectedReadResp: nil,
+		},
 	}
 
 	for name, test := range tests {
@@ -244,9 +295,7 @@ func TestConfig_Create(t *testing.T) {
 				t.Fatalf("err:%s resp:%#v\n", err, resp)
 			}
 
-			if !reflect.DeepEqual(resp, test.expectedReadResp) {
-				t.Fatalf("Actual: %#v\nExpected: %#v", resp, test.expectedReadResp)
-			}
+			require.Equal(t, test.expectedReadResp, resp)
 		})
 	}
 }
@@ -596,6 +645,12 @@ func fieldData(raw map[string]interface{}) *framework.FieldData {
 		Type:        framework.TypeBool,
 		Description: "Whether to skip the 'import' rotation.",
 	}
+	fields["credential_type"] = &framework.FieldSchema{
+		Type: framework.TypeString,
+		Description: "The type of credential to manage. Options include: " +
+			"'password', 'phrase'. Defaults to 'password'.",
+		Default: "password",
+	}
 
 	// Deprecated
 	fields["length"] = &framework.FieldSchema{
@@ -607,6 +662,11 @@ func fieldData(raw map[string]interface{}) *framework.FieldData {
 
 	automatedrotationutil.AddAutomatedRotationFields(fields)
 
+	for k := range raw {
+		if _, ok := fields[k]; !ok {
+			panic(fmt.Sprintf("field %q not defined in schema in fieldData() test helper", k))
+		}
+	}
 	return &framework.FieldData{
 		Raw:    raw,
 		Schema: fields,
@@ -649,6 +709,7 @@ func ldapResponseData(vals ...interface{}) map[string]interface{} {
 		"rotation_window":                  float64(0),
 		"disable_automated_rotation":       false,
 		"enable_samaccountname_login":      false,
+		"credential_type":                  "password",
 	}
 
 	for i := 0; i < len(vals); i += 2 {

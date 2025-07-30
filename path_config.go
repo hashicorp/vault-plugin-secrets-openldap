@@ -356,46 +356,11 @@ func (b *backend) configDeleteOperation(ctx context.Context, req *logical.Reques
 
 type config struct {
 	LDAP                         *client.Config
-	PasswordPolicy               string         `json:"password_policy,omitempty"`
-	SkipStaticRoleImportRotation bool           `json:"skip_static_role_import_rotation"`
-	CredentialType               CredentialType `json:"credential_type"`
+	PasswordPolicy               string `json:"password_policy,omitempty"`
+	SkipStaticRoleImportRotation bool   `json:"skip_static_role_import_rotation"`
 
 	automatedrotationutil.AutomatedRotationParams
 
 	// Deprecated
 	PasswordLength int `json:"length,omitempty"`
-}
-
-// CredentialType is a type of database credential.
-type CredentialType int
-
-const (
-	CredentialTypeUnknown CredentialType = iota
-	CredentialTypePassword
-	CredentialTypePhrase
-)
-
-func (c CredentialType) String() string {
-	switch c {
-	case CredentialTypePassword:
-		return "password"
-	case CredentialTypePhrase:
-		return "phrase"
-	default:
-		return "unknown"
-	}
-}
-
-// setCredentialType sets the credential type for the role given its string form.
-// Returns an error if the given credential type string is unknown.
-func (c *config) setCredentialType(credentialType string) error {
-	switch credentialType {
-	case CredentialTypePassword.String():
-		c.CredentialType = CredentialTypePassword
-	case CredentialTypePhrase.String():
-		c.CredentialType = CredentialTypePhrase
-	default:
-		return fmt.Errorf("invalid credential_type %q", credentialType)
-	}
-	return nil
 }

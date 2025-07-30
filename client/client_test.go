@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/vault-plugin-secrets-openldap/ldapifc"
 )
@@ -121,7 +122,8 @@ func TestUpdatePasswordOpenLDAP(t *testing.T) {
 		FieldRegistry.ObjectClass: {"*"},
 	}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaOpenLDAP, testPass)
+	config.Schema = SchemaOpenLDAP
+	newValues, err := GetSchemaFieldRegistry(config, testPass)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,26 +134,30 @@ func TestUpdatePasswordOpenLDAP(t *testing.T) {
 }
 
 func TestUpdatePasswordRACF(t *testing.T) {
+	testPassword := "pass1234"
+	testPhrase := "this is a much longer passphrase for racfPassPhrase"
+
 	tests := []struct {
 		name           string
 		password       string
+		credentialType CredentialType
 		expectedFields map[*Field][]string
 	}{
 		{
-			name:     "short password (8 chars)",
-			password: "pass1234",
+			name:           "password",
+			password:       testPassword,
+			credentialType: CredentialTypePassword,
 			expectedFields: map[*Field][]string{
-				FieldRegistry.RACFPassword:   {"pass1234"},
-				FieldRegistry.RACFPassphrase: nil,
+				FieldRegistry.RACFPassword:   {testPassword},
 				FieldRegistry.RACFAttributes: {"noexpired"},
 			},
 		},
 		{
-			name:     "very long passphrase",
-			password: "this is a much longer passphrase that should definitely use racfPassPhrase",
+			name:           "passphrase",
+			password:       testPhrase,
+			credentialType: CredentialTypePhrase,
 			expectedFields: map[*Field][]string{
-				FieldRegistry.RACFPassword:   nil,
-				FieldRegistry.RACFPassphrase: {"this is a much longer passphrase that should definitely use racfPassPhrase"},
+				FieldRegistry.RACFPassphrase: {testPhrase},
 				FieldRegistry.RACFAttributes: {"noexpired"},
 			},
 		},
@@ -162,6 +168,8 @@ func TestUpdatePasswordRACF(t *testing.T) {
 			config := emptyConfig()
 			config.BindDN = "cats"
 			config.BindPassword = "dogs"
+			config.Schema = SchemaRACF
+			config.CredentialType = tt.credentialType
 
 			conn := &ldapifc.FakeLDAPConnection{
 				SearchRequestToExpect: testSearchRequest(),
@@ -189,35 +197,22 @@ func TestUpdatePasswordRACF(t *testing.T) {
 				FieldRegistry.ObjectClass: {"*"},
 			}
 
-			newValues, err := GetSchemaFieldRegistry(SchemaRACF, tt.password)
-			if err != nil {
-				t.Fatal(err)
-			}
+			newValues, err := GetSchemaFieldRegistry(config, tt.password)
+			require.NoError(t, err)
 
 			// verify that the fields are set correctly in newValues
 			for field, expectedValues := range tt.expectedFields {
 				actualValues, exists := newValues[field]
 				if !exists {
-					t.Errorf("Expected field %s to exist in newValues", field.String())
-					continue
+					t.Fatalf("Expected field %s to exist in newValues", field.String())
 				}
 
-				if expectedValues == nil && actualValues != nil {
-					t.Errorf("Expected field %s to be nil, got %v", field.String(), actualValues)
-				} else if len(actualValues) != len(expectedValues) {
-					t.Errorf("Expected %d values for field %s, got %d", len(expectedValues), field.String(), len(actualValues))
-				} else {
-					for i, expected := range expectedValues {
-						if actualValues[i] != expected {
-							t.Errorf("Expected value %q for field %s, got %q", expected, field.String(), actualValues[i])
-						}
-					}
-				}
+				t.Logf("JMF: expectedValues: %v, actualValues: %v", expectedValues, actualValues)
+				require.Equal(t, expectedValues, actualValues)
 			}
 
-			if err := client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters); err != nil {
-				t.Fatal(err)
-			}
+			err = client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -255,7 +250,8 @@ func TestUpdatePasswordAD(t *testing.T) {
 		FieldRegistry.ObjectClass: {"*"},
 	}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaAD, testPass)
+	config.Schema = SchemaAD
+	newValues, err := GetSchemaFieldRegistry(config, testPass)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +301,8 @@ func TestUpdateRootPassword(t *testing.T) {
 		FieldRegistry.ObjectClass: {"*"},
 	}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaOpenLDAP, testPass)
+	config.Schema = SchemaOpenLDAP
+	newValues, err := GetSchemaFieldRegistry(config, testPass)
 	if err != nil {
 		t.Fatal(err)
 	}

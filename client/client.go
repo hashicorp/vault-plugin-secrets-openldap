@@ -20,9 +20,11 @@ import (
 
 type Config struct {
 	*ldaputil.ConfigEntry
-	LastBindPassword         string    `json:"last_bind_password"`
-	LastBindPasswordRotation time.Time `json:"last_bind_password_rotation"`
-	Schema                   string    `json:"schema"`
+	// CredentialType specifies the type of credential to generate for the Schema
+	CredentialType           CredentialType `json:"credential_type"`
+	LastBindPassword         string         `json:"last_bind_password"`
+	LastBindPasswordRotation time.Time      `json:"last_bind_password_rotation"`
+	Schema                   string         `json:"schema"`
 }
 
 func New(logger hclog.Logger) Client {
@@ -275,4 +277,38 @@ func errorf(format string, wrappedErr error) error {
 	}
 
 	return fmt.Errorf(format, wrappedErr)
+}
+
+// CredentialType is a type of database credential.
+type CredentialType int
+
+const (
+	CredentialTypeUnknown CredentialType = iota
+	CredentialTypePassword
+	CredentialTypePhrase
+)
+
+func (c CredentialType) String() string {
+	switch c {
+	case CredentialTypePassword:
+		return "password"
+	case CredentialTypePhrase:
+		return "phrase"
+	default:
+		return "unknown"
+	}
+}
+
+// SetCredentialType sets the credential type for the role given its string form.
+// Returns an error if the given credential type string is unknown.
+func (c *Config) SetCredentialType(credentialType string) error {
+	switch credentialType {
+	case CredentialTypePassword.String():
+		c.CredentialType = CredentialTypePassword
+	case CredentialTypePhrase.String():
+		c.CredentialType = CredentialTypePhrase
+	default:
+		return fmt.Errorf("invalid credential_type %q", credentialType)
+	}
+	return nil
 }

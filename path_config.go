@@ -22,7 +22,7 @@ const (
 	configPath            = "config"
 	defaultPasswordLength = 64
 	defaultSchema         = client.SchemaOpenLDAP
-	defaultCredentialType = CredentialType(CredentialTypePassword)
+	defaultCredentialType = client.CredentialType(client.CredentialTypePassword)
 	defaultTLSVersion     = "tls12"
 	defaultCtxTimeout     = 1 * time.Minute
 
@@ -205,7 +205,7 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 	if credentialTypeRaw, ok := fieldData.GetOk("credential_type"); ok {
 		credentialType = credentialTypeRaw.(string)
 	}
-	if err := conf.setCredentialType(credentialType); err != nil {
+	if err := conf.LDAP.SetCredentialType(credentialType); err != nil {
 		return nil, err
 	}
 
@@ -332,7 +332,7 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	if config.LDAP.Schema != "" {
 		configMap["schema"] = config.LDAP.Schema
 	}
-	configMap["credential_type"] = config.CredentialType.String()
+	configMap["credential_type"] = config.LDAP.CredentialType.String()
 
 	config.PopulateAutomatedRotationData(configMap)
 
@@ -351,46 +351,11 @@ func (b *backend) configDeleteOperation(ctx context.Context, req *logical.Reques
 
 type config struct {
 	LDAP                         *client.Config
-	PasswordPolicy               string         `json:"password_policy,omitempty"`
-	SkipStaticRoleImportRotation bool           `json:"skip_static_role_import_rotation"`
-	CredentialType               CredentialType `json:"credential_type"`
+	PasswordPolicy               string `json:"password_policy,omitempty"`
+	SkipStaticRoleImportRotation bool   `json:"skip_static_role_import_rotation"`
 
 	automatedrotationutil.AutomatedRotationParams
 
 	// Deprecated
 	PasswordLength int `json:"length,omitempty"`
-}
-
-// CredentialType is a type of database credential.
-type CredentialType int
-
-const (
-	CredentialTypeUnknown CredentialType = iota
-	CredentialTypePassword
-	CredentialTypePhrase
-)
-
-func (c CredentialType) String() string {
-	switch c {
-	case CredentialTypePassword:
-		return "password"
-	case CredentialTypePhrase:
-		return "phrase"
-	default:
-		return "unknown"
-	}
-}
-
-// setCredentialType sets the credential type for the role given its string form.
-// Returns an error if the given credential type string is unknown.
-func (c *config) setCredentialType(credentialType string) error {
-	switch credentialType {
-	case CredentialTypePassword.String():
-		c.CredentialType = CredentialTypePassword
-	case CredentialTypePhrase.String():
-		c.CredentialType = CredentialTypePhrase
-	default:
-		return fmt.Errorf("invalid credential_type %q", credentialType)
-	}
-	return nil
 }

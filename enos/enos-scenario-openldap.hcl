@@ -129,7 +129,7 @@ scenario "openldap" {
   step "read_vault_license" {
     description = global.description.read_vault_license
     skip_step   = matrix.edition == "ce"
-    module      = null
+    module      = module.read_license
 
     variables {
       file_name = global.vault_license_path

@@ -67,11 +67,6 @@ globals {
         - Availability Zones for our desired machine instance types
     EOF
 
-    enable_multiseal = <<-EOF
-      Configure the Vault cluster with 'enable_multiseal' and up to three auto-unseal methods
-      via individual, prioritized 'seal' stanzas.
-    EOF
-
     get_local_metadata = <<-EOF
       Performs several Vault quality verification that are dynamically modified based on the Vault
       binary version, commit SHA, build-date (commit SHA date), and edition metadata. When we're
@@ -97,95 +92,9 @@ globals {
       Build, register, and enable the Vault plugin.
     EOF
 
-    shutdown_nodes = <<-EOF
-      Shut down the nodes to ensure that they are no longer operating software as part of the
-      cluster.
-    EOF
-
-    start_vault_agent = <<-EOF
-      Create an agent approle in the auth engine, generate a Vault Agent configuration file, and
-      start the Vault agent.
-    EOF
-
-    stop_vault = <<-EOF
-      Stop the Vault cluster by stopping the vault service via systemctl.
-    EOF
-
-    vault_leader_step_down = <<-EOF
-      Force the Vault cluster leader to step down which forces the Vault cluster to perform a leader
-      election.
-    EOF
-
-    verify_agent_output = <<-EOF
-      Vault running in Agent mode uses templates to create log output.
-    EOF
-
-    verify_log_secrets = <<-EOF
-      Verify that the vault audit log and systemd journal do not leak secret values.
-    EOF
-
     verify_raft_cluster_all_nodes_are_voters = <<-EOF
       When configured with a 'backend:raft' variant, verify that all nodes in the cluster are
       healthy and are voters.
-    EOF
-
-    verify_autopilot_idle_state = <<-EOF
-      Wait for the Autopilot to upgrade the entire Vault cluster and ensure that the target version
-      matches the candidate version. Ensure that the cluster reaches an upgrade state of
-      'await-server-removal'.
-    EOF
-
-    verify_replication_status = <<-EOF
-      Verify that the default replication status is correct depending on the edition of Vault that
-      been deployed. When testing a Community Edition of Vault we'll ensure that replication is not
-      enabled. When testing any Enterprise edition of Vault we'll ensure that Performance and
-      Disaster Recovery replication are available.
-    EOF
-
-    verify_seal_rewrap_entries_processed_eq_entries_succeeded_post_rewrap = <<-EOF
-      Verify that the v1/sys/sealwrap/rewrap Vault API returns the rewrap data and
-      'entries.processed' equals 'entries.succeeded' after the rewrap has completed.
-    EOF
-
-    verify_seal_rewrap_entries_processed_is_gt_zero_post_rewrap = <<-EOF
-      Verify that the /sys/sealwrap/rewrap Vault API returns the rewrap data and the 'entries.processed' has
-      processed at least one entry after the rewrap has completed.
-    EOF
-
-    verify_seal_rewrap_is_running_false_post_rewrap = <<-EOF
-      Verify that the v1/sys/sealwrap/rewrap Vault API returns the rewrap data and 'is_running' is set to
-      'false' after a rewrap has completed.
-    EOF
-
-    verify_seal_rewrap_no_entries_fail_during_rewrap = <<-EOF
-      Verify that the v1/sys/sealwrap/rewrap Vault API returns the rewrap data and 'entries.failed' is '0'
-      after the rewrap has completed.
-    EOF
-
-    verify_seal_type = <<-EOF
-      Vault's reported seal type matches our configuration.
-    EOF
-
-    verify_secrets_engines_create = <<-EOF
-      Verify that Vault is capable mounting, configuring, and using various secrets engines and auth
-      methods. These currently include:
-        - v1/auth/userpass/*
-        - v1/identity/*
-        - v1/kv/*
-        - v1/sys/policy/*
-    EOF
-
-    verify_secrets_engines_read = <<-EOF
-      Verify that data that we've created previously is still valid, consistent, and duarable.
-      This includes:
-        - v1/auth/userpass/*
-        - v1/identity/*
-        - v1/kv/*
-        - v1/sys/policy/*
-    EOF
-
-    verify_ui = <<-EOF
-      The Vault UI assets are embedded in the Vault binary and available when running.
     EOF
 
     verify_vault_unsealed = <<-EOF
@@ -201,15 +110,6 @@ globals {
     wait_for_cluster_to_have_leader = <<-EOF
       Wait for a leader election to occur before we proceed with any further quality verification.
     EOF
-
-    wait_for_seal_rewrap = <<-EOF
-      Wait for the Vault cluster seal rewrap process to complete.
-    EOF
-
-    verify_billing_start_date = <<-EOF
-      Verify that the billing start date has successfully rolled over to the latest billing year if needed.
-    EOF
-
 
   }
 }

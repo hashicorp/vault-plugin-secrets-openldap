@@ -116,7 +116,7 @@ variable "ldap_schema" {
   default     = "openldap"
 }
 
-variable "ldap_version" {
+variable "ldap_tag" {
   description = "LDAP image tag version"
   type        = string
   default     = null

@@ -10,8 +10,14 @@ variable "hosts" {
   }))
 }
 
-variable "ldap_version" {
+variable "ldap_tag" {
   type        = string
   description = "OpenLDAP Server Version to use"
   default     = "1.5.0"
+}
+
+variable "ldap_port" {
+  type        = number
+  description = "OpenLDAP Server Port"
+  default     = 389
 }

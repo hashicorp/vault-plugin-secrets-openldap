@@ -407,8 +407,9 @@ scenario "openldap" {
     }
 
     variables {
-      hosts        = step.create_ldap_server_target.hosts
-      ldap_version = var.ldap_version
+      hosts     = step.create_ldap_server_target.hosts
+      ldap_tag  = var.ldap_tag
+      ldap_port = global.ports.ldap.port
     }
   }
 

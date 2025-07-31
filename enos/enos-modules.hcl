@@ -152,7 +152,7 @@ module "target_ec2_fleet" {
 
 // create target instances using ec2:RunInstances
 module "target_ec2_instances" {
-  source = "./modules/target_ec2_instances"
+  source = "git::https://github.com/hashicorp/vault.git//enos/target_ec2_instances?ref=main"
 
   common_tags   = var.tags
   ports_ingress = values(global.ports)

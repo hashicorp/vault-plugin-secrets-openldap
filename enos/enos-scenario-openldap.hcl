@@ -364,18 +364,18 @@ scenario "openldap" {
     module      = "build_ldap_${matrix.ldap_artifact_source}"
 
     variables {
-      plugin_dest_dir   = var.plugin_dest_dir
       goarch            = matrix.arch
       goos              = "linux"
       artifactory_host  = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_host : null
-      artifactory_repo  = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_repo : null
+      artifactory_repo  = matrix.ldap_artifact_source == "artifactory" ? var.plugin_artifactory_repo : null
       artifactory_token = matrix.ldap_artifact_source == "artifactory" ? var.artifactory_token : null
       arch              = matrix.ldap_artifact_source == "artifactory" ? matrix.arch : null
-      product_version   = var.ldap_product_version
-      artifact_type     = matrix.artifact_type
+      artifact_type     = matrix.ldap_artifact_source == "artifactory" ? "bundle" : null
+      product_version   = var.ldap_plugin_version
       revision          = var.ldap_revision
       plugin_name       = var.plugin_name
-      makefile_dir      = var.makefile_dir
+      makefile_dir      = matrix.ldap_artifact_source == "local" ? var.makefile_dir : null
+      plugin_dest_dir   = matrix.ldap_artifact_source == "local" ? var.plugin_dest_dir : null
     }
   }
 
@@ -429,10 +429,10 @@ scenario "openldap" {
     }
 
     variables {
-      artifactory_release = null
-      //artifactory_release     = matrix.artifact_source == "artifactory" ? step.build_ldap.ldap_artifactory_release : null
+      artifactory_release = matrix.ldap_artifact_source == "artifactory" ? step.build_ldap.ldap_artifactory_release : null
+      release             = matrix.ldap_artifact_source == "releases" ? { version = var.ldap_plugin_version, edition = "ce" } : null
       hosts               = step.create_vault_cluster_targets.hosts
-      local_artifact_path = local.ldap_artifact_path
+      local_artifact_path = matrix.ldap_artifact_source == "releases" ? null : local.ldap_artifact_path //TDOD: Wwhat if I provide a local path
 
 
       vault_leader_ip  = step.get_leader_ip.leader_host.public_ip

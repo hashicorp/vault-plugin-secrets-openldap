@@ -92,6 +92,10 @@ globals {
       Build, register, and enable the Vault plugin.
     EOF
 
+    verify_log_secrets = <<-EOF
+      Verify that the vault audit log and systemd journal do not leak secret values.
+    EOF
+
     verify_raft_cluster_all_nodes_are_voters = <<-EOF
       When configured with a 'backend:raft' variant, verify that all nodes in the cluster are
       healthy and are voters.

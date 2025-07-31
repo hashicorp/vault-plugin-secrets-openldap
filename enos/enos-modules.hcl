@@ -26,18 +26,20 @@ module "build_vault_artifactory_package" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_artifactory_package?ref=${var.vault_repo_ref}"
 }
 
-// Find any released RPM or Deb in Artifactory. Requires the version, edition, distro, and distro
-// version.
-module "build_ldap_artifactory_package" {
-  source = "./modules/build_artifactory_package"
-}
-
 // A shim "build module" suitable for use when using locally pre-built artifacts or a zip bundle
 // from releases.hashicorp.com. When using a local pre-built artifact it requires the local
 // artifact path. When using a release zip it does nothing as you'll need to configure the
 // vault_cluster module with release info instead.
 module "build_vault_crt" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/build_crt?ref=${var.vault_repo_ref}"
+}
+
+// A shim "build module" suitable for use when using locally pre-built artifacts or a zip bundle
+// from releases.hashicorp.com. When using a local pre-built artifact it requires the local
+// artifact path. When using a release zip it does nothing as you'll need to configure the
+// vault_cluster module with release info instead.
+module "build_ldap_releases" {
+  source = "./modules/build_releases"
 }
 
 // Build the local branch and package it into a zip artifact. Requires the goarch, goos, build tags,

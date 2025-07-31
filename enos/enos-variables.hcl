@@ -20,6 +20,12 @@ variable "artifactory_repo" {
   default     = "hashicorp-crt-stable-local*"
 }
 
+variable "plugin_artifactory_repo" {
+  type        = string
+  description = "The artifactory repo to search for vault plugin artifacts"
+  default     = "hashicorp-vault-ecosystem-staging-local"
+}
+
 variable "aws_region" {
   description = "The AWS region where we'll create infrastructure"
   type        = string
@@ -112,6 +118,12 @@ variable "ldap_schema" {
 
 variable "ldap_version" {
   description = "LDAP image tag version"
+  type        = string
+  default     = null
+}
+
+variable "ldap_plugin_version" {
+  description = "LDAP plugin version to use"
   type        = string
   default     = null
 }

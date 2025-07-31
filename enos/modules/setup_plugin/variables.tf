@@ -43,10 +43,10 @@ variable "plugin_mount_path" {
 
 variable "artifactory_release" {
   type = object({
-    username = string
     token    = string
     url      = string
     sha256   = string
+    username = string
   })
   description = "The Artifactory release information to install Vault artifacts from Artifactory"
   default     = null

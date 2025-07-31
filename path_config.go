@@ -22,7 +22,7 @@ const (
 	configPath            = "config"
 	defaultPasswordLength = 64
 	defaultSchema         = client.SchemaOpenLDAP
-	defaultCredentialType = client.CredentialType(client.CredentialTypePassword)
+	defaultCredentialType = client.DefaultCredentialType
 	defaultTLSVersion     = "tls12"
 	defaultCtxTimeout     = 1 * time.Minute
 
@@ -333,6 +333,11 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 		configMap["schema"] = config.LDAP.Schema
 	}
 	configMap["credential_type"] = config.LDAP.CredentialType.String()
+	if config.LDAP.CredentialType == client.CredentialTypeUnknown {
+		// this handles the upgrade path for legacy configs created before
+		// credential_type was added
+		configMap["credential_type"] = client.CredentialTypePassword.String()
+	}
 
 	config.PopulateAutomatedRotationData(configMap)
 

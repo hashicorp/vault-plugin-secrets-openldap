@@ -207,7 +207,6 @@ func TestUpdatePasswordRACF(t *testing.T) {
 					t.Fatalf("Expected field %s to exist in newValues", field.String())
 				}
 
-				t.Logf("JMF: expectedValues: %v, actualValues: %v", expectedValues, actualValues)
 				require.Equal(t, expectedValues, actualValues)
 			}
 

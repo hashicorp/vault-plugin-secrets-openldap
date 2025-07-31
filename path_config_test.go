@@ -17,6 +17,46 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
+// TestConfig_CreateUpgradeCredentialType tests that configs created before we
+// added the credential_type field will have the correct default value
+func TestConfig_CreateUpgradeCredentialType(t *testing.T) {
+	createData := map[string]interface{}{
+		"binddn":   "tester",
+		"bindpass": "pa$$w0rd",
+		"url":      "ldap://138.91.247.105",
+	}
+
+	b, storage := getBackend(false)
+	defer b.Cleanup(context.Background())
+
+	resp, err := testCreateConfigWithData(t, b, storage, createData)
+	assertNoError(t, resp, err)
+
+	// Remove the 'credential_type' parameter in the stored config to simulate a legacy config
+	raw, err := storage.Get(context.Background(), configPath)
+	var config map[string]interface{}
+	if err := raw.DecodeJSON(&config); err != nil {
+		t.Fatal(err)
+	}
+	ldap := config["LDAP"].(map[string]interface{})
+	delete(ldap, "credential_type")
+	config["LDAP"] = ldap
+	entry, err := logical.StorageEntryJSON(configPath, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := storage.Put(context.Background(), entry); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err = testReadConfig(t, b, storage)
+	require.NotNil(t, resp)
+	assertNoError(t, resp, err)
+
+	require.Equal(t, defaultCredentialType.String(), resp.Data["credential_type"])
+}
+
 func TestConfig_Create(t *testing.T) {
 	type testCase struct {
 		createData      *framework.FieldData
@@ -222,7 +262,7 @@ func TestConfig_Create(t *testing.T) {
 				Data: ldapResponseData(
 					"binddn", "tester",
 					"url", "ldap://138.91.247.105",
-					"credential_type", "password",
+					"credential_type", client.CredentialTypePassword.String(),
 					"request_timeout", 90,
 				),
 			},
@@ -232,13 +272,13 @@ func TestConfig_Create(t *testing.T) {
 				"binddn":          "tester",
 				"bindpass":        "pa$$w0rd",
 				"url":             "ldap://138.91.247.105",
-				"credential_type": "phrase",
+				"credential_type": client.CredentialTypePhrase.String(),
 			}),
 			expectedReadResp: &logical.Response{
 				Data: ldapResponseData(
 					"binddn", "tester",
 					"url", "ldap://138.91.247.105",
-					"credential_type", "phrase",
+					"credential_type", client.CredentialTypePhrase.String(),
 					"request_timeout", 90,
 				),
 			},

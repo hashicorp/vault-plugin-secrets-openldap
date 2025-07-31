@@ -20,12 +20,6 @@ variable "artifactory_repo" {
   default     = "hashicorp-crt-stable-local*"
 }
 
-variable "plugin_artifactory_repo" {
-  type        = string
-  description = "The artifactory repo to search for vault plugin artifacts"
-  default     = "hashicorp-vault-ecosystem-staging-local"
-}
-
 variable "aws_region" {
   description = "The AWS region where we'll create infrastructure"
   type        = string
@@ -42,30 +36,6 @@ variable "aws_ssh_private_key_path" {
   description = "The path to the AWS keypair private key"
   type        = string
   default     = "./support/private_key.pem"
-}
-
-variable "backend_edition" {
-  description = "The backend release edition if applicable"
-  type        = string
-  default     = "ce" // or "ent"
-}
-
-variable "backend_instance_type" {
-  description = "The instance type to use for the Vault backend. Must be arm64/nitro compatible"
-  type        = string
-  default     = "t4g.small"
-}
-
-variable "backend_log_level" {
-  description = "The server log level for the backend. Supported values include 'trace', 'debug', 'info', 'warn', 'error'"
-  type        = string
-  default     = "trace"
-}
-
-variable "project_name" {
-  description = "The description of the project"
-  type        = string
-  default     = "vault-enos-integration"
 }
 
 variable "distro_version_amzn" {
@@ -98,6 +68,12 @@ variable "distro_version_ubuntu" {
   default     = "24.04" // or "20.04", "22.04"
 }
 
+variable "ldap_artifact_path" {
+  description = "Path to CRT generated or local vault.zip bundle"
+  type        = string
+  default     = "/tmp/vault-plugin-secrets-openldap.zip"
+}
+
 variable "ldap_bind_dn" {
   description = "LDAP bind DN"
   type        = string
@@ -110,6 +86,18 @@ variable "ldap_bind_pass" {
   default     = null
 }
 
+variable "ldap_plugin_version" {
+  description = "LDAP plugin version to use"
+  type        = string
+  default     = null
+}
+
+variable "ldap_revision" {
+  description = "The git sha of LDAP plugin artifact we are testing"
+  type        = string
+  default     = null
+}
+
 variable "ldap_schema" {
   description = "LDAP schema type"
   type        = string
@@ -118,12 +106,6 @@ variable "ldap_schema" {
 
 variable "ldap_tag" {
   description = "LDAP image tag version"
-  type        = string
-  default     = null
-}
-
-variable "ldap_plugin_version" {
-  description = "LDAP plugin version to use"
   type        = string
   default     = null
 }
@@ -146,6 +128,12 @@ variable "makefile_dir" {
   default     = null
 }
 
+variable "plugin_artifactory_repo" {
+  type        = string
+  description = "The artifactory repo to search for vault plugin artifacts"
+  default     = "hashicorp-vault-ecosystem-staging-local"
+}
+
 variable "plugin_dest_dir" {
   description = "Destination directory for the plugin binary"
   type        = string
@@ -156,12 +144,6 @@ variable "plugin_dir_vault" {
   description = "Vault server plugin directory"
   type        = string
   default     = "/etc/vault/plugins"
-}
-
-variable "plugin_local_path" {
-  description = "Local path to an existing plugin binary"
-  type        = string
-  default     = null
 }
 
 variable "plugin_mount_path" {
@@ -176,16 +158,10 @@ variable "plugin_name" {
   default     = null
 }
 
-variable "plugin_registry_url" {
-  description = "URL for downloading the plugin from a registry"
+variable "project_name" {
+  description = "The description of the project"
   type        = string
-  default     = null
-}
-
-variable "plugin_source_type" {
-  description = "Source type for the plugin (e.g., local_build, registry, local_path)"
-  type        = string
-  default     = "local_build"
+  default     = "vault-plugin-secrets-openldap-enos-integration"
 }
 
 variable "tags" {
@@ -221,12 +197,6 @@ variable "vault_artifact_path" {
   description = "Path to CRT generated or local vault.zip bundle"
   type        = string
   default     = "/tmp/vault.zip"
-}
-
-variable "ldap_artifact_path" {
-  description = "Path to CRT generated or local vault.zip bundle"
-  type        = string
-  default     = "/tmp/vault-plugin-secrets-openldap.zip"
 }
 
 variable "vault_build_date" {
@@ -277,34 +247,22 @@ variable "vault_product_version" {
   default     = null
 }
 
-variable "ldap_product_version" {
-  description = "The version of LDAP secrets engine plugin we are testing"
-  type        = string
-  default     = null
-}
-
 variable "vault_radar_license_path" {
   description = "The license for vault-radar which is used to verify the audit log"
   type        = string
   default     = null
 }
 
+variable "vault_repo_ref" {
+  description = "The Git ref to use for external modules; can be pinned to a specific SHA"
+  type        = string
+  default     = "main"
+}
+
 variable "vault_revision" {
   description = "The git sha of Vault artifact we are testing"
   type        = string
   default     = null
-}
-
-variable "ldap_revision" {
-  description = "The git sha of LDAP plugin artifact we are testing"
-  type        = string
-  default     = null
-}
-
-variable "vault_upgrade_initial_version" {
-  description = "The Vault release to deploy before upgrading"
-  type        = string
-  default     = "1.13.13"
 }
 
 variable "verify_aws_secrets_engine" {
@@ -317,10 +275,4 @@ variable "verify_log_secrets" {
   description = "If true and var.vault_enable_audit_devices is true we'll verify that the audit log does not contain unencrypted secrets. Requires var.vault_radar_license_path to be set to a valid license file."
   type        = bool
   default     = false
-}
-
-variable "vault_repo_ref" {
-  description = "The Git ref to use for external modules; can be pinned to a specific SHA"
-  type        = string
-  default     = "main"
 }

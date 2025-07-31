@@ -4,7 +4,7 @@
 globals {
   archs                 = ["amd64", "arm64"]
   artifact_sources      = ["local", "crt", "artifactory"]
-  ldap_artifact_sources = ["local", "artifactory", "releases"]
+  ldap_artifact_sources = ["local", "releases", "artifactory"]
   artifact_types        = ["bundle", "package"]
   backends              = ["raft"]
   backend_tag_key       = "VaultStorage"
@@ -66,6 +66,11 @@ globals {
     ssh : {
       description = "SSH"
       port        = 22
+      protocol    = "tcp"
+    },
+    ldap : {
+      description = "LDAP"
+      port        = 389
       protocol    = "tcp"
     },
     vault_agent : {

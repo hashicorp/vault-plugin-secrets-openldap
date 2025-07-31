@@ -115,7 +115,7 @@ module "setup_plugin" {
 
 // create target instances using ec2:RunInstances
 module "target_ec2_instances" {
-  source = "./modules/target_ec2_instances"
+  source = "git::https://github.com/hashicorp/vault.git//enos/modules/target_ec2_instances?ref=${var.vault_repo_ref}"
 
   common_tags   = var.tags
   ports_ingress = values(global.ports)

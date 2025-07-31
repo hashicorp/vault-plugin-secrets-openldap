@@ -394,8 +394,6 @@ scenario "openldap" {
       common_tags     = global.tags
       vpc_id          = step.create_vpc.id
       instance_count  = 1
-      from_port       = 389
-      to_port         = 389
     }
   }
 

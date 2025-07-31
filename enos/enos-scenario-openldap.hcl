@@ -430,7 +430,7 @@ scenario "openldap" {
       artifactory_release = matrix.ldap_artifact_source == "artifactory" ? step.build_ldap.ldap_artifactory_release : null
       release             = matrix.ldap_artifact_source == "releases" ? { version = var.ldap_plugin_version, edition = "ce" } : null
       hosts               = step.create_vault_cluster_targets.hosts
-      local_artifact_path = matrix.ldap_artifact_source == "releases" ? null : local.ldap_artifact_path //TDOD: Wwhat if I provide a local path
+      local_artifact_path = matrix.ldap_artifact_source == "local" ? local.ldap_artifact_path : null
 
 
       vault_leader_ip  = step.get_leader_ip.leader_host.public_ip

@@ -267,6 +267,22 @@ func TestConfig_Create(t *testing.T) {
 				),
 			},
 		},
+		"credential_type password": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":          "tester",
+				"bindpass":        "pa$$w0rd",
+				"url":             "ldap://138.91.247.105",
+				"credential_type": client.CredentialTypePassword.String(),
+			}),
+			expectedReadResp: &logical.Response{
+				Data: ldapResponseData(
+					"binddn", "tester",
+					"url", "ldap://138.91.247.105",
+					"credential_type", client.CredentialTypePassword.String(),
+					"request_timeout", 90,
+				),
+			},
+		},
 		"credential_type phrase": {
 			createData: fieldData(map[string]interface{}{
 				"binddn":          "tester",

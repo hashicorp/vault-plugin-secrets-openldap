@@ -40,6 +40,9 @@ func GetSchemaFieldRegistry(cfg *Config, newPassword string) (map[*Field][]strin
 
 	case SchemaRACF:
 		fields := map[*Field][]string{}
+		// Password and password phrase management are mutually exclusive
+		// operations. When the system is configured to manage one, it will not
+		// modify the other.
 		if cfg.CredentialType == CredentialTypePhrase {
 			fields[FieldRegistry.RACFPassphrase] = []string{newPassword}
 		} else {

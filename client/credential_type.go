@@ -9,7 +9,10 @@ type CredentialType int
 
 const (
 	CredentialTypeUnknown CredentialType = iota
+	// CredentialTypePassword is the default for all LDAP implementations
 	CredentialTypePassword
+	// CredentialTypePhrase is used for to customize the RACF schema to support
+	// password phrases
 	CredentialTypePhrase
 )
 

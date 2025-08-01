@@ -1,5 +1,5 @@
 # Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: BUSL-1.1
+# SPDX-License-Identifier: MPL-2.0
 
 terraform {
   required_providers {
@@ -12,7 +12,7 @@ terraform {
 # Install Shasum on EC2 targets
 resource "enos_remote_exec" "install-shasum" {
   for_each = var.hosts
-  scripts = [abspath("${path.module}/scripts/install-shasum.sh")]
+  scripts  = [abspath("${path.module}/scripts/install-shasum.sh")]
 
   transport = {
     ssh = {

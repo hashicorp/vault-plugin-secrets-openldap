@@ -1,5 +1,5 @@
 # Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: BUSL-1.1
+# SPDX-License-Identifier: MPL-2.0
 
 # Shim module since Releases provided things will use the ldap_release variable
 variable "bundle_path" {

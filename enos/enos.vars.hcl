@@ -20,9 +20,6 @@
 // aws_ssh_private_key_path is the path to the AWS keypair private key
 // aws_ssh_private_key_path = "./support/private_key.pem"
 
-// backend_license_path is the license for the backend if applicable (Consul Enterprise)".
-// backend_license_path = "./support/consul.hclic"
-
 // backend_log_level is the server log level for the backend. Supported values include 'trace',
 // 'debug', 'info', 'warn', 'error'"
 // backend_log_level = "trace"
@@ -48,6 +45,51 @@
 
 // distro_version_ubuntu is the version of ubuntu to use for "distro:ubuntu" variants
 // distro_version_ubuntu = "22.04" // or "20.04"
+
+// ldap_artifact_path is the path to the LDAP plugin artifact (zip file) to be installed.
+// ldap_artifact_path = "~/go/vault-plugins/vault-plugin-secrets-openldap.zip"
+
+// ldap_artifactory_repo is the Artifactory repository where the LDAP plugin artifact is stored.
+// ldap_artifactory_repo = "hashicorp-vault-ecosystem-staging-local"
+
+// ldap_bind_dn is the distinguished name used to bind to the LDAP server.
+// ldap_bind_dn = "cn=admin,dc=example,dc=com"
+
+// ldap_bind_pass is the password for the LDAP bind distinguished name.
+// ldap_bind_pass = "adminpassword"
+
+// ldap_plugin_version is the version of the LDAP plugin being used.
+// ldap_plugin_version = "0.15.0"
+
+// ldap_revision is the git SHA of the LDAP plugin artifact being tested.
+// ldap_revision = "2ee1253cb5ff67196d0e4747e8aedd1c4903625f"
+
+// ldap_schema specifies the LDAP schema to use (e.g., openldap).
+// ldap_schema = "openldap"
+
+// ldap_tag is the tag or version identifier for the LDAP plugin build.
+// ldap_tag = "1.5.0"
+
+// ldap_user_dn is the base distinguished name under which user entries are located in LDAP.
+// ldap_user_dn = "ou=users,dc=example,dc=com"
+
+// makefile_dir is the directory containing the Makefile for building the plugin.
+// makefile_dir = "~/hashicorp/plugins/vault-plugin-secrets-openldap/"
+
+// plugin_dest_dir is the local directory where the plugin artifact will be stored.
+// plugin_dest_dir = "~/go/vault-plugins"
+
+// plugin_dir_vault is the directory on the Vault server where plugins are installed.
+// plugin_dir_vault = "/etc/vault/plugins"
+
+// plugin_mount_path is the mount path in Vault where the plugin will be enabled.
+// plugin_mount_path = "local-secrets-ldap"
+
+// plugin_name is the name of the Vault plugin to be used for LDAP secrets.
+// plugin_name = "vault-plugin-secrets-openldap"
+
+// plugin_source_type specifies the source type for the plugin (e.g., local_build, artifactory).
+// plugin_source_type = "local_build"
 
 // tags are a map of tags that will be applied to infrastructure resources that
 // support tagging.

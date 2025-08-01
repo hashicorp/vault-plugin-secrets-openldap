@@ -1,12 +1,5 @@
 // Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: BUSL-1.1
-
-variable "artifactory_username" {
-  type        = string
-  description = "The username to use when testing an artifact from artifactory"
-  default     = null
-  sensitive   = true
-}
+// SPDX-License-Identifier: MPL-2.0
 
 variable "artifactory_token" {
   type        = string
@@ -45,36 +38,6 @@ variable "aws_ssh_private_key_path" {
   default     = "./support/private_key.pem"
 }
 
-variable "backend_edition" {
-  description = "The backend release edition if applicable"
-  type        = string
-  default     = "ce" // or "ent"
-}
-
-variable "backend_instance_type" {
-  description = "The instance type to use for the Vault backend. Must be arm64/nitro compatible"
-  type        = string
-  default     = "t4g.small"
-}
-
-variable "backend_license_path" {
-  description = "The license for the backend if applicable (Consul Enterprise)"
-  type        = string
-  default     = null
-}
-
-variable "backend_log_level" {
-  description = "The server log level for the backend. Supported values include 'trace', 'debug', 'info', 'warn', 'error'"
-  type        = string
-  default     = "trace"
-}
-
-variable "project_name" {
-  description = "The description of the project"
-  type        = string
-  default     = "vault-enos-integration"
-}
-
 variable "distro_version_amzn" {
   description = "The version of Amazon Linux 2 to use"
   type        = string
@@ -103,6 +66,102 @@ variable "distro_version_ubuntu" {
   description = "The version of ubuntu to use"
   type        = string
   default     = "24.04" // or "20.04", "22.04"
+}
+
+variable "ldap_artifact_path" {
+  description = "Path to CRT generated or local vault.zip bundle"
+  type        = string
+  default     = "/tmp/vault-plugin-secrets-openldap.zip"
+}
+
+variable "ldap_bind_dn" {
+  description = "LDAP bind DN"
+  type        = string
+  default     = null
+}
+
+variable "ldap_bind_pass" {
+  description = "LDAP bind password"
+  type        = string
+  default     = null
+}
+
+variable "ldap_plugin_version" {
+  description = "LDAP plugin version to use"
+  type        = string
+  default     = null
+}
+
+variable "ldap_revision" {
+  description = "The git sha of LDAP plugin artifact we are testing"
+  type        = string
+  default     = null
+}
+
+variable "ldap_schema" {
+  description = "LDAP schema type"
+  type        = string
+  default     = "openldap"
+}
+
+variable "ldap_tag" {
+  description = "LDAP image tag version"
+  type        = string
+  default     = null
+}
+
+variable "ldap_url" {
+  description = "LDAP server URL"
+  type        = string
+  default     = null
+}
+
+variable "ldap_user_dn" {
+  description = "LDAP user DN"
+  type        = string
+  default     = null
+}
+
+variable "makefile_dir" {
+  description = "Directory containing the Makefile for plugin build"
+  type        = string
+  default     = null
+}
+
+variable "plugin_artifactory_repo" {
+  type        = string
+  description = "The artifactory repo to search for vault plugin artifacts"
+  default     = "hashicorp-vault-ecosystem-staging-local"
+}
+
+variable "plugin_dest_dir" {
+  description = "Destination directory for the plugin binary"
+  type        = string
+  default     = null
+}
+
+variable "plugin_dir_vault" {
+  description = "Vault server plugin directory"
+  type        = string
+  default     = "/etc/vault/plugins"
+}
+
+variable "plugin_mount_path" {
+  description = "Mount path for the plugin in Vault"
+  type        = string
+  default     = null
+}
+
+variable "plugin_name" {
+  description = "Name of the Vault plugin to use"
+  type        = string
+  default     = null
+}
+
+variable "project_name" {
+  description = "The description of the project"
+  type        = string
+  default     = "vault-plugin-secrets-openldap-enos-integration"
 }
 
 variable "tags" {
@@ -194,16 +253,16 @@ variable "vault_radar_license_path" {
   default     = null
 }
 
+variable "vault_repo_ref" {
+  description = "The Git ref to use for external modules; can be pinned to a specific SHA"
+  type        = string
+  default     = "main"
+}
+
 variable "vault_revision" {
   description = "The git sha of Vault artifact we are testing"
   type        = string
   default     = null
-}
-
-variable "vault_upgrade_initial_version" {
-  description = "The Vault release to deploy before upgrading"
-  type        = string
-  default     = "1.13.13"
 }
 
 variable "verify_aws_secrets_engine" {

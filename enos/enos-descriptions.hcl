@@ -88,6 +88,10 @@ globals {
       Must have the 'edition' variant to be set to any Enterprise edition.
     EOF
 
+    static_role_crud_api = <<-EOF
+      Tests the lifecycle of a static role via the Vault CRUD API.
+    EOF
+
     setup_plugin = <<-EOF
       Build, register, and enable the Vault plugin.
     EOF

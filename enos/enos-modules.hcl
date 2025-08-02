@@ -112,6 +112,9 @@ module "setup_plugin" {
   source = "./modules/setup_plugin"
 }
 
+module "static_role_crud_api" {
+  source = "./modules/static_role_crud_api"
+}
 
 // create target instances using ec2:RunInstances
 module "target_ec2_instances" {

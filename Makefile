@@ -114,3 +114,11 @@ configure: plugin-build plugin-register plugin-enable plugin-configure
 .PHONY: teardown-env
 teardown-env:
 	cd bootstrap && ./teardown-env.sh
+
+.PHONY: static-role-test
+static-role-test:
+	cd enos/modules/static_role_crud_api && ./scripts/static-role.sh
+
+.PHONY: teardown-env
+teardown-env:
+	cd bootstrap && ./teardown-env.sh

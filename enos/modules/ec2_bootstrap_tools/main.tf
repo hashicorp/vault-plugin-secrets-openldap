@@ -92,9 +92,9 @@ resource "enos_remote_exec" "unseal_vault" {
   scripts = [abspath("${path.module}/scripts/vault-unseal.sh")]
 
   environment = {
-    VAULT_ADDR= var.vault_addr
-    UNSEAL_KEYS= join(",", var.unseal_keys)
-    THRESHOLD= tostring(var.threshold)
+    VAULT_ADDR  = var.vault_addr
+    UNSEAL_KEYS = join(",", var.unseal_keys)
+    THRESHOLD   = tostring(var.threshold)
   }
 
   transport = {

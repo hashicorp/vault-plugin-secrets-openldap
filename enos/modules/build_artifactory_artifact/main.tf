@@ -67,11 +67,11 @@ locals {
 }
 
 data "enos_artifactory_item" "ldap" {
-  token    = var.artifactory_token
-  name     = local.artifact_name
-  host     = var.artifactory_host
-  repo     = var.artifactory_repo
-  path     = "${var.product_name}/*"
+  token = var.artifactory_token
+  name  = local.artifact_name
+  host  = var.artifactory_host
+  repo  = var.artifactory_repo
+  path  = "${var.product_name}/*"
   properties = tomap({
     "commit"          = var.revision,
     "product-name"    = var.product_name,

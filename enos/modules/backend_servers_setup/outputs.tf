@@ -8,11 +8,11 @@ output "state" {
 }
 
 output "ldap_url" {
-  value = "ldap://${local.ldap_server.ip_address}:${local.ldap_server.port}"
+  value = "ldap://${local.ldap_server.private_ip}:${local.ldap_server.port}"
 }
 
 output "ldap_ip_address" {
-  value = local.ldap_server.ip_address
+  value = local.ldap_server.private_ip
 }
 
 output "ldap_port" {

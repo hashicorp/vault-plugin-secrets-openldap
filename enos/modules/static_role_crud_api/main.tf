@@ -9,7 +9,11 @@ terraform {
   }
 }
 
-#
+locals {
+  users_dn = "ou=users,${var.ldap_base_dn}"
+  user_dn  = "uid=${var.ldap_username},${local.users_dn}"
+}
+
 resource "enos_remote_exec" "static_role_crud_api_test" {
   scripts = ["${path.module}/scripts/static-role.sh"]
 
@@ -19,10 +23,10 @@ resource "enos_remote_exec" "static_role_crud_api_test" {
     PLUGIN_PATH       = var.plugin_mount_path
     LDAP_HOST         = var.ldap_host
     LDAP_PORT         = var.ldap_port
-    LDAP_DN           = var.ldap_dn
+    LDAP_DN           = local.user_dn
     LDAP_USERNAME     = var.ldap_username
-    LDAP_OLD_PASSWORD = var.ldap_old_password
-    ROLE_NAME         = var.ldap_role_name
+    LDAP_OLD_PASSWORD = var.ldap_user_old_password
+    ROLE_NAME         = var.ldap_user_role_name
   }
 
   transport = {

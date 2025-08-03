@@ -166,6 +166,7 @@ scenario "openldap" {
       common_tags     = global.tags
       seal_key_names  = step.create_seal_key.resource_names
       vpc_id          = step.create_vpc.id
+      instance_count  = 1
     }
   }
 
@@ -459,10 +460,10 @@ scenario "openldap" {
       vault_root_token = step.create_vault_cluster.root_token
 
       plugin_mount_path = var.plugin_mount_path
-      ldap_url          = step.create_ldap_server.ldap_url
-      ldap_bind_dn      = var.ldap_bind_dn
+      ldap_host         = step.create_ldap_server.ldap_ip_address
+      ldap_port         = step.create_ldap_server.ldap_port
+      ldap_base_dn      = var.ldap_base_dn
       ldap_bind_pass    = var.ldap_bind_pass
-      ldap_user_dn      = var.ldap_user_dn
       ldap_schema       = var.ldap_schema
     }
   }
@@ -477,17 +478,16 @@ scenario "openldap" {
     }
 
     variables {
-      vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
-      vault_addr       = step.create_vault_cluster.api_addr_localhost
-      vault_root_token = step.create_vault_cluster.root_token
-
-      plugin_mount_path = "local-secrets-ldap"
-      ldap_host         = step.create_ldap_server.ldap_ip_address
-      ldap_port         = step.create_ldap_server.ldap_port
-      ldap_dn           = "uid=mary.smith,ou=users,dc=example,dc=com"
-      ldap_username     = "mary.smith"
-      ldap_old_password = "defaultpassword"
-      ldap_role_name    = "mary"
+      vault_leader_ip        = step.get_leader_ip.leader_host.public_ip
+      vault_addr             = step.create_vault_cluster.api_addr_localhost
+      vault_root_token       = step.create_vault_cluster.root_token
+      plugin_mount_path      = var.plugin_mount_path
+      ldap_host              = step.create_ldap_server.ldap_ip_address
+      ldap_port              = step.create_ldap_server.ldap_port
+      ldap_base_dn           = var.ldap_base_dn
+      ldap_user_role_name    = var.ldap_user_role_name
+      ldap_username          = var.ldap_username
+      ldap_user_old_password = var.ldap_user_old_password
     }
   }
 

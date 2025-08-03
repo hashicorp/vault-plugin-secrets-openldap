@@ -21,28 +21,27 @@ variable "plugin_mount_path" {
   description = "Mount path for the plugin"
 }
 
-# LDAP variables for configuration
-variable "ldap_url" {
+variable "ldap_host" {
   type        = string
-  description = "LDAP URL, e.g., ldap://<ip>:389"
+  description = "The LDAP server host"
 }
 
-variable "ldap_bind_dn" {
+variable "ldap_port" {
   type        = string
-  description = "LDAP Bind DN"
+  description = "The LDAP server port"
+}
+
+variable "ldap_base_dn" {
+  type        = string
+  description = "The common DN suffix"
 }
 
 variable "ldap_bind_pass" {
   type        = string
-  description = "LDAP Bind password"
-}
-
-variable "ldap_user_dn" {
-  type        = string
-  description = "LDAP User DN"
+  description = "LDAP bind password"
 }
 
 variable "ldap_schema" {
   type        = string
-  description = "LDAP schema type, e.g., openldap"
+  description = "LDAP schema type"
 }

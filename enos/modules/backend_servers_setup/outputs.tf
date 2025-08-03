@@ -7,10 +7,6 @@ output "state" {
   }
 }
 
-output "ldap_url" {
-  value = "ldap://${local.ldap_server.private_ip}:${local.ldap_server.port}"
-}
-
 output "ldap_ip_address" {
   value = local.ldap_server.private_ip
 }

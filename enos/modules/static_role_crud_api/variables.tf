@@ -8,35 +8,35 @@ variable "plugin_mount_path" {
   description = "Mount path for the plugin"
 }
 
-# LDAP variables for configuration
+
 variable "ldap_host" {
   type        = string
-  description = "LDAP IP or hostname"
+  description = "The LDAP server host"
 }
 
 variable "ldap_port" {
   type        = string
-  description = "LDAP port"
+  description = "The LDAP server port"
 }
 
-variable "ldap_dn" {
+variable "ldap_base_dn" {
   type        = string
-  description = "LDAP Distinguished Name (DN)"
+  description = "The common DN suffix"
 }
 
 variable "ldap_username" {
+  description = "The username of the LDAP user to create"
   type        = string
-  description = "LDAP username for authentication"
 }
 
-variable "ldap_old_password" {
+variable "ldap_user_old_password" {
+  description = "The old password of the LDAP user to create"
   type        = string
-  description = "LDAP old password"
 }
 
-variable "ldap_role_name" {
+variable "ldap_user_role_name" {
+  description = "The name of the LDAP user role to create"
   type        = string
-  description = "LDAP role name to be created"
 }
 
 variable "vault_addr" {

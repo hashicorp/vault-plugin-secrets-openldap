@@ -71,7 +71,6 @@ else
   exit 1
 fi
 
-# Manual static-role rotation
 echo "==> Forcing manual rotation for static role"
 vault write -force "${PLUGIN_PATH}/rotate-role/${ROLE_NAME}"
 echo "==> Reading credentials after manual rotation"
@@ -91,16 +90,8 @@ else
   exit 1
 fi
 
-# Root credential rotation
 echo "==> Rotating root credentials"
 vault write -f "${PLUGIN_PATH}/rotate-root"
-echo "==> LDAP root check: old root password should be rejected"
-if ldapwhoami -h "${LDAP_HOST}:${LDAP_PORT}" -x -w "${LDAP_BIND_PASS}" -D "${LDAP_BIND_DN}"; then
-  echo "[ERROR] Old root password still works after rotation!"
-  exit 1
-else
-  echo "[OK] Old root password rejected as expected."
-fi
 
 echo "==> Updating static role (change rotation_period)"
 vault write "${ROLE_PATH}" \

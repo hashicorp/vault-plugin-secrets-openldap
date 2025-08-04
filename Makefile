@@ -16,7 +16,7 @@ PLUGIN_PATH ?= local-secrets-ldap
 LDAP_DOMAIN ?= example.com
 LDAP_ORG ?= example
 LDAP_ADMIN_PW ?= adminpassword
-IMAGE_TAG ?= 1.5.0
+IMAGE_TAG ?= 1.3.0
 LDAP_PORT ?= 389
 LDIF_PATH ?= $(PWD)/bootstrap/ldif/seed.ldif
 

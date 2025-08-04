@@ -39,6 +39,9 @@ CRED_PATH="${PLUGIN_PATH}/static-cred/${ROLE_NAME}"
 echo "==> LDAP_HOST: ${LDAP_HOST}"
 echo "==> LDAP_PORT: ${LDAP_PORT}"
 
+echo "==> Rotating root credentials"
+vault write -f "${PLUGIN_PATH}/rotate-root"
+
 echo "==> Creating static role ${ROLE_NAME}"
 vault write "${ROLE_PATH}" \
     dn="${LDAP_DN}" \
@@ -89,9 +92,6 @@ else
   echo "[ERROR] Rotated password did not work!"
   exit 1
 fi
-
-echo "==> Rotating root credentials"
-vault write -f "${PLUGIN_PATH}/rotate-root"
 
 echo "==> Updating static role (change rotation_period)"
 vault write "${ROLE_PATH}" \

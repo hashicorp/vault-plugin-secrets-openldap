@@ -16,7 +16,7 @@ PLUGIN_PATH ?= local-secrets-ldap
 LDAP_DOMAIN ?= example.com
 LDAP_ORG ?= example
 LDAP_ADMIN_PW ?= adminpassword
-IMAGE_TAG ?= 1.5.0
+IMAGE_TAG ?= 1.3.0
 LDAP_PORT ?= 389
 LDIF_PATH ?= $(PWD)/bootstrap/ldif/seed.ldif
 
@@ -110,6 +110,14 @@ plugin-configure:
 
 .PHONY: configure
 configure: plugin-build plugin-register plugin-enable plugin-configure
+
+.PHONY: teardown-env
+teardown-env:
+	cd bootstrap && ./teardown-env.sh
+
+.PHONY: static-role-test
+static-role-test:
+	cd enos/modules/static_role_crud_api && ./scripts/static-role.sh
 
 .PHONY: teardown-env
 teardown-env:

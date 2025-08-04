@@ -21,6 +21,21 @@ resource "enos_remote_exec" "install-shasum" {
   }
 }
 
+# Install OpenLDAP clients on EC2 targets
+resource "enos_remote_exec" "install-openldap-clients" {
+  for_each = var.hosts
+
+  inline = [
+    "sudo yum install -y openldap-clients"
+  ]
+
+  transport = {
+    ssh = {
+      host = each.value.public_ip
+    }
+  }
+}
+
 # Ensure the Vault plugin directory exists
 resource "enos_remote_exec" "create_plugin_directory" {
   for_each = var.hosts

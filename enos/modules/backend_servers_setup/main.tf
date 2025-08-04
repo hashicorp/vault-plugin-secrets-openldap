@@ -17,6 +17,7 @@ locals {
     tag        = var.ldap_tag
     port       = tostring(var.ldap_port)
     ip_address = var.hosts[0].public_ip
+    private_ip = var.hosts[0].private_ip
   }
   ldif_path = "/tmp/seed.ldif"
 }

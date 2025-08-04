@@ -74,10 +74,10 @@ variable "ldap_artifact_path" {
   default     = "/tmp/vault-plugin-secrets-openldap.zip"
 }
 
-variable "ldap_bind_dn" {
-  description = "LDAP bind DN"
+variable "ldap_base_dn" {
   type        = string
-  default     = null
+  description = "The common DN suffix"
+  default     = "dc=example,dc=com"
 }
 
 variable "ldap_bind_pass" {
@@ -107,19 +107,25 @@ variable "ldap_schema" {
 variable "ldap_tag" {
   description = "LDAP image tag version"
   type        = string
-  default     = null
+  default     = "1.3.0"
 }
 
-variable "ldap_url" {
-  description = "LDAP server URL"
+variable "ldap_username" {
+  description = "The username of the LDAP user to create"
   type        = string
-  default     = null
+  default     = "mary.smith"
 }
 
-variable "ldap_user_dn" {
-  description = "LDAP user DN"
+variable "ldap_user_old_password" {
+  description = "The old password of the LDAP user to create"
   type        = string
-  default     = null
+  default     = "defaultpassword"
+}
+
+variable "ldap_user_role_name" {
+  description = "The name of the LDAP user role to create"
+  type        = string
+  default     = "mary"
 }
 
 variable "makefile_dir" {

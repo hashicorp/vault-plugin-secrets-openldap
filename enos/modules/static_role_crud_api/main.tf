@@ -10,6 +10,7 @@ terraform {
 }
 
 locals {
+  admin_dn = "cn=admin,${var.ldap_base_dn}"
   users_dn = "ou=users,${var.ldap_base_dn}"
   user_dn  = "uid=${var.ldap_username},${local.users_dn}"
 }
@@ -27,6 +28,8 @@ resource "enos_remote_exec" "static_role_crud_api_test" {
     LDAP_USERNAME     = var.ldap_username
     LDAP_OLD_PASSWORD = var.ldap_user_old_password
     ROLE_NAME         = var.ldap_user_role_name
+    LDAP_BIND_DN      = local.admin_dn
+    LDAP_BIND_PASS    = var.ldap_bind_pass
   }
 
   transport = {

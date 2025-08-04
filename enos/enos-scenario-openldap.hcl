@@ -485,6 +485,7 @@ scenario "openldap" {
       ldap_host              = step.create_ldap_server.ldap_ip_address
       ldap_port              = step.create_ldap_server.ldap_port
       ldap_base_dn           = var.ldap_base_dn
+      ldap_bind_pass         = var.ldap_bind_pass
       ldap_user_role_name    = var.ldap_user_role_name
       ldap_username          = var.ldap_username
       ldap_user_old_password = var.ldap_user_old_password

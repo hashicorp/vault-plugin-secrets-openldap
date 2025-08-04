@@ -24,6 +24,11 @@ variable "ldap_base_dn" {
   description = "The common DN suffix"
 }
 
+variable "ldap_bind_pass" {
+  type        = string
+  description = "LDAP bind password"
+}
+
 variable "ldap_username" {
   description = "The username of the LDAP user to create"
   type        = string

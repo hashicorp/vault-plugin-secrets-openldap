@@ -27,6 +27,8 @@ fail() {
 [[ -z "$LDAP_USERNAME" ]] && fail "LDAP_USERNAME env variable has not been set"
 [[ -z "$LDAP_OLD_PASSWORD" ]] && fail "LDAP_OLD_PASSWORD env variable has not been set"
 [[ -z "$ROLE_NAME" ]] && fail "ROLE_NAME env variable has not been set"
+[[ -z "$LDAP_BIND_DN" ]] && fail "LDAP_BIND_DN env variable has not been set"
+[[ -z "$LDAP_BIND_PASS" ]] && fail "LDAP_BIND_PASS env variable has not been set"
 
 export VAULT_ADDR
 export VAULT_TOKEN
@@ -67,6 +69,37 @@ if ldapwhoami -h "${LDAP_HOST}:${LDAP_PORT}" -x -w "${NEW_PASSWORD}" -D "${LDAP_
 else
   echo "[ERROR] New password did not work!"
   exit 1
+fi
+
+# Manual static-role rotation
+echo "==> Forcing manual rotation for static role"
+vault write -force "${PLUGIN_PATH}/rotate-role/${ROLE_NAME}"
+echo "==> Reading credentials after manual rotation"
+ROTATED_PASSWORD=$(vault read -field=password "${CRED_PATH}")
+echo "==> LDAP check: old generated password should be rejected"
+if ldapwhoami -h "${LDAP_HOST}:${LDAP_PORT}" -x -w "${NEW_PASSWORD}" -D "${LDAP_DN}"; then
+  echo "[ERROR] Previously generated password still works after manual rotation!"
+  exit 1
+else
+  echo "[OK] Old generated password rejected as expected."
+fi
+echo "==> LDAP check: new rotated password should succeed"
+if ldapwhoami -h "${LDAP_HOST}:${LDAP_PORT}" -x -w "${ROTATED_PASSWORD}" -D "${LDAP_DN}"; then
+  echo "[OK] Rotated password accepted as expected."
+else
+  echo "[ERROR] Rotated password did not work!"
+  exit 1
+fi
+
+# Root credential rotation
+echo "==> Rotating root credentials"
+vault write -f "${PLUGIN_PATH}/rotate-root"
+echo "==> LDAP root check: old root password should be rejected"
+if ldapwhoami -h "${LDAP_HOST}:${LDAP_PORT}" -x -w "${LDAP_BIND_PASS}" -D "${LDAP_BIND_DN}"; then
+  echo "[ERROR] Old root password still works after rotation!"
+  exit 1
+else
+  echo "[OK] Old root password rejected as expected."
 fi
 
 echo "==> Updating static role (change rotation_period)"

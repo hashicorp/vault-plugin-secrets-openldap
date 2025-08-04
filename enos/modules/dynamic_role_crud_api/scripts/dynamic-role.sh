@@ -29,13 +29,16 @@ fail() {
 export VAULT_ADDR
 export VAULT_TOKEN
 
+echo "==> Rotating root credentials"
+vault write -f "${PLUGIN_PATH}/rotate-root"
+
 ROLE_PATH="${PLUGIN_PATH}/role/${ROLE_NAME}"
 
 echo "==> Creating dynamic role: ${ROLE_NAME}"
 vault write "${ROLE_PATH}" \
-    creation_ldif=@${LDIF_PATH}/creation.ldif \
-    deletion_ldif=@${LDIF_PATH}/deletion.ldif \
-    rollback_ldif=@${LDIF_PATH}/rollback.ldif \
+    creation_ldif=@"${LDIF_PATH}/creation.ldif" \
+    deletion_ldif=@"${LDIF_PATH}/deletion.ldif" \
+    rollback_ldif=@"${LDIF_PATH}/rollback.ldif" \
     default_ttl="2m" \
     max_ttl="10m"
 
@@ -47,11 +50,17 @@ vault list "${PLUGIN_PATH}/role"
 
 echo "==> Requesting dynamic credentials"
 CRED_PATH="${PLUGIN_PATH}/creds/${ROLE_NAME}"
-DYNAMIC_CREDS="$(vault read -format=json "${CRED_PATH}")"
+if ! DYNAMIC_CREDS=$(vault read -format=json "${CRED_PATH}"); then
+  fail "Vault read failed when requesting dynamic credentials from ${CRED_PATH}"
+fi
 DYN_USERNAME=$(echo "${DYNAMIC_CREDS}" | jq -r .data.username)
 DYN_PASSWORD=$(echo "${DYNAMIC_CREDS}" | jq -r .data.password)
 LEASE_ID=$(echo "${DYNAMIC_CREDS}" | jq -r .lease_id)
-
+if [[ -z "${DYN_USERNAME}" || -z "${DYN_PASSWORD}" || \
+-z "${LEASE_ID}" || "${DYN_USERNAME}" == "null" || \
+"${DYN_PASSWORD}" == "null" || "${LEASE_ID}" == "null" ]]; then
+  fail "Invalid dynamic credentials returned: ${DYNAMIC_CREDS}"
+fi
 echo "==> Got dynamic username: ${DYN_USERNAME}"
 echo "==> Got dynamic password: ${DYN_PASSWORD}"
 echo "==> Lease ID: ${LEASE_ID}"

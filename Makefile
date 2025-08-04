@@ -16,12 +16,11 @@ PLUGIN_PATH ?= local-secrets-ldap
 LDAP_DOMAIN ?= example.com
 LDAP_ORG ?= example
 LDAP_ADMIN_PW ?= adminpassword
-LDAP_VERSION ?= 1.3.0
+IMAGE_TAG ?= 1.3.0
 LDAP_PORT ?= 389
 LDIF_PATH ?= $(PWD)/bootstrap/ldif/seed.ldif
 
 #configure ldap plugin
-PLUGIN_DEST_DIR ?= $(PLUGIN_DIR)
 MAKEFILE_DIR ?= $(PWD)
 PLUGIN_SOURCE_TYPE ?= local_build
 PLUGIN_DIR_VAULT ?= /etc/vault/plugins
@@ -34,11 +33,11 @@ LDAP_SCHEMA ?= openldap
 export LDAP_DOMAIN
 export LDAP_ORG
 export LDAP_ADMIN_PW
-export LDAP_VERSION
+export IMAGE_TAG
 export LDAP_PORT
+export PLUGIN_DIR
 export PLUGIN_NAME
 export PLUGIN_PATH
-export PLUGIN_DEST_DIR
 export PLUGIN_SOURCE_TYPE
 export MAKEFILE_DIR
 export PLUGIN_DIR_VAULT
@@ -94,23 +93,31 @@ setup-env:
 
 .PHONY: plugin-build
 plugin-build:
-	cd enos/modules/configure_plugin && ./scripts/plugin-build.sh
+	cd enos/modules/build_local && ./scripts/plugin-build.sh
 
 .PHONY: plugin-register
 plugin-register:
-	cd enos/modules/configure_plugin && \
-	PLUGIN_BINARY_SRC="$(PLUGIN_DEST_DIR)/$(PLUGIN_NAME)" ./scripts/plugin-register.sh
+	cd enos/modules/setup_plugin && \
+	PLUGIN_BINARY_SRC="$(PLUGIN_DIR)/$(PLUGIN_NAME)" ./scripts/plugin-register.sh
 
 .PHONY: plugin-enable
 plugin-enable:
-	cd enos/modules/configure_plugin && ./scripts/plugin-enable.sh
+	cd enos/modules/setup_plugin && ./scripts/plugin-enable.sh
 
 .PHONY: plugin-configure
 plugin-configure:
-	cd enos/modules/configure_plugin && ./scripts/plugin-configure.sh
+	cd enos/modules/configure_plugin/ldap && ./scripts/plugin-configure.sh
 
 .PHONY: configure
 configure: plugin-build plugin-register plugin-enable plugin-configure
+
+.PHONY: teardown-env
+teardown-env:
+	cd bootstrap && ./teardown-env.sh
+
+.PHONY: static-role-test
+static-role-test:
+	cd enos/modules/static_role_crud_api && ./scripts/static-role.sh
 
 .PHONY: dynamic-role-test
 dynamic-role-test:

@@ -1,3 +1,6 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 variable "hosts" {
   description = "The target machines host addresses to use for the Vault cluster"
   type = map(object({

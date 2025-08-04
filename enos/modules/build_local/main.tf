@@ -1,5 +1,5 @@
 # Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: BUSL-1.1
+# SPDX-License-Identifier: MPL-2.0
 
 terraform {
   required_providers {
@@ -9,19 +9,8 @@ terraform {
   }
 }
 
-variable "artifact_path" {
-  description = "Where to create the zip bundle of the Vault build"
-}
-
-variable "build_tags" {
-  type        = list(string)
-  description = "The build tags to pass to the Go compiler"
-}
-
-variable "build_ui" {
-  type        = bool
-  description = "Whether or not we should build the UI when creating the local build"
-  default     = true
+variable "plugin_dest_dir" {
+  description = "Where to create the zip bundle of the Plugin build"
 }
 
 variable "goarch" {
@@ -36,34 +25,34 @@ variable "goos" {
   default     = "linux"
 }
 
+variable "plugin_name" {
+  type        = string
+  description = "Name of the plugin"
+}
+
+variable "makefile_dir" {
+  type        = string
+  description = "Plugin Project Makefile directory"
+  default     = "$(PWD)"
+}
+
 variable "artifactory_host" { default = null }
 variable "artifactory_repo" { default = null }
-variable "artifactory_username" { default = null }
 variable "artifactory_token" { default = null }
 variable "arch" { default = null }
 variable "artifact_type" { default = null }
-variable "distro" { default = null }
-variable "distro_version" { default = null }
-variable "edition" { default = null }
 variable "revision" { default = null }
 variable "product_version" { default = null }
 
-module "local_metadata" {
-  source = "../get_local_metadata"
-}
-
 resource "enos_local_exec" "build" {
-  scripts = [abspath("${path.module}/scripts/build.sh")]
+  scripts = ["${path.module}/scripts/plugin-build.sh"]
 
   environment = {
-    BASE_VERSION       = module.local_metadata.version_base
-    BIN_PATH           = abspath("${path.module}/../../../dist")
-    BUILD_UI           = tostring(var.build_ui)
-    BUNDLE_PATH        = abspath(var.artifact_path)
-    GO_TAGS            = join(" ", var.build_tags)
-    GOARCH             = var.goarch
-    GOOS               = var.goos
-    PRERELEASE_VERSION = module.local_metadata.version_pre
-    VERSION_METADATA   = module.local_metadata.version_meta
+    PLUGIN_NAME  = var.plugin_name
+    PLUGIN_DIR   = var.plugin_dest_dir
+    MAKEFILE_DIR = var.makefile_dir
+    GOARCH       = var.goarch
+    GOOS         = var.goos
   }
+
 }

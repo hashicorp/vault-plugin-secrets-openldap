@@ -1,5 +1,4 @@
 # Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: BUSL-1.1
 
 terraform {
   required_providers {
@@ -14,11 +13,12 @@ locals {
     domain     = "example.com"
     org        = "example"
     admin_pw   = "adminpassword"
-    version    = var.ldap_version
-    port       = "389"
+    tag        = var.ldap_tag
+    port       = tostring(var.ldap_port)
     ip_address = var.hosts[0].public_ip
+    private_ip = var.hosts[0].private_ip
   }
-  ldif_path  = "/tmp/seed.ldif"
+  ldif_path = "/tmp/seed.ldif"
 }
 
 # Step 1: Install Docker
@@ -54,7 +54,7 @@ resource "enos_remote_exec" "setup_openldap" {
     LDAP_DOMAIN   = local.ldap_server.domain
     LDAP_ORG      = local.ldap_server.org
     LDAP_ADMIN_PW = local.ldap_server.admin_pw
-    LDAP_VERSION  = local.ldap_server.version
+    IMAGE_TAG     = local.ldap_server.tag
     LDAP_PORT     = local.ldap_server.port
     LDIF_PATH     = local.ldif_path
   }

@@ -1,3 +1,8 @@
+variable "dynamic_role_ldif_templates_path" {
+  type        = string
+  description = "LDIF files path"
+}
+
 variable "hosts" {
   description = "The target machines host addresses to use for the Vault cluster"
   type = map(object({
@@ -17,7 +22,11 @@ variable "plugin_mount_path" {
   description = "Mount path for the plugin"
 }
 
-# LDAP variables for configuration
+variable "ldap_base_dn" {
+  type        = string
+  description = "The common DN suffix"
+}
+
 variable "ldap_host" {
   type        = string
   description = "LDAP IP or hostname"
@@ -28,19 +37,9 @@ variable "ldap_port" {
   description = "LDAP port"
 }
 
-variable "ldap_user_dn_tpl" {
-  type        = string
-  description = "LDAP user DN template"
-}
-
-variable "ldap_role_name" {
+variable "ldap_dynamic_user_role_name" {
   type        = string
   description = "LDAP role name to be created"
-}
-
-variable "ldif_path" {
-  type        = string
-  description = "LDIF files path"
 }
 
 variable "vault_addr" {

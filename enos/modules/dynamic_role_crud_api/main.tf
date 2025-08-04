@@ -24,13 +24,15 @@ locals {
     for item in local.file_host_pairs :
     "${item["host_index"]}_${item["file"]}" => item
   }
+  users_dn         = "ou=users,${var.ldap_base_dn}"
+  ldap_user_dn_tpl = "uid={{username}},${local.users_dn}"
 }
 
 # Copy LDIF files to the hosts
 resource "enos_file" "ldif_files" {
   for_each    = local.file_host_map
   source      = abspath("${path.module}/ldif/${each.value["file"]}")
-  destination = "${var.ldif_path}/${each.value["file"]}"
+  destination = "${var.dynamic_role_ldif_templates_path}/${each.value["file"]}"
   transport = {
     ssh = {
       host = each.value["public_ip"]
@@ -50,9 +52,9 @@ resource "enos_remote_exec" "dynamic_role_crud_api_test" {
     LDAP_HOST   = var.ldap_host
     LDAP_PORT   = var.ldap_port
 
-    ROLE_NAME        = var.ldap_role_name
-    LDAP_USER_DN_TPL = var.ldap_user_dn_tpl
-    LDIF_PATH        = var.ldif_path
+    ROLE_NAME        = var.ldap_dynamic_user_role_name
+    LDAP_USER_DN_TPL = local.ldap_user_dn_tpl
+    LDIF_PATH        = var.dynamic_role_ldif_templates_path
   }
 
   transport = {

@@ -506,12 +506,12 @@ scenario "openldap" {
       vault_root_token = step.create_vault_cluster.root_token
       hosts            = step.create_vault_cluster_targets.hosts
 
-      plugin_mount_path = "local-secrets-ldap"
-      ldap_host         = step.create_ldap_server.ldap_ip_address
-      ldap_port         = step.create_ldap_server.ldap_port
-      ldap_user_dn_tpl  = "uid={{username}},ou=users,dc=example,dc=com"
-      ldif_path         = "/tmp"
-      ldap_role_name    = "adam"
+      plugin_mount_path                = var.plugin_mount_path
+      ldap_host                        = step.create_ldap_server.ldap_ip_address
+      ldap_port                        = step.create_ldap_server.ldap_port
+      ldap_base_dn                     = var.ldap_base_dn
+      dynamic_role_ldif_templates_path = var.dynamic_role_ldif_templates_path
+      ldap_dynamic_user_role_name      = var.ldap_dynamic_user_role_name
     }
   }
 

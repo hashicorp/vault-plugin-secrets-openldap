@@ -107,7 +107,7 @@ variable "ldap_schema" {
 variable "ldap_tag" {
   description = "LDAP image tag version"
   type        = string
-  default     = null
+  default     = "1.3.0"
 }
 
 variable "ldap_username" {

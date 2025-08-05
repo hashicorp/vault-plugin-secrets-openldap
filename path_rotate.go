@@ -72,7 +72,9 @@ func (b *backend) pathRotateCredentials() []*framework.Path {
 func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 	err := b.rotateRootCredential(ctx, req)
 	if err != nil {
-		b.Logger().Error("failed to rotate root credential:", "rotationID", req.Path, "err", err.Error())
+		b.Logger().Error("failed to rotate root credential on user request", "path", req.Path, "error", err.Error())
+	} else {
+		b.Logger().Info("succesfully rotated root credential on user request", "path", req.Path)
 	}
 
 	return nil, err

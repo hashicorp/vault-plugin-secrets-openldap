@@ -166,7 +166,6 @@ scenario "openldap" {
       common_tags     = global.tags
       seal_key_names  = step.create_seal_key.resource_names
       vpc_id          = step.create_vpc.id
-      instance_count  = 1
     }
   }
 
@@ -489,6 +488,30 @@ scenario "openldap" {
       ldap_user_role_name    = var.ldap_user_role_name
       ldap_username          = var.ldap_username
       ldap_user_old_password = var.ldap_user_old_password
+    }
+  }
+
+  step "test_dynamic_role_crud_api" {
+    description = global.description.dynamic_role_crud_api
+    module      = module.dynamic_role_crud_api
+    depends_on  = [step.setup_plugin]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
+      vault_addr       = step.create_vault_cluster.api_addr_localhost
+      vault_root_token = step.create_vault_cluster.root_token
+      hosts            = step.create_vault_cluster_targets.hosts
+
+      plugin_mount_path                = var.plugin_mount_path
+      ldap_host                        = step.create_ldap_server.ldap_ip_address
+      ldap_port                        = step.create_ldap_server.ldap_port
+      ldap_base_dn                     = var.ldap_base_dn
+      dynamic_role_ldif_templates_path = var.dynamic_role_ldif_templates_path
+      ldap_dynamic_user_role_name      = var.ldap_dynamic_user_role_name
     }
   }
 

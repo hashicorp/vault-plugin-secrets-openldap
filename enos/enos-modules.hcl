@@ -65,6 +65,10 @@ module "create_vpc" {
   common_tags = var.tags
 }
 
+module "dynamic_role_crud_api" {
+  source = "./modules/dynamic_role_crud_api"
+}
+
 module "ec2_info" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/ec2_info?ref=${var.vault_repo_ref}"
 }

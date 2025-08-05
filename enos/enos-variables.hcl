@@ -68,6 +68,11 @@ variable "distro_version_ubuntu" {
   default     = "24.04" // or "20.04", "22.04"
 }
 
+variable "dynamic_role_ldif_templates_path" {
+  description = "LDIF templates path for dynamic role CRUD API tests"
+  default     = "/tmp"
+}
+
 variable "ldap_artifact_path" {
   description = "Path to CRT generated or local vault.zip bundle"
   type        = string
@@ -84,6 +89,12 @@ variable "ldap_bind_pass" {
   description = "LDAP bind password"
   type        = string
   default     = null
+}
+
+variable "ldap_dynamic_user_role_name" {
+  description = "The name of the LDAP dynamic user role to create"
+  type        = string
+  default     = "adam"
 }
 
 variable "ldap_plugin_version" {

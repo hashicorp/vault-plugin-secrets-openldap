@@ -119,6 +119,10 @@ teardown-env:
 static-role-test:
 	cd enos/modules/static_role_crud_api && ./scripts/static-role.sh
 
+.PHONY: dynamic-role-test
+dynamic-role-test:
+	cd enos/modules/dynamic_role_crud_api && ./scripts/dynamic-role.sh
+
 .PHONY: teardown-env
 teardown-env:
 	cd bootstrap && ./teardown-env.sh

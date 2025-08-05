@@ -59,6 +59,10 @@ globals {
       egress traffic via the internet gateway.
     EOF
 
+    dynamic_role_crud_api = <<-EOF
+      Tests the lifecycle of a dynamic role via the Vault CRUD API.
+    EOF
+
     ec2_info = <<-EOF
       Query various endpoints in AWS Ec2 to gather metadata we'll use later in our run when creating
       infrastructure for the Vault cluster. This metadata includes:

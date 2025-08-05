@@ -184,11 +184,11 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	}
 
 	if err != nil {
-		b.Logger().Error("unable to rotate credentials in rotate-role", "error", err)
+		b.Logger().Error("unable to rotate credentials in rotate-role on user request", "error", err)
 		return nil, fmt.Errorf("unable to finish rotating credentials; retries will "+
 			"continue in the background but it is also safe to retry manually: %w", err)
 	} else {
-		b.Logger().Info("successfully rotated credential in rotate-role", "item_key", item.Key)
+		b.Logger().Info("successfully rotated credential in rotate-role on user request", "item_key", item.Key)
 	}
 
 	// We're not returning creds here because we do not know if its been processed

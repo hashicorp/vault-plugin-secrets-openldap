@@ -81,3 +81,7 @@ tmp/
 
 scripts/custom.sh
 
+# enos
+/enos/.enos/*
+/enos/enos.vars.hcl
+

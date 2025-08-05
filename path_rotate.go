@@ -161,7 +161,6 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	}
 	resp, err := b.setStaticAccountPassword(ctx, req.Storage, input)
 	if err != nil {
-		b.Logger().Warn("unable to rotate credentials in rotate-role", "error", err)
 		// Update the priority to re-try this rotation and re-add the item to
 		// the queue
 		item.Priority = time.Now().Add(10 * time.Second).Unix()
@@ -185,8 +184,11 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	}
 
 	if err != nil {
+		b.Logger().Error("unable to rotate credentials in rotate-role", "error", err)
 		return nil, fmt.Errorf("unable to finish rotating credentials; retries will "+
 			"continue in the background but it is also safe to retry manually: %w", err)
+	} else {
+		b.Logger().Info("successfully rotated credential in rotate-role", "item_key", item.Key)
 	}
 
 	// We're not returning creds here because we do not know if its been processed

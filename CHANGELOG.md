@@ -1,5 +1,70 @@
 ## Unreleased
 
+FEATURES:
+* Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
+
+## v0.16.0
+### June 4, 2025
+
+IMPROVEMENTS:
+* Upgrade Go to 1.24.3
+* Updated dependencies:
+  * `github.com/go-ldap/ldap/v3` v3.4.10 -> v3.4.11
+  * `github.com/hashicorp/go-secure-stdlib/parseutil` v0.1.9 -> v0.2.0
+  * `github.com/hashicorp/vault/sdk` v0.15.2 -> v0.17.0
+  * `github.com/ory/dockertest/v3` v3.11.0 -> v3.12.0
+  * `golang.org/x/text v0.24.0` -> v0.25.0
+
+BUG FIXES:
+
+* Fix issue where roles created before 0.14.5 had a nil NextVaultRotation value: [GH-156](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/156)
+
+## v0.15.4
+
+### April 16, 2025
+
+BUG FIXES:
+
+* Fix issue where roles created before 0.14.5 had a nil NextVaultRotation value: [GH-158](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/158)
+
+## v0.15.2
+### March 27, 2025
+
+BUG FIXES:
+* Fix a panic when a performance standby node attempts to write/update config: [GH-154](https://github.com/vault-plugin-secrets-openldap/pull/154)
+
+## v0.15.1
+### February 26, 2025
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * `github.com/hashicorp/vault/sdk` v0.15.0 -> v0.15.2
+  * `golang.org/x/crypto` v0.33.0 -> v0.35.0
+  * `github.com/jose/go-jose` v4.0.4 -> v4.0.5
+
+## v0.15.0
+
+FEATURES:
+
+* (Enterprise feature) Add api fields to allow for scheduled rotation of root credentials. (https://github.com/vault-plugin-secrets-openldap/pull/141)
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * `github.com/go-ldap/ldap/v3` v3.4.8 -> v3.4.10
+  * `github.com/hashicorp/vault/api` v1.15.0 -> v1.16.0
+  * `github.com/ory/dockertest/v3` v3.10.0 -> v3.11.0
+  * `golang.org/x/text` v0.21.0 -> v0.22.0
+
+BUG FIXES:
+
+* Fix a bug where static role passwords are erroneously rotated across backend restarts when using skip import rotation. (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140)
+
+## v0.14.6
+
+BUG FIXES:
+
+* Fix issue where roles created before 0.14.5 had a nil NextVaultRotation value: [GH-159](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/159)
+
 ## v0.14.5
 
 BUG FIXES:

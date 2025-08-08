@@ -1,5 +1,8 @@
 ## Unreleased
 
+FEATURES:
+* Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
+
 ## v0.16.0
 ### June 4, 2025
 

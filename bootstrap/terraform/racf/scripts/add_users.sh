@@ -11,6 +11,9 @@ set -e
 [ "${USER_DN:?}" ]
 [ "${GROUP:?}" ]
 
+rm seed.ldif || true
+rm cleanup.ldif || true
+
 for i in $(seq 0 9); do
 
   USER="USER${i}"

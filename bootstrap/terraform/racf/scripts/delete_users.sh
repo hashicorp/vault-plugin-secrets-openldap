@@ -12,6 +12,6 @@ set -e
 ldapmodify -x -D "${BIND_DN}" -w "${BIND_PASSWORD}" \
   -H "${LDAP_URL}" -f ./cleanup.ldif
 
-rm seed.ldif
-rm cleanup.ldif
+rm seed.ldif || true
+rm cleanup.ldif || true
 

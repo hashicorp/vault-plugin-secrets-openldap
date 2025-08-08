@@ -61,7 +61,8 @@ resource "vault_password_policy" "racf_policy" {
 
 # Mount the RACF secret engine
 resource "vault_mount" "openldap_racf" {
-  path        = "racf"
+  path = "racf"
+  # change type to "ldap" if you are using the builtin plugin
   type        = "vault-plugin-secrets-openldap"
   description = "RACF LDAP secrets engine"
 }
@@ -85,7 +86,7 @@ resource "vault_generic_secret" "racf_config" {
 
 # Create 10 static roles: user0...user9
 resource "vault_ldap_secret_backend_static_role" "racf_static_roles" {
-  depends_on = [vault_generic_secret.racf_config]
+  depends_on = [vault_generic_secret.racf_config, null_resource.racf_create_static_users]
   mount      = vault_mount.openldap_racf.path
   count      = 10
 

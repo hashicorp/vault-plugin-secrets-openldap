@@ -64,7 +64,7 @@ func Test_UpdateDNPassword_AD_UserPrincipalName(t *testing.T) {
 	}
 
 	// depending on the schema, the password may be formatted, so we leverage this helper function
-	fields, err := client.GetSchemaFieldRegistry(config.Schema, newPassword)
+	fields, err := client.GetSchemaFieldRegistry(config, newPassword)
 	assert.NoError(t, err)
 	for k, v := range fields {
 		conn.ModifyRequestToExpect.Replace(k.String(), v)
@@ -108,7 +108,7 @@ func Test_UpdateDNPassword_AD_UserPrincipalName_Missing_upndomain(t *testing.T) 
 	}
 
 	// depending on the schema, the password may be formatted, so we leverage this helper function
-	fields, err := client.GetSchemaFieldRegistry(config.Schema, newPassword)
+	fields, err := client.GetSchemaFieldRegistry(config, newPassword)
 	assert.NoError(t, err)
 	for k, v := range fields {
 		conn.ModifyRequestToExpect.Replace(k.String(), v)
@@ -151,7 +151,7 @@ func Test_UpdateDNPassword_AD_DN(t *testing.T) {
 	}
 
 	// depending on the schema, the password may be formatted, so we leverage this helper function
-	fields, err := client.GetSchemaFieldRegistry(config.Schema, newPassword)
+	fields, err := client.GetSchemaFieldRegistry(config, newPassword)
 	assert.NoError(t, err)
 	for k, v := range fields {
 		conn.ModifyRequestToExpect.Replace(k.String(), v)

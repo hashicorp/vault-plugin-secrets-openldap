@@ -1,5 +1,32 @@
 ## Unreleased
 
+FEATURES:
+* Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
+
+## v0.16.0
+### June 4, 2025
+
+IMPROVEMENTS:
+* Upgrade Go to 1.24.3
+* Updated dependencies:
+  * `github.com/go-ldap/ldap/v3` v3.4.10 -> v3.4.11
+  * `github.com/hashicorp/go-secure-stdlib/parseutil` v0.1.9 -> v0.2.0
+  * `github.com/hashicorp/vault/sdk` v0.15.2 -> v0.17.0
+  * `github.com/ory/dockertest/v3` v3.11.0 -> v3.12.0
+  * `golang.org/x/text v0.24.0` -> v0.25.0
+
+BUG FIXES:
+
+* Fix issue where roles created before 0.14.5 had a nil NextVaultRotation value: [GH-156](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/156)
+
+## v0.15.4
+
+### April 16, 2025
+
+BUG FIXES:
+
+* Fix issue where roles created before 0.14.5 had a nil NextVaultRotation value: [GH-158](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/158)
+
 ## v0.15.2
 ### March 27, 2025
 

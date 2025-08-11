@@ -1,4 +1,5 @@
 ## Unreleased
+* Have rotations actions log success or failure
 
 ## v0.15.2
 ### March 27, 2025

@@ -25,9 +25,28 @@ resource "enos_bundle_install" "ldap" {
   }
 }
 
-# Step 2: Register the plugin
-resource "enos_remote_exec" "plugin_register" {
+# Step 2: Clean up the plugin directory and copy the plugin binary there
+resource "enos_remote_exec" "plugin_copy" {
   depends_on = [enos_bundle_install.ldap]
+  for_each   = var.hosts
+  scripts    = [abspath("${path.module}/scripts/plugin-copy.sh")]
+  environment = {
+    PLUGIN_BINARY_SRC = "/tmp/${var.plugin_name}"
+    PLUGIN_DIR_VAULT  = var.plugin_dir_vault
+    PLUGIN_NAME       = var.plugin_name
+    VAULT_ADDR        = var.vault_addr
+    VAULT_TOKEN       = var.vault_root_token
+  }
+  transport = {
+    ssh = {
+      host = each.value.public_ip
+    }
+  }
+}
+
+# Step 3: Register the plugin
+resource "enos_remote_exec" "plugin_register" {
+  depends_on = [enos_remote_exec.plugin_copy]
   scripts    = [abspath("${path.module}/scripts/plugin-register.sh")]
   environment = {
     PLUGIN_BINARY_SRC = "/tmp/${var.plugin_name}"
@@ -43,7 +62,7 @@ resource "enos_remote_exec" "plugin_register" {
   }
 }
 
-# Step 3: Enable the plugin
+# Step 4: Enable the plugin
 resource "enos_remote_exec" "plugin_enable" {
   depends_on = [enos_remote_exec.plugin_register]
   scripts    = [abspath("${path.module}/scripts/plugin-enable.sh")]

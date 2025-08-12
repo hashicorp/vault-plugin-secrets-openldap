@@ -260,7 +260,7 @@ scenario "openldap_restart" {
     description = global.description.wait_for_cluster_to_have_leader
     module      = module.vault_wait_for_leader
     depends_on = [step.create_vault_cluster,
-      step.bootstrap_vault_cluster_targets]
+    step.bootstrap_vault_cluster_targets]
 
     providers = {
       enos = local.enos_provider[matrix.distro]
@@ -537,6 +537,31 @@ scenario "openldap_restart" {
     }
   }
 
+  step "test_library_crud_api" {
+    description = global.description.library_crud_api
+    module      = module.library_crud_api
+    depends_on  = [
+      step.configure_plugin,
+      step.test_static_role_crud_api
+    ]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip       = step.get_vault_cluster_ips.leader_host.public_ip
+      vault_addr            = step.create_vault_cluster.api_addr_localhost
+      vault_root_token      = step.create_vault_cluster.root_token
+      plugin_mount_path     = var.plugin_mount_path
+      ldap_host             = step.create_ldap_server.ldap_ip_address
+      ldap_port             = step.create_ldap_server.ldap_port
+      ldap_base_dn          = var.ldap_base_dn
+      library_set_name      = var.library_set_name
+      service_account_names = var.service_account_names
+    }
+  }
+
   step "verify_log_secrets" {
     skip_step = !var.vault_enable_audit_devices || !var.verify_log_secrets
 
@@ -572,8 +597,10 @@ scenario "openldap_restart" {
     module      = module.restart_vault
     depends_on = [
       step.get_vault_cluster_ips,
+      step.test_static_role_crud_api,
       step.test_dynamic_role_crud_api,
-      step.verify_raft_auto_join_voter,
+      step.test_library_crud_api,
+      step.verify_raft_auto_join_voter
     ]
 
     providers = {
@@ -716,6 +743,31 @@ scenario "openldap_restart" {
       ldap_base_dn                     = var.ldap_base_dn
       dynamic_role_ldif_templates_path = var.dynamic_role_ldif_templates_path
       ldap_dynamic_user_role_name      = var.ldap_dynamic_user_role_name
+    }
+  }
+
+  step "test_library_crud_api_after_restart" {
+    description = global.description.library_crud_api
+    module      = module.library_crud_api
+    depends_on  = [
+      step.get_vault_cluster_ips_after_restart,
+      step.test_static_role_crud_api_after_restart
+    ]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip       = step.get_vault_cluster_ips_after_restart.leader_host.public_ip
+      vault_addr            = step.create_vault_cluster.api_addr_localhost
+      vault_root_token      = step.create_vault_cluster.root_token
+      plugin_mount_path     = var.plugin_mount_path
+      ldap_host             = step.create_ldap_server.ldap_ip_address
+      ldap_port             = step.create_ldap_server.ldap_port
+      ldap_base_dn          = var.ldap_base_dn
+      library_set_name      = var.library_set_name
+      service_account_names = var.service_account_names
     }
   }
 

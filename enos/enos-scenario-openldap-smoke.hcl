@@ -538,6 +538,31 @@ scenario "openldap_smoke" {
     }
   }
 
+  step "test_library_crud_api" {
+    description = global.description.library_crud_api
+    module      = module.library_crud_api
+    depends_on  = [
+      step.configure_plugin,
+      step.test_static_role_crud_api
+    ]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip       = step.get_vault_cluster_ips.leader_host.public_ip
+      vault_addr            = step.create_vault_cluster.api_addr_localhost
+      vault_root_token      = step.create_vault_cluster.root_token
+      plugin_mount_path     = var.plugin_mount_path
+      ldap_host             = step.create_ldap_server.ldap_ip_address
+      ldap_port             = step.create_ldap_server.ldap_port
+      ldap_base_dn          = var.ldap_base_dn
+      library_set_name      = var.library_set_name
+      service_account_names = var.service_account_names
+    }
+  }
+
   step "verify_log_secrets" {
     skip_step = !var.vault_enable_audit_devices || !var.verify_log_secrets
 
@@ -546,7 +571,8 @@ scenario "openldap_smoke" {
     depends_on = [
       step.verify_vault_unsealed,
       step.test_static_role_crud_api,
-      step.test_dynamic_role_crud_api
+      step.test_dynamic_role_crud_api,
+      test_library_crud_api
     ]
 
     providers = {

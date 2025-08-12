@@ -92,6 +92,11 @@ globals {
       Must have the 'edition' variant to be set to any Enterprise edition.
     EOF
 
+    restart_all_vault_nodes = <<-EOF
+      Restart all Vault nodes in the cluster. This is useful for testing the Vault cluster's
+      resilience to node restarts and ensuring that the cluster can recover and maintain its state.
+    EOF
+
     static_role_crud_api = <<-EOF
       Tests the lifecycle of a static role via the Vault CRUD API.
     EOF
@@ -100,6 +105,10 @@ globals {
       Build, register, and enable the Vault plugin.
     EOF
 
+    unseal_vault = <<-EOF
+        Unseal the Vault cluster using the configured seal mechanism.
+EOF
+
     verify_log_secrets = <<-EOF
       Verify that the vault audit log and systemd journal do not leak secret values.
     EOF
@@ -107,6 +116,10 @@ globals {
     verify_raft_cluster_all_nodes_are_voters = <<-EOF
       When configured with a 'backend:raft' variant, verify that all nodes in the cluster are
       healthy and are voters.
+    EOF
+
+    verify_vault_sealed = <<-EOF
+      Verify that the Vault cluster has successfully sealed.
     EOF
 
     verify_vault_unsealed = <<-EOF

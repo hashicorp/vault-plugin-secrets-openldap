@@ -1,15 +1,13 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-scenario "openldap" {
+scenario "openldap_restart" {
   description = <<-EOF
-    The scenario deploys a Vault cluster and a test OpenLDAP server to act as the LDAP backend for integration.
-    It enables and configures the OpenLDAP secrets engine plugin in Vault, connecting it to the deployed LDAP server, then
-    performs plugin configuration and usage tests to verify correct integration and expected functionality of the secrets engine.
+    The scenario verifies that the Vault OpenLDAP secrets engine plugin works correctly after a restart of the Vault cluster.
 
-    This scenario validates that the Vault OpenLDAP secrets engine plugin works as expected after a fresh installation,
-    covering plugin setup, configuration, and end-to-end workflow testing.
-    //TODO: add testing for static and dynamic roles
+    This scenario creates a Vault cluster with the OpenLDAP secrets engine plugin installed and configured, and starts an OpenLDAP server.
+    It then tests the plugin by creating static and dynamic roles, verifying that they can be created, read, updated, and deleted via the Vault API.
+    After that, it restarts all Vault nodes and verifies that the plugin still works correctly after the restart.
 
     # How to run this scenario
 
@@ -262,7 +260,7 @@ scenario "openldap" {
     description = global.description.wait_for_cluster_to_have_leader
     module      = module.vault_wait_for_leader
     depends_on = [step.create_vault_cluster,
-    step.bootstrap_vault_cluster_targets]
+      step.bootstrap_vault_cluster_targets]
 
     providers = {
       enos = local.enos_provider[matrix.distro]
@@ -283,7 +281,7 @@ scenario "openldap" {
     }
   }
 
-  step "get_leader_ip" {
+  step "get_vault_cluster_ips" {
     description = global.description.get_vault_cluster_ip_addresses
     module      = module.vault_get_cluster_ips
     depends_on  = [step.wait_for_new_leader]
@@ -359,6 +357,30 @@ scenario "openldap" {
     }
   }
 
+  step "verify_raft_auto_join_voter" {
+    description = global.description.verify_raft_cluster_all_nodes_are_voters
+    skip_step   = matrix.backend != "raft"
+    module      = module.vault_verify_raft_auto_join_voter
+    depends_on = [
+      step.verify_vault_unsealed,
+      step.get_vault_cluster_ips
+    ]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    verifies = quality.vault_raft_voters
+
+    variables {
+      hosts             = step.create_vault_cluster_targets.hosts
+      ip_version        = matrix.ip_version
+      vault_addr        = step.create_vault_cluster.api_addr_localhost
+      vault_install_dir = global.vault_install_dir[matrix.artifact_type]
+      vault_root_token  = step.create_vault_cluster.root_token
+    }
+  }
+
   step "build_ldap" {
     description = global.description.build_ldap
     module      = "build_ldap_${matrix.ldap_artifact_source}"
@@ -417,7 +439,7 @@ scenario "openldap" {
     description = global.description.setup_plugin
     module      = module.setup_plugin
     depends_on = [
-      step.get_leader_ip,
+      step.get_vault_cluster_ips,
       step.create_ldap_server,
       step.verify_vault_unsealed,
       step.build_ldap
@@ -434,7 +456,7 @@ scenario "openldap" {
       local_artifact_path = matrix.ldap_artifact_source == "local" ? local.ldap_artifact_path : null
 
 
-      vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
+      vault_leader_ip  = step.get_vault_cluster_ips.leader_host.public_ip
       vault_addr       = step.create_vault_cluster.api_addr_localhost
       vault_root_token = step.create_vault_cluster.root_token
 
@@ -454,7 +476,7 @@ scenario "openldap" {
     }
 
     variables {
-      vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
+      vault_leader_ip  = step.get_vault_cluster_ips.leader_host.public_ip
       vault_addr       = step.create_vault_cluster.api_addr_localhost
       vault_root_token = step.create_vault_cluster.root_token
 
@@ -477,7 +499,7 @@ scenario "openldap" {
     }
 
     variables {
-      vault_leader_ip        = step.get_leader_ip.leader_host.public_ip
+      vault_leader_ip        = step.get_vault_cluster_ips.leader_host.public_ip
       vault_addr             = step.create_vault_cluster.api_addr_localhost
       vault_root_token       = step.create_vault_cluster.root_token
       plugin_mount_path      = var.plugin_mount_path
@@ -494,14 +516,14 @@ scenario "openldap" {
   step "test_dynamic_role_crud_api" {
     description = global.description.dynamic_role_crud_api
     module      = module.dynamic_role_crud_api
-    depends_on  = [step.setup_plugin]
+    depends_on  = [step.configure_plugin]
 
     providers = {
       enos = local.enos_provider[matrix.distro]
     }
 
     variables {
-      vault_leader_ip  = step.get_leader_ip.leader_host.public_ip
+      vault_leader_ip  = step.get_vault_cluster_ips.leader_host.public_ip
       vault_addr       = step.create_vault_cluster.api_addr_localhost
       vault_root_token = step.create_vault_cluster.root_token
       hosts            = step.create_vault_cluster_targets.hosts
@@ -515,36 +537,15 @@ scenario "openldap" {
     }
   }
 
-
-  step "verify_raft_auto_join_voter" {
-    description = global.description.verify_raft_cluster_all_nodes_are_voters
-    skip_step   = matrix.backend != "raft"
-    module      = module.vault_verify_raft_auto_join_voter
-    depends_on  = [step.verify_vault_unsealed]
-
-    providers = {
-      enos = local.enos_provider[matrix.distro]
-    }
-
-    verifies = quality.vault_raft_voters
-
-    variables {
-      hosts             = step.create_vault_cluster_targets.hosts
-      ip_version        = matrix.ip_version
-      vault_addr        = step.create_vault_cluster.api_addr_localhost
-      vault_install_dir = global.vault_install_dir[matrix.artifact_type]
-      vault_root_token  = step.create_vault_cluster.root_token
-    }
-  }
-
-
   step "verify_log_secrets" {
     skip_step = !var.vault_enable_audit_devices || !var.verify_log_secrets
 
     description = global.description.verify_log_secrets
     module      = module.verify_log_secrets
     depends_on = [
-      step.verify_secrets_engines_read,
+      step.verify_vault_unsealed,
+      step.test_static_role_crud_api,
+      step.test_dynamic_role_crud_api
     ]
 
     providers = {
@@ -563,6 +564,158 @@ scenario "openldap" {
       leader_host         = step.get_vault_cluster_ips.leader_host
       vault_addr          = step.create_vault_cluster.api_addr_localhost
       vault_root_token    = step.create_vault_cluster.root_token
+    }
+  }
+
+  step "restart_all_vault_nodes" {
+    description = global.description.restart_all_vault_nodes
+    module      = module.restart_vault
+    depends_on = [
+      step.get_vault_cluster_ips,
+      step.test_dynamic_role_crud_api,
+      step.verify_raft_auto_join_voter,
+    ]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      hosts             = step.create_vault_cluster_targets.hosts
+      vault_addr        = step.create_vault_cluster.api_addr_localhost
+      vault_install_dir = global.vault_install_dir[matrix.artifact_type]
+    }
+  }
+
+  step "verify_vault_sealed_after_restart" {
+    description = global.description.verify_vault_sealed
+    module      = module.vault_wait_for_cluster_sealed
+    depends_on = [
+      step.restart_all_vault_nodes
+    ]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      hosts             = step.create_vault_cluster_targets.hosts
+      vault_addr        = step.create_vault_cluster.api_addr_localhost
+      vault_install_dir = global.vault_install_dir[matrix.artifact_type]
+    }
+  }
+
+  step "unseal_vault" {
+    description = global.description.unseal_vault
+    module      = module.vault_unseal_replication_followers
+    depends_on  = [step.verify_vault_sealed_after_restart]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      hosts             = step.create_vault_cluster_targets.hosts
+      vault_addr        = step.create_vault_cluster.api_addr_localhost
+      vault_install_dir = global.vault_install_dir[matrix.artifact_type]
+      vault_seal_type   = matrix.seal
+      vault_unseal_keys = step.create_vault_cluster.unseal_keys_hex
+    }
+  }
+
+  step "verify_vault_unsealed_after_restart" {
+    description = global.description.verify_vault_unsealed
+    module      = module.vault_wait_for_cluster_unsealed
+    depends_on  = [step.unseal_vault]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    verifies = [
+      quality.vault_seal_awskms,
+      quality.vault_seal_pkcs11,
+      quality.vault_seal_shamir,
+    ]
+
+    variables {
+      hosts             = step.create_vault_cluster_targets.hosts
+      vault_addr        = step.create_vault_cluster.api_addr_localhost
+      vault_install_dir = global.vault_install_dir[matrix.artifact_type]
+    }
+  }
+
+  step "get_vault_cluster_ips_after_restart" {
+    description = global.description.get_vault_cluster_ip_addresses
+    module      = module.vault_get_cluster_ips
+    depends_on  = [step.verify_vault_unsealed_after_restart]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    verifies = [
+      quality.vault_api_sys_ha_status_read,
+      quality.vault_api_sys_leader_read,
+      quality.vault_cli_operator_members,
+    ]
+
+    variables {
+      hosts             = step.create_vault_cluster_targets.hosts
+      ip_version        = matrix.ip_version
+      vault_addr        = step.create_vault_cluster.api_addr_localhost
+      vault_install_dir = global.vault_install_dir[matrix.artifact_type]
+      vault_root_token  = step.create_vault_cluster.root_token
+    }
+  }
+
+  step "test_static_role_crud_api_after_restart" {
+    description = global.description.static_role_crud_api
+    module      = module.static_role_crud_api
+    depends_on  = [step.get_vault_cluster_ips_after_restart]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip        = step.get_vault_cluster_ips_after_restart.leader_host.public_ip
+      vault_addr             = step.create_vault_cluster.api_addr_localhost
+      vault_root_token       = step.create_vault_cluster.root_token
+      plugin_mount_path      = var.plugin_mount_path
+      ldap_host              = step.create_ldap_server.ldap_ip_address
+      ldap_port              = step.create_ldap_server.ldap_port
+      ldap_base_dn           = var.ldap_base_dn
+      ldap_bind_pass         = var.ldap_bind_pass
+      ldap_user_role_name    = var.ldap_user_role_name
+      ldap_username          = var.ldap_username
+      ldap_user_old_password = var.ldap_user_old_password
+    }
+  }
+
+  step "test_dynamic_role_crud_api_after_restart" {
+    description = global.description.dynamic_role_crud_api
+    module      = module.dynamic_role_crud_api
+    depends_on = [
+      step.get_vault_cluster_ips_after_restart
+    ]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip  = step.get_vault_cluster_ips_after_restart.leader_host.public_ip
+      vault_addr       = step.create_vault_cluster.api_addr_localhost
+      vault_root_token = step.create_vault_cluster.root_token
+      hosts            = step.create_vault_cluster_targets.hosts
+
+      plugin_mount_path                = var.plugin_mount_path
+      ldap_host                        = step.create_ldap_server.ldap_ip_address
+      ldap_port                        = step.create_ldap_server.ldap_port
+      ldap_base_dn                     = var.ldap_base_dn
+      dynamic_role_ldif_templates_path = var.dynamic_role_ldif_templates_path
+      ldap_dynamic_user_role_name      = var.ldap_dynamic_user_role_name
     }
   }
 

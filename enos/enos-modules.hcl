@@ -111,6 +111,10 @@ module "seal_pkcs11" {
   common_tags         = var.tags
 }
 
+module "seal_vault" {
+  source = "./modules/seal_vault"
+}
+
 // Register, and enable the Vault plugin
 module "setup_plugin" {
   source = "./modules/setup_plugin"
@@ -155,10 +159,28 @@ module "vault_get_cluster_ips" {
   vault_install_dir = var.vault_install_dir
 }
 
+module "vault_unseal_replication_followers" {
+  source = "git::https://github.com/hashicorp/vault.git//enos/modules/vault_unseal_replication_followers?ref=${var.vault_repo_ref}"
+
+  vault_install_dir = var.vault_install_dir
+}
+
+module "vault_wait_for_cluster_sealed" {
+  source = "./modules/vault_wait_for_cluster_sealed"
+
+  vault_install_dir = var.vault_install_dir
+}
+
 module "vault_wait_for_cluster_unsealed" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/vault_wait_for_cluster_unsealed?ref=${var.vault_repo_ref}"
 
   vault_install_dir = var.vault_install_dir
+}
+
+module "verify_log_secrets" {
+  source = "git::https://github.com/hashicorp/vault.git//enos/modules/verify_log_secrets?ref=${var.vault_repo_ref}"
+
+  radar_license_path = var.vault_radar_license_path != null ? abspath(var.vault_radar_license_path) : null
 }
 
 module "vault_verify_raft_auto_join_voter" {

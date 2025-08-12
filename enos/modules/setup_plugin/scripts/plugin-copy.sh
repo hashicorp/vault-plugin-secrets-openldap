@@ -22,20 +22,21 @@ fail() {
 
 echo "[register] Registering plugin: $PLUGIN_NAME"
 
-# Calculate shasum
-SHASUM="$(shasum -a 256 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}" | awk '{print $1}')"
-if [[ -z "$SHASUM" ]]; then
-  echo "[register] error: shasum not set"
-  exit 1
+# Determine plugin binary source path (handle directories)
+if [[ -d "$PLUGIN_BINARY_SRC" ]]; then
+  BINARY_PATH="$PLUGIN_BINARY_SRC/$PLUGIN_NAME"
+else
+  BINARY_PATH="$PLUGIN_BINARY_SRC"
 fi
-echo "[register] Plugin SHA256: $SHASUM"
 
-# Deregister any previous registration of this plugin
-vault plugin deregister secret "${PLUGIN_NAME}" || true
+# Ensure the Vault plugin directory exists
+mkdir -p "${PLUGIN_DIR_VAULT}"
 
-# Register plugin with Vault
-vault plugin register \
-  -sha256="${SHASUM}" \
-  secret "${PLUGIN_NAME}"
+# Clean up any previous plugin binary
+sudo rm -f "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}" || true
 
-echo "[register] Plugin $PLUGIN_NAME registered successfully."
+# Copy the binary to Vault's plugin directory
+sudo cp "${BINARY_PATH}" "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"
+
+# Set permissions to ensure Vault can execute the plugin binary
+sudo chmod 755 "${PLUGIN_DIR_VAULT}/${PLUGIN_NAME}"

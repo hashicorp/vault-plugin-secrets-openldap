@@ -55,10 +55,11 @@ resource "enos_remote_exec" "create_plugin_directory" {
 
 # Add plugin directory to the config file
 resource "enos_remote_exec" "add_plugin_directory_to_config" {
+  depends_on = [enos_remote_exec.create_plugin_directory]
   for_each = var.hosts
 
   inline = [
-    "echo 'plugin_directory = \"/etc/vault/plugins\"' | sudo tee -a /etc/vault.d/vault.hcl"
+    "echo \"plugin_directory = \\\"${var.plugin_dir_vault}\\\"\" | sudo tee -a /etc/vault.d/vault.hcl"
   ]
 
   transport = {
@@ -70,6 +71,8 @@ resource "enos_remote_exec" "add_plugin_directory_to_config" {
 
 # Restart Vault service on all hosts
 resource "enos_remote_exec" "restart_vault" {
+  depends_on = [enos_remote_exec.add_plugin_directory_to_config]
+
   for_each = var.hosts
 
   inline = [
@@ -85,9 +88,9 @@ resource "enos_remote_exec" "restart_vault" {
 
 # Unseal Vault
 resource "enos_remote_exec" "unseal_vault" {
-  for_each = var.hosts
-
   depends_on = [enos_remote_exec.restart_vault]
+
+  for_each = var.hosts
 
   scripts = [abspath("${path.module}/scripts/vault-unseal.sh")]
 

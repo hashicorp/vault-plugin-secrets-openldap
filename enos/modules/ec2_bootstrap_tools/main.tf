@@ -56,7 +56,7 @@ resource "enos_remote_exec" "create_plugin_directory" {
 # Add plugin directory to the config file
 resource "enos_remote_exec" "add_plugin_directory_to_config" {
   depends_on = [enos_remote_exec.create_plugin_directory]
-  for_each = var.hosts
+  for_each   = var.hosts
 
   inline = [
     "echo \"plugin_directory = \\\"${var.plugin_dir_vault}\\\"\" | sudo tee -a /etc/vault.d/vault.hcl"

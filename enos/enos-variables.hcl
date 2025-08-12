@@ -139,6 +139,12 @@ variable "ldap_user_role_name" {
   default     = "mary"
 }
 
+variable "library_set_name" {
+  description = "The name of the library set to use for library CRUD API tests"
+  type        = string
+  default     = "dev-team"
+}
+
 variable "makefile_dir" {
   description = "Directory containing the Makefile for plugin build"
   type        = string
@@ -179,6 +185,12 @@ variable "project_name" {
   description = "The description of the project"
   type        = string
   default     = "vault-plugin-secrets-openldap-enos-integration"
+}
+
+variable "service_account_names" {
+  description = "List of service account names to create for library CRUD API tests"
+  type        = list(string)
+  default     = ["staticuser", "bob.johnson", "mary.smith"]
 }
 
 variable "tags" {

@@ -13,6 +13,7 @@ import (
 )
 
 func TestCheckOutHandlerStorageLayer(t *testing.T) {
+	t.FailNow()
 	ctx := context.Background()
 	b, s := getBackend(false)
 	defer b.Cleanup(ctx)

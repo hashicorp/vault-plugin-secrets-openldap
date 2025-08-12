@@ -540,7 +540,7 @@ scenario "openldap_restart" {
   step "test_library_crud_api" {
     description = global.description.library_crud_api
     module      = module.library_crud_api
-    depends_on  = [
+    depends_on = [
       step.configure_plugin,
       step.test_static_role_crud_api
     ]
@@ -749,7 +749,7 @@ scenario "openldap_restart" {
   step "test_library_crud_api_after_restart" {
     description = global.description.library_crud_api
     module      = module.library_crud_api
-    depends_on  = [
+    depends_on = [
       step.get_vault_cluster_ips_after_restart,
       step.test_static_role_crud_api_after_restart
     ]

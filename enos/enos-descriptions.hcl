@@ -86,6 +86,10 @@ globals {
       and follower nodes.
     EOF
 
+    library_crud_api = <<-EOF
+      Tests the lifecycle of a dynamic role via the Vault CRUD API.
+    EOF
+
     read_vault_license = <<-EOF
       When deploying Vault Enterprise, ensure a Vault Enterprise license is present on disk and
       read its contents so that we can utilize it when configuring the Vault Enterprise cluster.

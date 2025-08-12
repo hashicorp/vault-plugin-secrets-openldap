@@ -572,7 +572,7 @@ scenario "openldap_smoke" {
       step.verify_vault_unsealed,
       step.test_static_role_crud_api,
       step.test_dynamic_role_crud_api,
-      test_library_crud_api
+      step.test_library_crud_api
     ]
 
     providers = {

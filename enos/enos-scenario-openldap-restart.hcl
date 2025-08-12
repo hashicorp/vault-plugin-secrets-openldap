@@ -771,7 +771,6 @@ scenario "openldap_restart" {
     }
   }
 
-
   output "audit_device_file_path" {
     description = "The file path for the file audit device, if enabled"
     value       = step.create_vault_cluster.audit_device_file_path

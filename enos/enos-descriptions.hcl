@@ -111,7 +111,12 @@ globals {
 
     unseal_vault = <<-EOF
         Unseal the Vault cluster using the configured seal mechanism.
-EOF
+    EOF
+
+    vault_leader_step_down = <<-EOF
+      Force the Vault cluster leader to step down which forces the Vault cluster to perform a leader
+      election.
+    EOF
 
     verify_log_secrets = <<-EOF
       Verify that the vault audit log and systemd journal do not leak secret values.

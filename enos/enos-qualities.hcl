@@ -41,6 +41,13 @@ quality "vault_api_sys_seal_status_api_read_matches_sys_health" {
   EOF
 }
 
+quality "vault_api_sys_step_down_steps_down" {
+  description = <<-EOF
+    The v1/sys/step-down Vault API forces the cluster leader to step down and intiates a new leader
+    election
+  EOF
+}
+
 quality "vault_api_sys_storage_raft_autopilot_configuration_read" {
   description = <<-EOF
     The /sys/storage/raft/autopilot/configuration Vault API returns the autopilot configuration of
@@ -110,6 +117,10 @@ quality "vault_autojoin_aws" {
 
 quality "vault_cli_operator_members" {
   description = "The 'vault operator members' command returns the expected list of members"
+}
+
+quality "vault_cli_operator_step_down" {
+  description = "The 'vault operator step-down' command forces the cluster leader to step down"
 }
 
 quality "vault_cli_status_exit_code" {

@@ -163,6 +163,12 @@ module "vault_get_cluster_ips" {
   vault_install_dir = var.vault_install_dir
 }
 
+module "vault_step_down" {
+  source = "git::https://github.com/hashicorp/vault.git//enos/modules/vault_step_down?ref=${var.vault_repo_ref}"
+
+  vault_install_dir = var.vault_install_dir
+}
+
 module "vault_unseal_replication_followers" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/vault_unseal_replication_followers?ref=${var.vault_repo_ref}"
 

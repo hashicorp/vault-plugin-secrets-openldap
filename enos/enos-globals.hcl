@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 globals {
-  archs                 = ["amd64", "arm64"]
-  artifact_sources      = ["local", "crt", "artifactory"]
-  ldap_artifact_sources = ["local", "releases", "artifactory"]
-  artifact_types        = ["bundle", "package"]
-  backends              = ["raft"]
-  backend_tag_key       = "VaultStorage"
+  archs                             = ["amd64", "arm64"]
+  artifact_sources                  = ["local", "crt", "artifactory"]
+  ldap_artifact_sources             = ["local", "releases", "artifactory"]
+  ldap_config_root_rotation_methods = ["period", "schedule", "manual"]
+  artifact_types                    = ["bundle", "package"]
+  backends                          = ["raft"]
+  backend_tag_key                   = "VaultStorage"
   build_tags = {
     "ce"               = ["ui"]
     "ent"              = ["ui", "enterprise", "ent"]

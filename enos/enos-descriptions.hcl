@@ -109,6 +109,10 @@ globals {
       Build, register, and enable the Vault plugin.
     EOF
 
+    ldap_config_root_rotation = <<-EOF
+      Test the LDAP secrets engine's config endpoint root rotation functionality.
+    EOF
+
     unseal_vault = <<-EOF
         Unseal the Vault cluster using the configured seal mechanism.
     EOF

@@ -33,10 +33,6 @@ if [[ ${#SA_LIST[@]} -lt 1 ]]; then
   fail "SERVICE_ACCOUNT_NAMES must contain at least one account"
 fi
 
-# Rotate root credentials
-echo "==> Rotating root credentials"
-vault write -f "${PLUGIN_PATH}/rotate-root"
-
 # Create library set
 echo "==> Creating library set ${LIBRARY_SET_NAME}"
 vault write "${LIB_PATH}" \

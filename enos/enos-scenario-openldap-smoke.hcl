@@ -172,6 +172,7 @@ scenario "openldap_smoke" {
       common_tags     = global.tags
       seal_key_names  = step.create_seal_key.resource_names
       vpc_id          = step.create_vpc.id
+      instance_count  = 1
     }
   }
 

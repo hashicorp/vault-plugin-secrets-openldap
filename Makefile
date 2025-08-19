@@ -23,12 +23,14 @@ LDIF_PATH ?= $(PWD)/bootstrap/ldif/seed.ldif
 #configure ldap plugin
 MAKEFILE_DIR ?= $(PWD)
 PLUGIN_SOURCE_TYPE ?= local_build
-PLUGIN_DIR_VAULT ?= /etc/vault/plugins
+PLUGIN_DIR_VAULT ?= /private/etc/vault/plugins #/etc/vault/plugins
 LDAP_URL ?= ldap://127.0.0.1:389
 LDAP_BIND_DN ?= cn=admin,dc=example,dc=com
 LDAP_BIND_PASS ?= adminpassword
 LDAP_USER_DN ?= ou=users,dc=example,dc=com
 LDAP_SCHEMA ?= openldap
+
+ROTATION_PERIOD ?= 10
 
 export LDAP_DOMAIN
 export LDAP_ORG
@@ -47,6 +49,8 @@ export LDAP_BIND_PASS
 export LDAP_USER_DN
 export LDAP_SCHEMA
 export LDIF_PATH
+
+export ROTATION_PERIOD
 
 .PHONY: default
 default: dev

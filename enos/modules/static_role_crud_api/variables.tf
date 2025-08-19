@@ -53,3 +53,8 @@ variable "vault_root_token" {
   type        = string
   description = "The Vault cluster root token"
 }
+
+variable "restart" {
+  type        = bool
+  default     = true
+}

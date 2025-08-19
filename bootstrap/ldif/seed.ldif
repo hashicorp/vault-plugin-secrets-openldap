@@ -39,3 +39,11 @@ sn: mary.smith
 uid: mary.smith
 memberOf: cn=dev,ou=groups,dc=example,dc=com
 userPassword: defaultpassword
+
+dn: uid=restartuser,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: restartuser
+sn: restartuser
+uid: restartuser
+memberOf: cn=dev,ou=groups,dc=example,dc=com
+userPassword: defaultpassword

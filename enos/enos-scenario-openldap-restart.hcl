@@ -510,6 +510,8 @@ scenario "openldap_restart" {
       ldap_user_role_name    = var.ldap_user_role_name
       ldap_username          = var.ldap_username
       ldap_user_old_password = var.ldap_user_old_password
+
+      restart = false
     }
   }
 
@@ -534,6 +536,8 @@ scenario "openldap_restart" {
       ldap_base_dn                     = var.ldap_base_dn
       dynamic_role_ldif_templates_path = var.dynamic_role_ldif_templates_path
       ldap_dynamic_user_role_name      = var.ldap_dynamic_user_role_name
+
+      restart = false
     }
   }
 
@@ -717,6 +721,8 @@ scenario "openldap_restart" {
       ldap_user_role_name    = var.ldap_user_role_name
       ldap_username          = var.ldap_username
       ldap_user_old_password = var.ldap_user_old_password
+
+      restart= true
     }
   }
 
@@ -743,6 +749,8 @@ scenario "openldap_restart" {
       ldap_base_dn                     = var.ldap_base_dn
       dynamic_role_ldif_templates_path = var.dynamic_role_ldif_templates_path
       ldap_dynamic_user_role_name      = var.ldap_dynamic_user_role_name
+
+      restart= true
     }
   }
 

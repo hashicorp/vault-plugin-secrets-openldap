@@ -30,3 +30,9 @@ variable "threshold" {
   description = "Number of unseal keys required to unseal Vault"
   type        = number
 }
+
+variable "log_file_path" {
+  description = "Path to the log file on remote machines"
+  type        = string
+  default     = "/var/log/my-plugin.log"
+}

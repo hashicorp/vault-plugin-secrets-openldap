@@ -55,6 +55,7 @@ resource "enos_remote_exec" "dynamic_role_crud_api_test" {
     ROLE_NAME        = var.ldap_dynamic_user_role_name
     LDAP_USER_DN_TPL = local.ldap_user_dn_tpl
     LDIF_PATH        = var.dynamic_role_ldif_templates_path
+    RESTART          = var.restart
   }
 
   transport = {

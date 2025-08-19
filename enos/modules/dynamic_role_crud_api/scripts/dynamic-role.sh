@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+source /opt/logging.sh
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 set -e
@@ -98,3 +99,24 @@ else
 fi
 
 echo "==> Dynamic role CRUD and credential lifecycle test: SUCCESS"
+
+# Verify Vault state persistence across restart based on RESTART env var
+ROLE_PATH_RESTART="${PLUGIN_PATH}/role/hamza"
+if [[ -z "$RESTART" ]]; then
+  echo "RESTART env variable has not been set; skipping restart test"
+elif [[ "$RESTART" == "false" ]]; then
+  echo "==> RESTART=false; creating dynamic role again"
+  vault write "${ROLE_PATH_RESTART}" \
+      creation_ldif=@"${LDIF_PATH}/creation.ldif" \
+      deletion_ldif=@"${LDIF_PATH}/deletion.ldif" \
+      rollback_ldif=@"${LDIF_PATH}/rollback.ldif" \
+      default_ttl="2m" \
+      max_ttl="10m"
+  echo "==> Reading dynamic role after recreate"
+  vault read "${ROLE_PATH_RESTART}"
+elif [[ "$RESTART" == "true" ]]; then
+  echo "==> RESTART=true; reading existing dynamic role"
+  vault read "${ROLE_PATH_RESTART}"
+else
+  fail "Invalid value for RESTART: $RESTART"
+fi

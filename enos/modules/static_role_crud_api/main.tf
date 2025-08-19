@@ -30,6 +30,7 @@ resource "enos_remote_exec" "static_role_crud_api_test" {
     ROLE_NAME         = var.ldap_user_role_name
     LDAP_BIND_DN      = local.admin_dn
     LDAP_BIND_PASS    = var.ldap_bind_pass
+    RESTART           = var.restart
   }
 
   transport = {

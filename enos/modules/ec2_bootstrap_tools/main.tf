@@ -106,3 +106,34 @@ resource "enos_remote_exec" "unseal_vault" {
     }
   }
 }
+
+# Upload the common logging helper script
+resource "enos_file" "logging_script" {
+  for_each = var.hosts
+
+  source      = abspath("${path.module}/scripts/logging.sh")
+  destination = "/opt/logging.sh"
+
+  transport = {
+    ssh = {
+      host = each.value.public_ip
+    }
+  }
+}
+
+# # Configure persistent logging environment on remote machines
+# resource "enos_remote_exec" "configure_logging_env" {
+#   depends_on = [enos_file.logging_script]
+#   for_each   = var.hosts
+#
+#   inline = [
+#     "sudo bash -c 'echo export LOG_FILE=\"${var.log_file_path}\" > /etc/profile.d/logging_env.sh'",
+#     "sudo bash -c 'echo export BASH_ENV=/opt/logging.sh >> /etc/profile.d/logging_env.sh'"
+#   ]
+#
+#   transport = {
+#     ssh = {
+#       host = each.value.public_ip
+#     }
+#   }
+# }

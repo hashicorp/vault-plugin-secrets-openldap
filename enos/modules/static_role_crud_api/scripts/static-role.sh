@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+source /opt/logging.sh
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 set -e
@@ -108,4 +109,23 @@ if vault read "${ROLE_PATH}"; then
   exit 1
 else
   echo "[OK] Static role deleted successfully."
+fi
+
+# Verify Vault state persistence across restart based on RESTART env var
+ROLE_PATH_AFTER_RESTART="${PLUGIN_PATH}/static-role/restartuser"
+if [[ -z "$RESTART" ]]; then
+  echo "RESTART env variable has not been set; skipping restart test"
+elif [[ "$RESTART" == "false" ]]; then
+  echo "==> RESTART=false; creating static role again"
+  vault write "${ROLE_PATH_AFTER_RESTART}" \
+      dn="${LDAP_DN}" \
+      username="restartuser" \
+      rotation_period="5m"
+  echo "==> Reading static role after recreate"
+  vault read "${ROLE_PATH_AFTER_RESTART}"
+elif [[ "$RESTART" == "true" ]]; then
+  echo "==> RESTART=true; reading existing static role"
+  vault read "${ROLE_PATH_AFTER_RESTART}"
+else
+  fail "Invalid value for RESTART: $RESTART"
 fi

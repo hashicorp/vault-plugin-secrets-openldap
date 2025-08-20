@@ -29,9 +29,6 @@ fail() {
 export VAULT_ADDR
 export VAULT_TOKEN
 
-echo "==> Rotating root credentials"
-vault write -f "${PLUGIN_PATH}/rotate-root"
-
 ROLE_PATH="${PLUGIN_PATH}/role/${ROLE_NAME}"
 
 echo "==> Creating dynamic role: ${ROLE_NAME}"

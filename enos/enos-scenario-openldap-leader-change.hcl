@@ -260,7 +260,7 @@ scenario "openldap_leader_change" {
     description = global.description.wait_for_cluster_to_have_leader
     module      = module.vault_wait_for_leader
     depends_on = [step.create_vault_cluster,
-      step.bootstrap_vault_cluster_targets]
+    step.bootstrap_vault_cluster_targets]
 
     providers = {
       enos = local.enos_provider[matrix.distro]
@@ -597,7 +597,7 @@ scenario "openldap_leader_change" {
   step "vault_leader_step_down" {
     description = global.description.vault_leader_step_down
     module      = module.vault_step_down
-    depends_on  = [
+    depends_on = [
       step.get_vault_cluster_ips,
       step.test_static_role_crud_api,
       step.test_dynamic_role_crud_api,

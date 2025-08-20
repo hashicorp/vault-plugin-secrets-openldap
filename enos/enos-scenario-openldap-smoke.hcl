@@ -37,16 +37,17 @@ scenario "openldap_smoke" {
   EOF
 
   matrix {
-    arch                 = global.archs
-    artifact_source      = global.artifact_sources
-    ldap_artifact_source = global.ldap_artifact_sources
-    artifact_type        = global.artifact_types
-    backend              = global.backends
-    config_mode          = global.config_modes
-    distro               = global.distros
-    edition              = global.editions
-    ip_version           = global.ip_versions
-    seal                 = global.seals
+    arch                             = global.archs
+    artifact_source                  = global.artifact_sources
+    ldap_artifact_source             = global.ldap_artifact_sources
+    artifact_type                    = global.artifact_types
+    backend                          = global.backends
+    config_mode                      = global.config_modes
+    distro                           = global.distros
+    edition                          = global.editions
+    ip_version                       = global.ip_versions
+    seal                             = global.seals
+    ldap_config_root_rotation_method = global.ldap_config_root_rotation_methods
 
     // Our local builder always creates bundles
     exclude {
@@ -65,6 +66,12 @@ scenario "openldap_smoke" {
     exclude {
       seal   = ["pkcs11"]
       distro = ["leap", "sles"]
+    }
+
+    // rotation manager capabilities not supported in Vault community edition
+    exclude {
+      edition                          = ["ce"]
+      ldap_config_root_rotation_method = ["period", "schedule"]
     }
   }
 
@@ -490,10 +497,30 @@ scenario "openldap_smoke" {
     }
   }
 
+  step "test_ldap_config_root_rotation" {
+    description = global.description.ldap_config_root_rotation
+    module      = "root_rotation_${matrix.ldap_config_root_rotation_method}"
+    depends_on  = [step.configure_plugin]
+
+    providers = {
+      enos = local.enos_provider[matrix.distro]
+    }
+
+    variables {
+      vault_leader_ip   = step.get_vault_cluster_ips.leader_host.public_ip
+      vault_addr        = step.create_vault_cluster.api_addr_localhost
+      vault_root_token  = step.create_vault_cluster.root_token
+      plugin_mount_path = var.plugin_mount_path
+
+      rotation_period = matrix.ldap_config_root_rotation_method == "period" ? var.ldap_rotation_period : null
+      rotation_window = matrix.ldap_config_root_rotation_method == "schedule" ? var.ldap_rotation_window : null
+    }
+  }
+
   step "test_static_role_crud_api" {
     description = global.description.static_role_crud_api
     module      = module.static_role_crud_api
-    depends_on  = [step.configure_plugin]
+    depends_on  = [step.test_ldap_config_root_rotation]
 
     providers = {
       enos = local.enos_provider[matrix.distro]
@@ -517,7 +544,7 @@ scenario "openldap_smoke" {
   step "test_dynamic_role_crud_api" {
     description = global.description.dynamic_role_crud_api
     module      = module.dynamic_role_crud_api
-    depends_on  = [step.configure_plugin]
+    depends_on  = [step.test_ldap_config_root_rotation]
 
     providers = {
       enos = local.enos_provider[matrix.distro]
@@ -542,7 +569,7 @@ scenario "openldap_smoke" {
     description = global.description.library_crud_api
     module      = module.library_crud_api
     depends_on = [
-      step.configure_plugin,
+      step.test_ldap_config_root_rotation,
       step.test_static_role_crud_api
     ]
 

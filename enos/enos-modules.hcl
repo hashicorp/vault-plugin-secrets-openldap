@@ -90,6 +90,18 @@ module "restart_vault" {
   vault_install_dir = var.vault_install_dir
 }
 
+module "root_rotation_period" {
+  source = "./modules/root_rotation_period"
+}
+
+module "root_rotation_schedule" {
+  source = "./modules/root_rotation_schedule"
+}
+
+module "root_rotation_manual" {
+  source = "./modules/root_rotation_manual"
+}
+
 module "seal_awskms" {
   source = "git::https://github.com/hashicorp/vault.git//enos/modules/seal_awskms?ref=${var.vault_repo_ref}"
 

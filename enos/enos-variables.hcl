@@ -91,6 +91,12 @@ variable "ldap_bind_pass" {
   default     = null
 }
 
+variable "ldap_disable_automated_rotation" {
+  type        = bool
+  default     = false
+  description = "Enterprise: cancel upcoming rotations until unset"
+}
+
 variable "ldap_dynamic_user_role_name" {
   description = "The name of the LDAP dynamic user role to create"
   type        = string
@@ -107,6 +113,18 @@ variable "ldap_revision" {
   description = "The git sha of LDAP plugin artifact we are testing"
   type        = string
   default     = null
+}
+
+variable "ldap_rotation_period" {
+  type        = number
+  default     = 0
+  description = "Enterprise: time in seconds before rotating the LDAP secret engine root credential. 0 disables rotation"
+}
+
+variable "ldap_rotation_window" {
+  type        = number
+  default     = 0
+  description = "Enterprise: max time in seconds to complete scheduled rotation"
 }
 
 variable "ldap_schema" {

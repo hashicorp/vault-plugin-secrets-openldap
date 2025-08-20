@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/vault-plugin-secrets-openldap/ldapifc"
 )
@@ -121,7 +122,8 @@ func TestUpdatePasswordOpenLDAP(t *testing.T) {
 		FieldRegistry.ObjectClass: {"*"},
 	}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaOpenLDAP, testPass)
+	config.Schema = SchemaOpenLDAP
+	newValues, err := GetSchemaFieldRegistry(config, testPass)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,42 +134,85 @@ func TestUpdatePasswordOpenLDAP(t *testing.T) {
 }
 
 func TestUpdatePasswordRACF(t *testing.T) {
-	testPass := "hell0$catz*"
+	testPassword := "pass1234"
+	testPhrase := "this is a much longer passphrase for racfPassPhrase"
 
-	config := emptyConfig()
-	config.BindDN = "cats"
-	config.BindPassword = "dogs"
-
-	conn := &ldapifc.FakeLDAPConnection{
-		SearchRequestToExpect: testSearchRequest(),
-		SearchResultToReturn:  testSearchResult(),
+	tests := []struct {
+		name           string
+		password       string
+		credentialType CredentialType
+		expectedFields map[*Field][]string
+	}{
+		{
+			name:           "password",
+			password:       testPassword,
+			credentialType: CredentialTypePassword,
+			expectedFields: map[*Field][]string{
+				FieldRegistry.RACFPassword:   {testPassword},
+				FieldRegistry.RACFAttributes: {"noexpired"},
+			},
+		},
+		{
+			name:           "passphrase",
+			password:       testPhrase,
+			credentialType: CredentialTypePhrase,
+			expectedFields: map[*Field][]string{
+				FieldRegistry.RACFPassphrase: {testPhrase},
+				FieldRegistry.RACFAttributes: {"noexpired"},
+			},
+		},
 	}
 
-	dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
-	conn.ModifyRequestToExpect = &ldap.ModifyRequest{
-		DN: dn,
-	}
-	conn.ModifyRequestToExpect.Replace("racfPassword", []string{testPass})
-	conn.ModifyRequestToExpect.Replace("racfAttributes", []string{"noexpired"})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := emptyConfig()
+			config.BindDN = "cats"
+			config.BindPassword = "dogs"
+			config.Schema = SchemaRACF
+			config.CredentialType = tt.credentialType
 
-	ldapClient := &ldaputil.Client{
-		Logger: hclog.NewNullLogger(),
-		LDAP:   &ldapifc.FakeLDAPClient{conn},
-	}
+			conn := &ldapifc.FakeLDAPConnection{
+				SearchRequestToExpect: testSearchRequest(),
+				SearchResultToReturn:  testSearchResult(),
+			}
 
-	client := &Client{ldapClient}
+			dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
+			conn.ModifyRequestToExpect = &ldap.ModifyRequest{
+				DN: dn,
+			}
 
-	filters := map[*Field][]string{
-		FieldRegistry.ObjectClass: {"*"},
-	}
+			// Set up expected modifications based on the test case
+			for field, values := range tt.expectedFields {
+				conn.ModifyRequestToExpect.Replace(field.String(), values)
+			}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaRACF, testPass)
-	if err != nil {
-		t.Fatal(err)
-	}
+			ldapClient := &ldaputil.Client{
+				Logger: hclog.NewNullLogger(),
+				LDAP:   &ldapifc.FakeLDAPClient{conn},
+			}
 
-	if err := client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters); err != nil {
-		t.Fatal(err)
+			client := &Client{ldapClient}
+
+			filters := map[*Field][]string{
+				FieldRegistry.ObjectClass: {"*"},
+			}
+
+			newValues, err := GetSchemaFieldRegistry(config, tt.password)
+			require.NoError(t, err)
+
+			// verify that the fields are set correctly in newValues
+			for field, expectedValues := range tt.expectedFields {
+				actualValues, exists := newValues[field]
+				if !exists {
+					t.Fatalf("Expected field %s to exist in newValues", field.String())
+				}
+
+				require.Equal(t, expectedValues, actualValues)
+			}
+
+			err = client.UpdatePassword(config, dn, ldap.ScopeBaseObject, newValues, filters)
+			require.NoError(t, err)
+		})
 	}
 }
 
@@ -204,7 +249,8 @@ func TestUpdatePasswordAD(t *testing.T) {
 		FieldRegistry.ObjectClass: {"*"},
 	}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaAD, testPass)
+	config.Schema = SchemaAD
+	newValues, err := GetSchemaFieldRegistry(config, testPass)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +300,8 @@ func TestUpdateRootPassword(t *testing.T) {
 		FieldRegistry.ObjectClass: {"*"},
 	}
 
-	newValues, err := GetSchemaFieldRegistry(SchemaOpenLDAP, testPass)
+	config.Schema = SchemaOpenLDAP
+	newValues, err := GetSchemaFieldRegistry(config, testPass)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,16 +6,56 @@ package openldap
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
+	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/vault-plugin-secrets-openldap/client"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/ldaputil"
 	"github.com/hashicorp/vault/sdk/logical"
 )
+
+// TestConfig_CreateUpgradeCredentialType tests that configs created before we
+// added the credential_type field will have the correct default value
+func TestConfig_CreateUpgradeCredentialType(t *testing.T) {
+	createData := map[string]interface{}{
+		"binddn":   "tester",
+		"bindpass": "pa$$w0rd",
+		"url":      "ldap://138.91.247.105",
+	}
+
+	b, storage := getBackend(false)
+	defer b.Cleanup(context.Background())
+
+	resp, err := testCreateConfigWithData(t, b, storage, createData)
+	assertNoError(t, resp, err)
+
+	// Remove the 'credential_type' parameter in the stored config to simulate a legacy config
+	raw, err := storage.Get(context.Background(), configPath)
+	var config map[string]interface{}
+	if err := raw.DecodeJSON(&config); err != nil {
+		t.Fatal(err)
+	}
+	ldap := config["LDAP"].(map[string]interface{})
+	delete(ldap, "credential_type")
+	config["LDAP"] = ldap
+	entry, err := logical.StorageEntryJSON(configPath, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := storage.Put(context.Background(), entry); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err = testReadConfig(t, b, storage)
+	require.NotNil(t, resp)
+	assertNoError(t, resp, err)
+
+	require.Equal(t, defaultCredentialType.String(), resp.Data["credential_type"])
+}
 
 func TestConfig_Create(t *testing.T) {
 	type testCase struct {
@@ -212,6 +252,73 @@ func TestConfig_Create(t *testing.T) {
 			createExpectErr:  true,
 			expectedReadResp: nil,
 		},
+		"default credential_type": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":   "tester",
+				"bindpass": "pa$$w0rd",
+				"url":      "ldap://138.91.247.105",
+			}),
+			expectedReadResp: &logical.Response{
+				Data: ldapResponseData(
+					"binddn", "tester",
+					"url", "ldap://138.91.247.105",
+					"credential_type", client.CredentialTypePassword.String(),
+					"request_timeout", 90,
+				),
+			},
+		},
+		"credential_type password": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":          "tester",
+				"bindpass":        "pa$$w0rd",
+				"url":             "ldap://138.91.247.105",
+				"credential_type": client.CredentialTypePassword.String(),
+			}),
+			expectedReadResp: &logical.Response{
+				Data: ldapResponseData(
+					"binddn", "tester",
+					"url", "ldap://138.91.247.105",
+					"credential_type", client.CredentialTypePassword.String(),
+					"request_timeout", 90,
+				),
+			},
+		},
+		"credential_type phrase": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":          "tester",
+				"bindpass":        "pa$$w0rd",
+				"url":             "ldap://138.91.247.105",
+				"credential_type": client.CredentialTypePhrase.String(),
+			}),
+			expectedReadResp: &logical.Response{
+				Data: ldapResponseData(
+					"binddn", "tester",
+					"url", "ldap://138.91.247.105",
+					"credential_type", client.CredentialTypePhrase.String(),
+					"request_timeout", 90,
+				),
+			},
+		},
+		"invalid credential_type": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":          "tester",
+				"bindpass":        "pa$$w0rd",
+				"url":             "ldap://138.91.247.105",
+				"credential_type": "foo",
+			}),
+			createExpectErr:  true,
+			expectedReadResp: nil,
+		},
+		"empty credential_type": {
+			createData: fieldData(map[string]interface{}{
+				"binddn":          "tester",
+				"bindpass":        "pa$$w0rd",
+				"url":             "ldap://138.91.247.105",
+				"credential_type": "",
+			}),
+			createExpectErr:  true,
+			expectedReadResp: nil,
+		},
 	}
 
 	for name, test := range tests {
@@ -244,9 +351,7 @@ func TestConfig_Create(t *testing.T) {
 				t.Fatalf("err:%s resp:%#v\n", err, resp)
 			}
 
-			if !reflect.DeepEqual(resp, test.expectedReadResp) {
-				t.Fatalf("Actual: %#v\nExpected: %#v", resp, test.expectedReadResp)
-			}
+			require.Equal(t, test.expectedReadResp, resp)
 		})
 	}
 }
@@ -596,6 +701,12 @@ func fieldData(raw map[string]interface{}) *framework.FieldData {
 		Type:        framework.TypeBool,
 		Description: "Whether to skip the 'import' rotation.",
 	}
+	fields["credential_type"] = &framework.FieldSchema{
+		Type: framework.TypeString,
+		Description: "The type of credential to manage. Options include: " +
+			"'password', 'phrase'. Defaults to 'password'.",
+		Default: "password",
+	}
 
 	// Deprecated
 	fields["length"] = &framework.FieldSchema{
@@ -607,6 +718,11 @@ func fieldData(raw map[string]interface{}) *framework.FieldData {
 
 	automatedrotationutil.AddAutomatedRotationFields(fields)
 
+	for k := range raw {
+		if _, ok := fields[k]; !ok {
+			panic(fmt.Sprintf("field %q not defined in schema in fieldData() test helper", k))
+		}
+	}
 	return &framework.FieldData{
 		Raw:    raw,
 		Schema: fields,
@@ -649,6 +765,7 @@ func ldapResponseData(vals ...interface{}) map[string]interface{} {
 		"rotation_window":                  float64(0),
 		"disable_automated_rotation":       false,
 		"enable_samaccountname_login":      false,
+		"credential_type":                  "password",
 	}
 
 	for i := 0; i < len(vals); i += 2 {

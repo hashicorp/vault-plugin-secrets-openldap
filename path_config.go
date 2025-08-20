@@ -19,6 +19,7 @@ const (
 	configPath            = "config"
 	defaultPasswordLength = 64
 	defaultSchema         = client.SchemaOpenLDAP
+	defaultCredentialType = client.DefaultCredentialType
 	defaultTLSVersion     = "tls12"
 	defaultCtxTimeout     = 1 * time.Minute
 )
@@ -96,6 +97,12 @@ func (b *backend) configFields() map[string]*framework.FieldSchema {
 	fields["skip_static_role_import_rotation"] = &framework.FieldSchema{
 		Type:        framework.TypeBool,
 		Description: "Whether to skip the 'import' rotation.",
+	}
+	fields["credential_type"] = &framework.FieldSchema{
+		Type: framework.TypeString,
+		Description: "The type of credential to manage. Options include: " +
+			"'password', 'phrase'. Defaults to 'password'.",
+		Default: defaultCredentialType,
 	}
 
 	// Deprecated
@@ -181,6 +188,15 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 		staticSkip = conf.SkipStaticRoleImportRotation // use existing value if not set
 	}
 
+	// CreateOperations and UpdateOperations should default to credential_type "password"
+	credentialType := defaultCredentialType.String()
+	if credentialTypeRaw, ok := fieldData.GetOk("credential_type"); ok {
+		credentialType = credentialTypeRaw.(string)
+	}
+	if err := conf.LDAP.SetCredentialType(credentialType); err != nil {
+		return nil, err
+	}
+
 	// Update config field values
 	conf.PasswordPolicy = passPolicy
 	conf.PasswordLength = passLength
@@ -262,6 +278,12 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	}
 	if config.LDAP.Schema != "" {
 		configMap["schema"] = config.LDAP.Schema
+	}
+	configMap["credential_type"] = config.LDAP.CredentialType.String()
+	if config.LDAP.CredentialType == client.CredentialTypeUnknown {
+		// this handles the upgrade path for legacy configs created before
+		// credential_type was added
+		configMap["credential_type"] = client.CredentialTypePassword.String()
 	}
 
 	resp := &logical.Response{

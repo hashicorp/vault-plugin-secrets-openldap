@@ -1,8 +1,12 @@
 ## Unreleased
-* Have rotations actions log success or failure
+
+## v0.16.1
+### August 21, 2025
 
 FEATURES:
+
 * Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
+* Have rotations actions log success or failure
 
 ## v0.16.0
 ### June 4, 2025

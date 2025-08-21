@@ -9,33 +9,6 @@ terraform {
   }
 }
 
-# Install Shasum on EC2 targets
-resource "enos_remote_exec" "install-shasum" {
-  for_each = var.hosts
-  scripts  = [abspath("${path.module}/scripts/install-shasum.sh")]
-
-  transport = {
-    ssh = {
-      host = each.value.public_ip
-    }
-  }
-}
-
-# Install OpenLDAP clients on EC2 targets
-resource "enos_remote_exec" "install-openldap-clients" {
-  for_each = var.hosts
-
-  inline = [
-    "sudo yum install -y openldap-clients"
-  ]
-
-  transport = {
-    ssh = {
-      host = each.value.public_ip
-    }
-  }
-}
-
 # Ensure the Vault plugin directory exists
 resource "enos_remote_exec" "create_plugin_directory" {
   for_each = var.hosts
@@ -52,6 +25,8 @@ resource "enos_remote_exec" "create_plugin_directory" {
     }
   }
 }
+
+#TODO: In the future, we should use the plugin_directory attribute in enos_vault_start resource when supported.
 
 # Add plugin directory to the config file
 resource "enos_remote_exec" "add_plugin_directory_to_config" {

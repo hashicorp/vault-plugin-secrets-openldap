@@ -17,25 +17,12 @@ globals {
     "ent.hsm.fips1403" = ["ui", "enterprise", "cgo", "hsm", "fips", "fips_140_3", "ent.hsm.fips1403"]
   }
   config_modes = ["env", "file"]
-  distros      = ["amzn", "leap", "rhel", "sles", "ubuntu"]
+  distros      = ["amzn", "ubuntu"]
   // Different distros may require different packages, or use different aliases for the same package
   distro_packages = {
     amzn = {
       "2"    = ["nc"]
       "2023" = ["nc"]
-    }
-    leap = {
-      "15.6" = ["netcat", "openssl"]
-    }
-    rhel = {
-      "8.10" = ["nc"]
-      "9.5"  = ["nc"]
-    }
-    sles = {
-      // When installing Vault RPM packages on a SLES AMI, the openssl package provided
-      // isn't named "openssl, which rpm doesn't know how to handle. Therefore we add the
-      // "correctly" named one in our package installation before installing Vault.
-      "15.6" = ["netcat-openbsd", "openssl"]
     }
     ubuntu = {
       "20.04" = ["netcat"]
@@ -45,9 +32,6 @@ globals {
   }
   distro_version = {
     amzn   = var.distro_version_amzn
-    leap   = var.distro_version_leap
-    rhel   = var.distro_version_rhel
-    sles   = var.distro_version_sles
     ubuntu = var.distro_version_ubuntu
   }
   editions            = ["ce", "ent", "ent.fips1403", "ent.hsm", "ent.hsm.fips1403"]
@@ -55,9 +39,6 @@ globals {
   ip_versions         = ["4", "6"]
   package_manager = {
     "amzn"   = "yum"
-    "leap"   = "zypper"
-    "rhel"   = "yum"
-    "sles"   = "zypper"
     "ubuntu" = "apt"
   }
   packages = ["jq"]

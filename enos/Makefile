@@ -19,10 +19,6 @@ fmt-enos:
 	enos fmt .
 	enos fmt ./k8s
 
-.PHONY: gen-enos
-gen-enos:
-	pushd ../tools/pipeline &> /dev/null && go run ./... generate enos-dynamic-config -d ../../enos -f enos-dynamic-config.hcl -e ce -v $(VAULT_VERSION) -n 3 --log info && popd &> /dev/null
-
 .PHONY: check-fmt-modules
 check-fmt-modules:
 	terraform fmt -check -diff -recursive ./modules

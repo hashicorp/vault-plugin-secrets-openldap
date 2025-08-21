@@ -20,6 +20,20 @@ scenario "openldap_restart" {
       - vault_build_date*
       - vault_product_version
       - vault_revision*
+      - ldap_revision*
+      - plugin_name
+      - plugin_dir_vault
+      - ldap_bind_pass
+      - ldap_schema
+      - ldap_tag
+      - ldap_base_dn
+      - ldap_user_role_name
+      - ldap_username
+      - ldap_user_old_password
+      - ldap_dynamic_user_role_name
+      - ldap_dynamic_role_ldif_templates_path
+      - ldap_library_set_name
+      - ldap_service_account_names
 
     * If you don't already know what build date and revision you should be using, see
     https://eng-handbook.hashicorp.services/internal-tools/enos/troubleshooting/#execution-error-expected-vs-got-for-vault-versioneditionrevisionbuild-date.
@@ -33,6 +47,10 @@ scenario "openldap_restart" {
       - vault_artifact_path (the path to where you have a Vault artifact already downloaded,
       if using `artifact_source:crt` in your filter)
       - vault_license_path (if using an ENT edition of Vault)
+      - ldap_plugin_version (if using `ldap_artifact_source:releases` or `ldap_artifact_source:artifactory` in your filter)
+      - ldap_artifactory_repo (if using `ldap_artifact_source:artifactory` in your filter)
+      - ldap_rotation_period (if using `ldap_config_root_rotation_method:period` in your filter)
+      - ldap_rotation_window (if using `ldap_config_root_rotation_method:schedule` in your filter)
   EOF
 
   matrix {
@@ -407,11 +425,11 @@ scenario "openldap_restart" {
     depends_on  = [step.create_vpc]
 
     providers = {
-      enos = local.enos_provider[matrix.distro]
+      enos = local.enos_provider["ubuntu"]
     }
 
     variables {
-      ami_id          = step.ec2_info.ami_ids[matrix.arch][matrix.distro][global.distro_version[matrix.distro]]
+      ami_id          = step.ec2_info.ami_ids["arm64"]["ubuntu"]["24.04"]
       cluster_tag_key = global.ldap_tag_key
       common_tags     = global.tags
       vpc_id          = step.create_vpc.id
@@ -425,13 +443,14 @@ scenario "openldap_restart" {
     depends_on  = [step.create_ldap_server_target]
 
     providers = {
-      enos = local.enos_provider[matrix.distro]
+      enos = local.enos_provider["ubuntu"]
     }
 
     variables {
-      hosts     = step.create_ldap_server_target.hosts
-      ldap_tag  = var.ldap_tag
-      ldap_port = global.ports.ldap.port
+      hosts    = step.create_ldap_server_target.hosts
+      ldap_tag = var.ldap_tag
+      packages = concat(global.packages, global.distro_packages["ubuntu"]["24.04"], ["podman", "podman-docker"])
+      ports    = global.ports
     }
   }
 
@@ -532,7 +551,7 @@ scenario "openldap_restart" {
       ldap_host                        = step.create_ldap_server.ldap_ip_address
       ldap_port                        = step.create_ldap_server.ldap_port
       ldap_base_dn                     = var.ldap_base_dn
-      dynamic_role_ldif_templates_path = var.dynamic_role_ldif_templates_path
+      dynamic_role_ldif_templates_path = var.ldap_dynamic_role_ldif_templates_path
       ldap_dynamic_user_role_name      = var.ldap_dynamic_user_role_name
     }
   }
@@ -557,8 +576,8 @@ scenario "openldap_restart" {
       ldap_host             = step.create_ldap_server.ldap_ip_address
       ldap_port             = step.create_ldap_server.ldap_port
       ldap_base_dn          = var.ldap_base_dn
-      library_set_name      = var.library_set_name
-      service_account_names = var.service_account_names
+      library_set_name      = var.ldap_library_set_name
+      service_account_names = var.ldap_service_account_names
     }
   }
 
@@ -741,7 +760,7 @@ scenario "openldap_restart" {
       ldap_host                        = step.create_ldap_server.ldap_ip_address
       ldap_port                        = step.create_ldap_server.ldap_port
       ldap_base_dn                     = var.ldap_base_dn
-      dynamic_role_ldif_templates_path = var.dynamic_role_ldif_templates_path
+      dynamic_role_ldif_templates_path = var.ldap_dynamic_role_ldif_templates_path
       ldap_dynamic_user_role_name      = var.ldap_dynamic_user_role_name
     }
   }
@@ -766,8 +785,8 @@ scenario "openldap_restart" {
       ldap_host             = step.create_ldap_server.ldap_ip_address
       ldap_port             = step.create_ldap_server.ldap_port
       ldap_base_dn          = var.ldap_base_dn
-      library_set_name      = var.library_set_name
-      service_account_names = var.service_account_names
+      library_set_name      = var.ldap_library_set_name
+      service_account_names = var.ldap_service_account_names
     }
   }
 

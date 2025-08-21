@@ -18,14 +18,25 @@ fail() {
 
 LDAP_HOSTNAME="${LDAP_HOSTNAME:-openldap}"
 
+# Determine container runtime: prefer podman if installed, allow override via CONTAINER_RUNTIME
+if [[ -n "$CONTAINER_RUNTIME" ]]; then
+  RUNTIME="$CONTAINER_RUNTIME"
+elif command -v podman >/dev/null 2>&1; then
+  RUNTIME="sudo podman"
+else
+  RUNTIME="sudo docker"
+fi
+
+echo "Using container runtime: $RUNTIME"
+
 # Pulling image
 echo "Pulling image: ${LDAP_DOCKER_NAME}"
 LDAP_DOCKER_NAME="docker.io/osixia/openldap:${IMAGE_TAG}"
-docker pull "${LDAP_DOCKER_NAME}"
+${RUNTIME} pull "${LDAP_DOCKER_NAME}"
 
 # Run OpenLDAP container
 echo "Starting OpenLDAP container..."
-docker run -d \
+${RUNTIME} run -d \
   --name openldap \
   --hostname "${LDAP_HOSTNAME}" \
   -p "${LDAP_PORT}:${LDAP_PORT}" \
@@ -35,21 +46,21 @@ docker run -d \
   -e LDAP_ADMIN_PASSWORD="${LDAP_ADMIN_PW}" \
   "${LDAP_DOCKER_NAME}"
 
-echo "OpenLDAP server is now running in Docker!"
+echo "OpenLDAP server is now running in container!"
 
 # Wait for the container to be up and running
 echo "Waiting for OpenLDAP to start..."
 sleep 5
 
 # Check container status
-status=$(docker ps --filter name=openldap --format "{{.Status}}")
+status=$(${RUNTIME} ps --filter name=openldap --format "{{.Status}}")
 if [[ -n "$status" ]]; then
   echo "OpenLDAP container is running. Status: $status"
 else
   echo "OpenLDAP container is NOT running!"
-  echo "Check logs with: docker logs openldap"
+  echo "Check logs with: ${RUNTIME} logs openldap"
   exit 1
 fi
 
 # Run ldapadd inside the container
-docker exec -i openldap ldapadd -x -w "${LDAP_ADMIN_PW}" -D "cn=admin,dc=${LDAP_DOMAIN//./,dc=}" -f /dev/stdin < "${LDIF_PATH}"
+${RUNTIME} exec -i openldap ldapadd -x -w "${LDAP_ADMIN_PW}" -D "cn=admin,dc=${LDAP_DOMAIN//./,dc=}" -f /dev/stdin < "${LDIF_PATH}"

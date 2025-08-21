@@ -16,8 +16,22 @@ variable "ldap_tag" {
   default     = "1.5.0"
 }
 
-variable "ldap_port" {
-  type        = number
-  description = "OpenLDAP Server Port"
-  default     = 389
+variable "ports" {
+  description = "Port configuration for services"
+  type = map(object({
+    port        = string
+    description = string
+  }))
+}
+
+variable "packages" {
+  type        = list(string)
+  description = "A list of packages to install via the target host package manager"
+  default     = []
+}
+
+variable "vault_repo_ref" {
+  type        = string
+  description = "The reference to use for the Vault repository"
+  default     = "main"
 }

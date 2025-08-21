@@ -15,27 +15,24 @@ locals {
     org        = "example"
     admin_pw   = "adminpassword"
     tag        = var.ldap_tag
-    port       = tostring(var.ldap_port)
+    port       = var.ports.ldap.port
+    secure_port = var.ports.ldaps.port
     ip_address = var.hosts[0].public_ip
     private_ip = var.hosts[0].private_ip
   }
   ldif_path = "/tmp/seed.ldif"
 }
 
-# Step 1: Install Docker
-resource "enos_remote_exec" "setup_docker" {
-  scripts = [abspath("${path.module}/../../../bootstrap/setup-docker.sh")]
-
-  transport = {
-    ssh = {
-      host = local.ldap_server.ip_address
-    }
-  }
+# Step 1: We run install_packages
+module "install_packages" {
+  source   = "git::https://github.com/hashicorp/vault.git//enos/modules/install_packages"
+  hosts    = var.hosts
+  packages = var.packages
 }
 
 # Step 2: Copy LDIF file for seeding LDAP
 resource "enos_file" "seed_ldif" {
-  depends_on = [enos_remote_exec.setup_docker]
+  depends_on = [module.install_packages]
 
   source      = abspath("${path.module}/../../../bootstrap/ldif/seed.ldif")
   destination = local.ldif_path

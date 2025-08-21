@@ -1,0 +1,69 @@
+---
+name: run-samples
+
+on:
+  workflow_dispatch:
+    inputs:
+      max:
+        description: The maximum number of scenarios to sample
+        type: number
+        default: 8
+      min:
+        description: The minimum number of scenarios to sample
+        type: number
+        default: 1
+      sample-name:
+        description: The sample name
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      download:
+        description: The name of the artifact to download
+        type: string
+        required: true
+      max:
+        description: The maximum number of scenarios to sample
+        type: number
+        default: 8
+      min:
+        description: The minimum number of scenarios to sample
+        type: number
+        default: 1
+      sample-name:
+        description: The sample name
+        required: true
+        type: string
+
+jobs:
+  sample:
+    name: sample observe
+    runs-on: ubuntu-latest
+    outputs:
+      sample: ${{ steps.metadata.outputs.sample }}
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+      - uses: hashicorp/action-setup-enos@v1
+        with:
+          github-token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+      - id: metadata
+        run: |
+          sample_seed=$(date +%s%N)
+          sample=$(enos scenario sample observe ${{ inputs.sample-name }} --chdir ./enos --min ${{ inputs.min }} --max ${{ inputs.max }} --seed "${sample_seed}" --format json | jq -c ".observation.elements")
+          {
+            echo "sample=${sample}"
+            echo "sample-seed=${sample_seed}" # This isn't used outside of here but is nice to know for duplicating observations
+          } | tee -a "$GITHUB_OUTPUT"
+
+  run:
+    needs: sample
+    name: run ${{ matrix.scenario.id.filter }}
+    strategy:
+      fail-fast: false # don't fail as that can skip required cleanup steps for jobs
+      matrix:
+        include: ${{ fromJSON(needs.sample.outputs.sample) }}
+    uses: ./.github/workflows/run-scenario.yml
+    secrets: inherit
+    with:
+      scenario-filter: ${{ matrix.scenario.id.filter }}
+      download: ${{ inputs.download }}

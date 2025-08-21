@@ -1,0 +1,127 @@
+---
+name: run-scenario
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario-filter:
+        description: The filter of the scenario to run
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      download:
+        type: string
+        required: false
+      scenario-filter:
+        required: true
+        type: string
+
+jobs:
+  run:
+    name: ${{ inputs.scenario-filter }}
+    runs-on: ubuntu-latest
+    env:
+      ENOS_DEBUG_DATA_ROOT_DIR: /tmp/enos/logs
+    steps:
+      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          # The github actions service user creds for this account managed in hashicorp/enos-ci
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-skip-session-tagging: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          # the terraform wrapper will break terraform execution in enos because
+          # it changes the output to text when we expect it to be JSON.
+          terraform_wrapper: false
+      - uses: hashicorp/action-setup-enos@v1
+        with:
+          github-token:
+            ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+      - name: Set up support files
+        run: |
+          mkdir -p enos/support
+          mkdir -p enos/support/vault-plugins
+          echo "${{ secrets.ENOS_CI_SSH_KEY }}" > enos/support/enos-ci-ssh-key.pem
+          echo "${{ secrets.VAULT_LICENSE }}" > enos/support/vault.hclic
+          chmod 600 enos/support/enos-ci-ssh-key.pem
+          chmod 600 enos/support/vault.hclic
+      - name: Download plugin artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          path: dist
+          name: ${{ inputs.download }}
+      - run: chmod +x ./dist/*
+      - name: Export OpenLDAP plugin vars
+        run: |
+          # Configure input environment variables.
+          {
+            echo "GITHUB_TOKEN=${ { steps.secrets.outputs.github-token } }"
+            echo "ENOS_DEBUG_DATA_ROOT_DIR=/tmp/enos-debug-data"
+            echo "ENOS_VAR_artifactory_token=${ { steps.secrets.outputs.artifactory-token } }"
+            echo "ENOS_VAR_artifactory_host=https://artifactory.hashicorp.engineering/artifactory"
+            echo "ENOS_VAR_artifactory_repo=hashicorp-crt-stable-local*"
+            echo "ENOS_VAR_aws_region="us-east-1"
+            echo "ENOS_VAR_aws_ssh_keypair_name=${ { inputs.ssh-key-name } }"
+            echo "ENOS_VAR_aws_ssh_private_key_path=./support/private_key.pem"
+            echo "ENOS_VAR_project_name=vault-openldap-se-enos-integration"
+            echo "ENOS_VAR_backend_license_path=./support/vault.hclic"
+            echo "ENOS_VAR_distro_version_amzn=2"
+            echo "ENOS_VAR_distro_version_ubuntu=22.04"
+            echo "ENOS_VAR_tags={\"Project Name\":\"Vault\",\"Something Cool\":\"Value\"}"
+            echo "ENOS_VAR_terraform_plugin_cache_dir=./support/terraform-plugin-cache"
+            echo "ENOS_VAR_vault_artifact_path=./support/downloads/${ { inputs.build-artifact-name } }"
+            echo "ENOS_VAR_vault_artifact_type=bundle"
+            echo "ENOS_VAR_vault_build_date=${ { needs.metadata.outputs.build-date } }"
+            echo "ENOS_VAR_vault_license_path=./support/vault.hclic"
+            echo "ENOS_VAR_vault_product_version=${ { needs.metadata.outputs.vault-version } }"
+            echo "ENOS_VAR_vault_revision=${ { inputs.vault-revision } }"
+            echo "ENOS_VAR_vault_enable_audit_devices=true"
+            echo "ENOS_VAR_vault_install_dir=/opt/vault/bin"
+            echo "ENOS_VAR_vault_instance_type=t3.small"
+            echo "ENOS_VAR_vault_log_level=trace"
+            echo "ENOS_VAR_verify_aws_secrets_engine=false"
+            echo "ENOS_VAR_verify_log_secrets=true"
+            
+            # Default LDAP settings from enos.vars.hcl
+            echo "ENOS_VAR_plugin_name=vault-plugin-secrets-openldap"
+            echo "ENOS_VAR_plugin_dest_dir=$(pwd)/enos/support/vault-plugins"
+            echo "ENOS_VAR_ldap_artifact_path=$(pwd)/dist/${{ inputs.download }}"
+            echo "ENOS_VAR_makefile_dir=$(pwd)"
+            echo "ENOS_VAR_plugin_dir_vault=/etc/vault/plugins"
+            echo "ENOS_VAR_plugin_mount_path=local-secrets-ldap"
+            echo "ENOS_VAR_ldap_bind_dn=cn=admin,dc=example,dc=com"
+            echo "ENOS_VAR_ldap_bind_pass=adminpassword"
+            echo "ENOS_VAR_ldap_user_dn=ou=users,dc=example,dc=com"
+            echo "ENOS_VAR_ldap_schema=openldap"
+            echo "ENOS_VAR_ldap_tag=${ { inputs.ldap-tag } }"
+            echo "ENOS_VAR_ldap_revision=${ { inputs.ldap-revision } }"
+            echo "ENOS_VAR_ldap_artifactory_repo=hashicorp-vault-ecosystem-staging-local"
+            echo "ENOS_VAR_ldap_plugin_version=${ { inputs.ldap-plugin-version } }"
+            echo "ENOS_VAR_ldap_base_dn=dc=example,dc=com"
+            echo "ENOS_VAR_ldap_user_role_name=mary"
+            echo "ENOS_VAR_ldap_username=mary.smith"
+            echo "ENOS_VAR_ldap_user_old_password=defaultpassword"
+            echo "ENOS_VAR_ldap_dynamic_user_role_name=adam"
+            echo "ENOS_VAR_dynamic_role_ldif_templates_path=/tmp"
+            echo "ENOS_VAR_library_set_name=dev-team"
+            echo "ENOS_VAR_service_account_names=[ \"staticuser\",\"bob.johnson\",\"mary.smith\" ]"
+            echo "ENOS_VAR_ldap_rotation_period=10"
+            echo "ENOS_VAR_ldap_rotation_window=3600"
+          } | tee -a "$GITHUB_ENV"
+      - run: enos scenario run ${{ inputs.scenario-filter }}
+        working-directory: enos
+      - if: ${{ always() }}
+        run: enos scenario destroy ${{ inputs.scenario-filter }}
+        working-directory: enos
+      - name: Remove enos runtime directories
+        if: ${{ always() }}
+        run: |
+          rm -rf /tmp/enos*
+          rm -rf enos/support
+          rm -rf enos/.enos
+          rm -rf "$HOME/.terraform.d"

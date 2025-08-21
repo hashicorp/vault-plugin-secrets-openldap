@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 globals {
-  archs                             = ["amd64", "arm64"]
+  archs                             = ["amd64"]
   artifact_sources                  = ["local", "crt", "artifactory"]
   ldap_artifact_sources             = ["local", "releases", "artifactory"]
   ldap_config_root_rotation_methods = ["period", "schedule", "manual"]
@@ -17,37 +17,20 @@ globals {
     "ent.hsm.fips1403" = ["ui", "enterprise", "cgo", "hsm", "fips", "fips_140_3", "ent.hsm.fips1403"]
   }
   config_modes = ["env", "file"]
-  distros      = ["amzn", "leap", "rhel", "sles", "ubuntu"]
+  distros      = ["amzn", "ubuntu"]
   // Different distros may require different packages, or use different aliases for the same package
   distro_packages = {
     amzn = {
-      "2"    = ["nc"]
-      "2023" = ["nc"]
-    }
-    leap = {
-      "15.6" = ["netcat", "openssl"]
-    }
-    rhel = {
-      "8.10" = ["nc"]
-      "9.5"  = ["nc"]
-    }
-    sles = {
-      // When installing Vault RPM packages on a SLES AMI, the openssl package provided
-      // isn't named "openssl, which rpm doesn't know how to handle. Therefore we add the
-      // "correctly" named one in our package installation before installing Vault.
-      "15.6" = ["netcat-openbsd", "openssl"]
+      "2"    = ["nc", "openldap-clients", "perl-Digest-SHA"]
+      "2023" = ["nc", "openldap-clients", "perl-Digest-SHA"]
     }
     ubuntu = {
-      "20.04" = ["netcat"]
-      "22.04" = ["netcat"]
-      "24.04" = ["netcat-openbsd"]
+      "22.04" = ["netcat", "ldap-utils", "perl"]
+      "24.04" = ["netcat-openbsd", "ldap-utils", "perl"]
     }
   }
   distro_version = {
     amzn   = var.distro_version_amzn
-    leap   = var.distro_version_leap
-    rhel   = var.distro_version_rhel
-    sles   = var.distro_version_sles
     ubuntu = var.distro_version_ubuntu
   }
   editions            = ["ce", "ent", "ent.fips1403", "ent.hsm", "ent.hsm.fips1403"]
@@ -55,9 +38,6 @@ globals {
   ip_versions         = ["4", "6"]
   package_manager = {
     "amzn"   = "yum"
-    "leap"   = "zypper"
-    "rhel"   = "yum"
-    "sles"   = "zypper"
     "ubuntu" = "apt"
   }
   packages = ["jq"]
@@ -72,6 +52,11 @@ globals {
     ldap : {
       description = "LDAP"
       port        = 389
+      protocol    = "tcp"
+    },
+    ldaps : {
+      description = "LDAPS"
+      port        = 636
       protocol    = "tcp"
     },
     vault_agent : {

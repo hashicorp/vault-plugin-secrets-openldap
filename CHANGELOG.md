@@ -1,8 +1,4 @@
 ## Unreleased
-* Have rotations actions log success or failure
-
-FEATURES:
-* Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
 
 ## v0.16.0
 ### June 4, 2025
@@ -19,6 +15,13 @@ IMPROVEMENTS:
 BUG FIXES:
 
 * Fix issue where roles created before 0.14.5 had a nil NextVaultRotation value: [GH-156](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/156)
+
+## v0.15.5
+
+FEATURES:
+
+* Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
+* Have rotations actions log success or failure
 
 ## v0.15.4
 

@@ -78,11 +78,6 @@ scenario "openldap_restart" {
       edition = [for e in matrix.edition : e if !strcontains(e, "hsm")]
     }
 
-    // softhsm packages not available for leap/sles.
-    exclude {
-      seal   = ["pkcs11"]
-      distro = ["leap", "sles"]
-    }
   }
 
   terraform_cli = terraform_cli.default
@@ -98,9 +93,6 @@ scenario "openldap_restart" {
     ldap_artifact_path = matrix.ldap_artifact_source != "artifactory" ? abspath(var.ldap_artifact_path) : null
     enos_provider = {
       amzn   = provider.enos.ec2_user
-      leap   = provider.enos.ec2_user
-      rhel   = provider.enos.ec2_user
-      sles   = provider.enos.ec2_user
       ubuntu = provider.enos.ubuntu
     }
     manage_service = matrix.artifact_type == "bundle"

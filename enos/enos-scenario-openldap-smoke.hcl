@@ -80,17 +80,12 @@ scenario "openldap_smoke" {
       edition = [for e in matrix.edition : e if !strcontains(e, "hsm")]
     }
 
-    // softhsm packages not available for leap/sles.
-    exclude {
-      seal   = ["pkcs11"]
-      distro = ["leap", "sles"]
-    }
-
     // rotation manager capabilities not supported in Vault community edition
     exclude {
       edition                          = ["ce"]
       ldap_config_root_rotation_method = ["period", "schedule"]
     }
+
   }
 
   terraform_cli = terraform_cli.default
@@ -106,9 +101,6 @@ scenario "openldap_smoke" {
     ldap_artifact_path = matrix.ldap_artifact_source != "artifactory" ? abspath(var.ldap_artifact_path) : null
     enos_provider = {
       amzn   = provider.enos.ec2_user
-      leap   = provider.enos.ec2_user
-      rhel   = provider.enos.ec2_user
-      sles   = provider.enos.ec2_user
       ubuntu = provider.enos.ubuntu
     }
     manage_service = matrix.artifact_type == "bundle"

@@ -8,8 +8,6 @@ fail() {
   exit 1
 }
 
-PLUGIN_PATH=local-secrets-ldap
-
 # Required env vars: PLUGIN_PATH
 if [[ -z "${PLUGIN_PATH:-}" ]]; then
   fail "PLUGIN_PATH env variable has not been set"

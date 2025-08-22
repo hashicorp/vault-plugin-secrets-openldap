@@ -17,6 +17,7 @@ LDAP_DOMAIN ?= example.com
 LDAP_ORG ?= example
 LDAP_ADMIN_PW ?= adminpassword
 IMAGE_TAG ?= 1.3.0
+LDAP_HOST ?= 127.0.0.1
 LDAP_PORT ?= 389
 LDIF_PATH ?= $(PWD)/bootstrap/ldif/seed.ldif
 
@@ -29,6 +30,17 @@ LDAP_BIND_DN ?= cn=admin,dc=example,dc=com
 LDAP_BIND_PASS ?= adminpassword
 LDAP_USER_DN ?= ou=users,dc=example,dc=com
 LDAP_SCHEMA ?= openldap
+
+#plugin endpoints tests
+ROTATION_PERIOD ?= 10
+ROTATION_WINDOW ?= 3600
+LDAP_DN ?= uid=mary.smith,ou=users,dc=example,dc=com
+LDAP_USERNAME ?= mary.smith
+LDAP_OLD_PASSWORD ?= defaultpassword
+LDIF_PATH ?= $(PWD)/enos/modules/dynamic_role_crud_api/ldif
+LDAP_BASE_DN ?= dc=example,dc=com
+LIBRARY_SET_NAME ?= staticuser bob.johnson mary.smith
+SERVICE_ACCOUNT_NAMES ?= dev-team
 
 export LDAP_DOMAIN
 export LDAP_ORG
@@ -47,6 +59,16 @@ export LDAP_BIND_PASS
 export LDAP_USER_DN
 export LDAP_SCHEMA
 export LDIF_PATH
+export LDAP_HOST
+export ROTATION_PERIOD
+export ROTATION_WINDOW
+export LDAP_DN
+export LDAP_USERNAME
+export LDAP_OLD_PASSWORD
+export LDIF_PATH
+export LDAP_BASE_DN
+export LIBRARY_SET_NAME
+export SERVICE_ACCOUNT_NAMES
 
 .PHONY: default
 default: dev
@@ -88,7 +110,6 @@ fmt:
 
 .PHONY: setup-env
 setup-env:
-	cd bootstrap && ./setup-docker.sh
 	cd bootstrap && ./setup-openldap.sh
 
 .PHONY: plugin-build
@@ -115,13 +136,29 @@ configure: plugin-build plugin-register plugin-enable plugin-configure
 teardown-env:
 	cd bootstrap && ./teardown-env.sh
 
+.PHONY: manual-root-rotation-test
+manual-root-rotation-test:
+	cd enos/modules/root_rotation_manual && ./scripts/test-root-rotation-manual.sh
+
+.PHONY: periodic-root-rotation-test
+periodic-root-rotation-test:
+	cd enos/modules/root_rotation_period && ./scripts/test-root-rotation-period.sh
+
+.PHONY: scheduled-root-rotation-test
+scheduled-root-rotation-test:
+	cd enos/modules/root_rotation_schedule && ./scripts/test-root-rotation-schedule.sh
+
 .PHONY: static-role-test
 static-role-test:
-	cd enos/modules/static_role_crud_api && ./scripts/static-role.sh
+	ROLE_NAME=mary cd enos/modules/static_role_crud_api && ./scripts/static-role.sh
 
 .PHONY: dynamic-role-test
 dynamic-role-test:
-	cd enos/modules/dynamic_role_crud_api && ./scripts/dynamic-role.sh
+	ROLE_NAME=adam cd enos/modules/dynamic_role_crud_api && ./scripts/dynamic-role.sh
+
+.PHONY: library-test
+library-test:
+	cd enos/modules/library_crud_api && ./scripts/library.sh
 
 .PHONY: teardown-env
 teardown-env:

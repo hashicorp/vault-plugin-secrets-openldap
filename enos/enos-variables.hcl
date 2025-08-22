@@ -68,7 +68,7 @@ variable "distro_version_ubuntu" {
   default     = "24.04" // or "20.04", "22.04"
 }
 
-variable "dynamic_role_ldif_templates_path" {
+variable "ldap_dynamic_role_ldif_templates_path" {
   description = "LDIF templates path for dynamic role CRUD API tests"
   default     = "/tmp"
 }
@@ -157,7 +157,7 @@ variable "ldap_user_role_name" {
   default     = "mary"
 }
 
-variable "library_set_name" {
+variable "ldap_library_set_name" {
   description = "The name of the library set to use for library CRUD API tests"
   type        = string
   default     = "dev-team"
@@ -205,7 +205,7 @@ variable "project_name" {
   default     = "vault-plugin-secrets-openldap-enos-integration"
 }
 
-variable "service_account_names" {
+variable "ldap_service_account_names" {
   description = "List of service account names to create for library CRUD API tests"
   type        = list(string)
   default     = ["staticuser", "bob.johnson", "mary.smith"]

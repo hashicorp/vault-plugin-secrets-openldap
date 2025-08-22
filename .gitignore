@@ -41,9 +41,6 @@ website/build
 .vagrant/
 Vagrantfile
 
-# Configs
-*.hcl
-
 .DS_Store
 .idea
 .vscode
@@ -84,3 +81,12 @@ scripts/custom.sh
 # enos
 /enos/.enos/*
 /enos/enos.vars.hcl
+
+**/.terraform/*
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+
+# ldap racf terraform
+seed.ldif
+cleanup.ldif

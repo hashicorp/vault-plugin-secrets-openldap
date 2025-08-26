@@ -1,0 +1,5 @@
+kind: FEATURES
+body: Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
+time: 2025-08-26T13:53:28.377592-07:00
+custom:
+    Issue: "184"

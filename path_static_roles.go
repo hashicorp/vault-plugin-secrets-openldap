@@ -135,6 +135,10 @@ func fieldsForType(roleType string) map[string]*framework.FieldSchema {
 // only to static roles
 func staticFields() map[string]*framework.FieldSchema {
 	fields := map[string]*framework.FieldSchema{
+		"password": {
+			Type:        framework.TypeString,
+			Description: "Password for the static account. This is required for Vault to manage an existing account and enable rotation.",
+		},
 		"rotation_period": {
 			Type:        framework.TypeDurationSecond,
 			Description: "Period for automatic credential rotation of the given entry.",
@@ -288,6 +292,10 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 
 		role.StaticAccount.DN = dn
+	}
+	if passwordRaw, ok := data.GetOk("password"); ok {
+		role.StaticAccount.Password = passwordRaw.(string)
+		role.StaticAccount.SelfManaged = true
 	}
 
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
@@ -460,6 +468,10 @@ type staticAccount struct {
 	// "time to live". This value is compared to the LastVaultRotation to
 	// determine if a password needs to be rotated
 	RotationPeriod time.Duration `json:"rotation_period"`
+
+	// whether the account is self-managed or Vault-managed (i.e. rotated by a privileged bind account).
+	// this is currently only set at account creation time and cannot be changed
+	SelfManaged bool `json:"self_managed"`
 }
 
 // NextRotationTime calculates the next rotation by adding the Rotation Period

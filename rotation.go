@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-secure-stdlib/base62"
@@ -345,6 +346,8 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	if config == nil {
 		return output, errors.New("the config is currently unset")
 	}
+	// Create a copy of the config to modify for rotation
+	rotateConfig := *config.LDAP
 
 	var newPassword string
 	var usedCredentialFromPreviousRotation bool
@@ -402,16 +405,37 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		}
 	}
 
+	// Perform password update:
+	if input.Role.StaticAccount.SelfManaged {
+		// Preconditions for self-managed rotation
+		if input.Role.StaticAccount.Password == "" {
+			return output, fmt.Errorf("self-managed static role %q has no stored current password", input.Role.StaticAccount.Username)
+		}
+		if input.Role.StaticAccount.DN == "" {
+			return output, fmt.Errorf("self-managed static role %q requires DN for rotation (no search path implemented)", input.Role.StaticAccount.Username)
+		}
+		// change the config to use the static account
+		rotateConfig.BindDN = input.Role.StaticAccount.DN
+		rotateConfig.BindPassword = input.Role.StaticAccount.Password
+	}
 	// Perform the LDAP search with the DN if it's configured. DN-based search
 	// targets the object directly. Otherwise, search using the userdn, userattr,
 	// and username. UserDN-based search targets the object by searching the whole
 	// subtree rooted at the userDN.
 	if input.Role.StaticAccount.DN != "" {
-		err = b.client.UpdateDNPassword(config.LDAP, input.Role.StaticAccount.DN, newPassword)
+		err = b.client.UpdateDNPassword(&rotateConfig, input.Role.StaticAccount.DN, newPassword)
 	} else {
-		err = b.client.UpdateUserPassword(config.LDAP, input.Role.StaticAccount.Username, newPassword)
+		err = b.client.UpdateUserPassword(&rotateConfig, input.Role.StaticAccount.Username, newPassword)
 	}
 	if err != nil {
+		// Special handling for self-managed invalid credential errors:
+		if input.Role.StaticAccount.SelfManaged && isInvalidCredErr(err) {
+			// Likely the stored current password is stale (changed out-of-band).
+			// Keep the WAL (if any) so we can retry after correction; just return error.
+			b.Logger().Error("self-managed rotation failed due to invalid current password; WAL retained",
+				"role", input.RoleName, "WAL ID", output.WALID, "error", err)
+			return output, err
+		}
 		if usedCredentialFromPreviousRotation {
 			b.Logger().Debug("password stored in WAL failed, deleting WAL", "role", input.RoleName, "WAL ID", output.WALID)
 			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
@@ -451,6 +475,15 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 
 	// The WAL has been deleted, return new setStaticAccountOutput without it
 	return &setStaticAccountOutput{RotationTime: lvr}, nil
+}
+
+func isInvalidCredErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "invalid credentials") ||
+		strings.Contains(msg, "ldap result code 49")
 }
 
 func (b *backend) GeneratePassword(ctx context.Context, cfg *config) (string, error) {

@@ -138,6 +138,9 @@ func staticFields() map[string]*framework.FieldSchema {
 		"password": {
 			Type:        framework.TypeString,
 			Description: "Password for the static account. This is required for Vault to manage an existing account and enable rotation.",
+			DisplayAttrs: &framework.DisplayAttributes{
+				Sensitive: true,
+			},
 		},
 		"rotation_period": {
 			Type:        framework.TypeDurationSecond,
@@ -308,10 +311,12 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			return logical.ErrorResponse("cannot change self_managed after creation"), nil
 		}
 		// only set password provided if it is self_managed
-		if sm && passwordInput != "" {
+		if sm && passwordInput != "" && role.StaticAccount.DN != "" {
 			role.StaticAccount.Password = passwordInput
 		} else if sm && passwordInput == "" {
 			return logical.ErrorResponse("password is required for self-managed static accounts"), nil
+		} else if sm && role.StaticAccount.DN == "" {
+			return logical.ErrorResponse("cannot set self_managed to true without a distinguished name (dn)"), nil
 		} else if !sm && passwordInput != "" {
 			return logical.ErrorResponse("cannot set password for non-self-managed static accounts"), nil
 		}

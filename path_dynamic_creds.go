@@ -95,6 +95,7 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 	dns, err := b.executeLDIF(config.LDAP, dRole.CreationLDIF, templateData, false)
 	if err != nil {
 		// Creation failed, attempt a rollback if one is specified
+		b.ldapEvent(ctx, "dynamic-creds-create-fail", req.Path, roleName, false)
 		if dRole.RollbackLDIF == "" {
 			return nil, fmt.Errorf("failed to create user: %w", err)
 		}
@@ -121,6 +122,9 @@ func (b *backend) pathDynamicCredsRead(ctx context.Context, req *logical.Request
 	resp := b.Secret(secretCredsType).Response(respData, internal)
 	resp.Secret.TTL = dRole.DefaultTTL
 	resp.Secret.MaxTTL = dRole.MaxTTL
+
+	// Send event notification for dynamic credentials creation
+	b.ldapEvent(ctx, "dynamic-creds-create", req.Path, roleName, true)
 
 	return resp, nil
 }

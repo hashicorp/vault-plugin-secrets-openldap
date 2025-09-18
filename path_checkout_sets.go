@@ -351,6 +351,9 @@ func (b *backend) operationSetUpdate(ctx context.Context, req *logical.Request, 
 		b.managedUsers[name] = struct{}{}
 	}
 
+	// Send event notification for library set create/update
+	b.ldapEvent(ctx, fmt.Sprintf("library-set-%s", req.Operation), req.Path, setName, true)
+
 	return nil, nil
 }
 
@@ -422,6 +425,9 @@ func (b *backend) operationSetDelete(ctx context.Context, req *logical.Request, 
 	for _, name := range set.ServiceAccountNames {
 		delete(b.managedUsers, name)
 	}
+
+	// Send event notification for library set delete
+	b.ldapEvent(ctx, "library-set-delete", req.Path, setName, true)
 
 	return nil, nil
 }

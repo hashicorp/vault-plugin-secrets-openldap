@@ -433,6 +433,67 @@ func TestRoles(t *testing.T) {
 			assertReadStaticRole(t, b, storage, role, data)
 		}
 	})
+
+	t.Run("happy path self managed", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		configureOpenLDAPMount(t, b, storage)
+
+		roleName := "hashicorp"
+		data := map[string]interface{}{
+			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period": float64(5),
+			"username":        "hashicorp",
+			"password":        "initialPassword!23",
+			"self_managed":    true,
+		}
+
+		resp, err := createStaticRoleWithData(t, b, storage, roleName, data)
+		if err != nil || (resp != nil && resp.IsError()) {
+			t.Fatalf("err:%s resp:%#v\n", err, resp)
+		}
+
+		assertReadStaticRole(t, b, storage, roleName, data)
+	})
+
+	t.Run("self managed missing password", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		configureOpenLDAPMount(t, b, storage)
+
+		data := map[string]interface{}{
+			"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+			"rotation_period": float64(5),
+			"username":        "hashicorp",
+			"self_managed":    true,
+		}
+
+		resp, _ := createStaticRoleWithData(t, b, storage, "hashicorp", data)
+		if resp == nil || !resp.IsError() {
+			t.Fatal("expected error")
+		}
+	})
+
+	t.Run("self managed missing dn", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(context.Background())
+
+		configureOpenLDAPMount(t, b, storage)
+
+		data := map[string]interface{}{
+			"rotation_period": float64(5),
+			"username":        "hashicorp",
+			"password":        "initialPassword!23",
+			"self_managed":    true,
+		}
+		resp, _ := createStaticRoleWithData(t, b, storage, "hashicorp", data)
+		if resp == nil || !resp.IsError() {
+			t.Fatal("expected error")
+		}
+	})
+
 }
 
 func TestRoles_NewPasswordGeneration(t *testing.T) {

@@ -147,6 +147,11 @@ func staticFields() map[string]*framework.FieldSchema {
 			Type:        framework.TypeBool,
 			Description: "Skip the initial pasword rotation on import (has no effect on updates)",
 		},
+		"self_managed": {
+			Type:        framework.TypeBool,
+			Description: "If true, Vault performs rotations by authenticating as this account using its current password (no privileged bind DN). Immutable after creation. Requires password on create.",
+			Default:     false,
+		},
 	}
 	return fields
 }
@@ -293,11 +298,26 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 
 		role.StaticAccount.DN = dn
 	}
+	passwordInput := ""
 	if passwordRaw, ok := data.GetOk("password"); ok {
-		role.StaticAccount.Password = passwordRaw.(string)
-		role.StaticAccount.SelfManaged = true
+		passwordInput = passwordRaw.(string)
 	}
-
+	if smRaw, ok := data.GetOk("self_managed"); ok {
+		sm := smRaw.(bool)
+		if !isCreate && sm != role.StaticAccount.SelfManaged {
+			return logical.ErrorResponse("cannot change self_managed after creation"), nil
+		}
+		// only set password provided if it is self_managed
+		if sm && passwordInput != "" {
+			role.StaticAccount.Password = passwordInput
+		} else if sm && passwordInput == "" {
+			return logical.ErrorResponse("password is required for self-managed static accounts"), nil
+		} else if !sm && passwordInput != "" {
+			return logical.ErrorResponse("cannot set password for non-self-managed static accounts"), nil
+		}
+		// If user explicitly set false while also providing password, honor explicit false.
+		role.StaticAccount.SelfManaged = sm
+	}
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
 	if !ok && isCreate {
 		return logical.ErrorResponse("rotation_period is required to create static accounts"), nil

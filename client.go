@@ -4,6 +4,7 @@
 package openldap
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/go-ldap/ldap/v3"
@@ -91,7 +92,10 @@ func (c *Client) UpdateUserPassword(conf *client.Config, username string, newPas
 func (c *Client) UpdateSelfDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
 	if dn == "" {
 		// Optionally implement a search to resolve DN from username, userdn, userattr in cfg.
-		return fmt.Errorf("user DN resolution not implemented")
+		return errors.New("user DN resolution not implemented")
+	}
+	if currentPassword == "" || newPassword == "" {
+		return fmt.Errorf("both current and new password must be provided for self-managed password changes on dn: %s", dn)
 	}
 
 	scope := ldap.ScopeBaseObject
@@ -106,11 +110,12 @@ func (c *Client) UpdateSelfDNPassword(conf *client.Config, dn string, currentPas
 	if err != nil {
 		return fmt.Errorf("error updating password: %s", err)
 	}
+	// Use a copy of the config to avoid modifying the original with the bind dn/password for rotation
 	rotationConf := *conf
 	rotationConf.BindDN = dn
 	rotationConf.BindPassword = currentPassword
 
-	return c.ldap.UpdateSelManagedPassword(&rotationConf, scope, currentValues, newValues, filters)
+	return c.ldap.UpdateSelfManagedPassword(&rotationConf, scope, currentValues, newValues, filters)
 }
 
 func (c *Client) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {

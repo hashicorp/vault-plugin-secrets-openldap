@@ -121,9 +121,10 @@ func (c *Client) UpdatePassword(cfg *Config, baseDN string, scope int, newValues
 	return c.UpdateEntry(cfg, baseDN, scope, filters, newValues)
 }
 
-// UpdateSelManagedPassword uses a Modify call under the hood for AD with Delete/Add and NewPasswordModifyRequest for OpenLDAP.
+// UpdateSelfManagedPassword uses a Modify call under the hood for AD with Delete/Add and NewPasswordModifyRequest for OpenLDAP.
 // This is for usage of self managed password since Replace modification like the one done in `UpdateEntry` requires extra permissions.
-func (c *Client) UpdateSelManagedPassword(cfg *Config, scope int, currentValues map[*Field][]string, newValues map[*Field][]string, filters map[*Field][]string) error {
+func (c *Client) UpdateSelfManagedPassword(cfg *Config, scope int, currentValues map[*Field][]string, newValues map[*Field][]string, filters map[*Field][]string) error {
+	// perform self search to validate account exists and current password is correct
 	entries, err := c.Search(cfg, cfg.BindDN, scope, filters)
 	if err != nil {
 		return err
@@ -154,21 +155,18 @@ func (c *Client) UpdateSelManagedPassword(cfg *Config, scope int, currentValues 
 		}
 		return conn.Modify(modifyReq)
 	case SchemaOpenLDAP:
-		var oldPassword, newPassword string
+		var currentPassword, newPassword string
 		for f, vals := range currentValues {
-			if f == FieldRegistry.UserPassword && len(vals) > 0 {
-				oldPassword = vals[0]
+			if f == FieldRegistry.UserPassword && len(vals) == 1 {
+				currentPassword = vals[0]
 			}
 		}
 		for f, vals := range newValues {
-			if f == FieldRegistry.UserPassword && len(vals) > 0 {
+			if f == FieldRegistry.UserPassword && len(vals) == 1 {
 				newPassword = vals[0]
 			}
 		}
-		if oldPassword == "" || newPassword == "" {
-			return errors.New("both current and new password must be provided")
-		}
-		req := ldap.NewPasswordModifyRequest(entries[0].DN, oldPassword, newPassword)
+		req := ldap.NewPasswordModifyRequest(entries[0].DN, currentPassword, newPassword)
 		pmConn, ok := conn.(interface {
 			PasswordModify(*ldap.PasswordModifyRequest) (*ldap.PasswordModifyResult, error)
 		})
@@ -178,6 +176,8 @@ func (c *Client) UpdateSelManagedPassword(cfg *Config, scope int, currentValues 
 		}
 		_, err = pmConn.PasswordModify(req)
 		return err
+	case SchemaRACF:
+		return c.UpdateEntry(cfg, cfg.BindDN, scope, filters, newValues)
 	default:
 		return fmt.Errorf("configured schema %s not valid", cfg.Schema)
 	}

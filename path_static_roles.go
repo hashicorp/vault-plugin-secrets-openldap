@@ -234,8 +234,9 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 	}
 
 	data := map[string]interface{}{
-		"dn":       role.StaticAccount.DN,
-		"username": role.StaticAccount.Username,
+		"dn":           role.StaticAccount.DN,
+		"username":     role.StaticAccount.Username,
+		"self_managed": role.StaticAccount.SelfManaged,
 	}
 
 	data["rotation_period"] = role.StaticAccount.RotationPeriod.Seconds()

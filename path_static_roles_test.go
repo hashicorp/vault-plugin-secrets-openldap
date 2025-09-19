@@ -69,6 +69,18 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 			wantUpdateErr: true,
 		},
 		{
+			name: "modified self_managed results in update error",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+			},
+			updateData: map[string]interface{}{
+				"self_managed": true,
+			},
+			wantUpdateErr: true,
+		},
+		{
 			name: "including skip_import_rotation is an update error",
 			createData: map[string]interface{}{
 				"username":        "bob",
@@ -549,6 +561,113 @@ func TestRoles_NewPasswordGeneration(t *testing.T) {
 		}
 	})
 
+	t.Run("updating password policy should generate new password", func(t *testing.T) {
+		// Fail to rotate the role
+		generateWALFromFailedRotation(t, b, storage, roleName)
+
+		// Get WAL
+		walIDs := requireWALs(t, storage, 1)
+		wal, err := b.findStaticWAL(ctx, storage, walIDs[0])
+		if err != nil || wal == nil {
+			t.Fatal(err)
+		}
+
+		expectedPassword := wal.NewPassword
+
+		// Update Password Policy
+		configureOpenLDAPMountWithPasswordPolicy(t, b, storage, testPasswordPolicy1, true)
+
+		// Rotate role manually and fail again
+		generateWALFromFailedRotation(t, b, storage, roleName)
+		// Get WAL
+		walIDs = requireWALs(t, storage, 1)
+		wal, err = b.findStaticWAL(ctx, storage, walIDs[0])
+		if err != nil || wal == nil {
+			t.Fatal(err)
+		}
+
+		// confirm new password is generated and is different from previous password
+		newPassword := wal.NewPassword
+		if expectedPassword == newPassword {
+			t.Fatalf("expected password to be different on second retry")
+		}
+
+		// confirm new password uses policy
+		if newPassword != testPasswordFromPolicy1 {
+			t.Fatalf("expected password %s, got %s", testPasswordFromPolicy1, newPassword)
+		}
+
+		// Successfully rotate the role
+		_, err = b.HandleRequest(context.Background(), &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      "rotate-role/" + roleName,
+			Storage:   storage,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Ensure WAL is flushed
+		walIDs = requireWALs(t, storage, 0)
+	})
+}
+func TestRoles_SelfManaged_NewPasswordGeneration(t *testing.T) {
+	ctx := context.Background()
+	b, storage := getBackend(false)
+	defer b.Cleanup(ctx)
+	configureOpenLDAPMount(t, b, storage)
+
+	// Create the role
+	roleName := "hashicorp-sm"
+	data := map[string]interface{}{
+		"username":        roleName,
+		"dn":              "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+		"rotation_period": "86400s",
+		"password":        "initialPassword!23",
+		"self_managed":    true,
+	}
+	createStaticRoleWithData(t, b, storage, roleName, data)
+
+	t.Run("self managed account rotation failures should generate new password on retry", func(t *testing.T) {
+		// Fail to rotate the role
+		generateWALFromFailedRotation(t, b, storage, roleName)
+
+		// Get WAL
+		walIDs := requireWALs(t, storage, 1)
+		wal, err := b.findStaticWAL(ctx, storage, walIDs[0])
+		if err != nil || wal == nil {
+			t.Fatal(err)
+		}
+		// Store password
+		initialPassword := wal.NewPassword
+
+		// Rotate role manually and fail again with same password
+		generateWALFromFailedRotation(t, b, storage, roleName)
+		// Ensure WAL is deleted since retrying initial password failed
+		requireWALs(t, storage, 0)
+
+		// Successfully rotate the role
+		_, err = b.HandleRequest(context.Background(), &logical.Request{
+			Operation: logical.UpdateOperation,
+			Path:      "rotate-role/" + roleName,
+			Storage:   storage,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Ensure WAL is flushed since request was successful
+		requireWALs(t, storage, 0)
+
+		// Read the credential
+		resp := readStaticCred(t, b, storage, roleName)
+
+		// Confirm successful rotation used new credential
+		// Assert previous failing credential is not being used
+		if resp.Data["password"] == initialPassword {
+			t.Fatalf("expected password to be different after second retry")
+		}
+	})
 	t.Run("updating password policy should generate new password", func(t *testing.T) {
 		// Fail to rotate the role
 		generateWALFromFailedRotation(t, b, storage, roleName)

@@ -121,6 +121,68 @@ func (c *Client) UpdatePassword(cfg *Config, baseDN string, scope int, newValues
 	return c.UpdateEntry(cfg, baseDN, scope, filters, newValues)
 }
 
+// ChangePassword uses a Modify call under the hood for AD with Delete/Add and NewPasswordModifyRequest for OpenLDAP.
+// This is for usage of self managed password since Replace modification like the one done in `UpdateEntry` requires extra permissions.
+func (c *Client) UpdateSelManagedPassword(cfg *Config, scope int, currentValues map[*Field][]string, newValues map[*Field][]string, filters map[*Field][]string) error {
+	entries, err := c.Search(cfg, cfg.BindDN, scope, filters)
+	if err != nil {
+		return err
+	}
+	if len(entries) != 1 {
+		return fmt.Errorf("expected one matching entry, but received %d", len(entries))
+	}
+	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if err := bind(cfg, conn); err != nil {
+		return err
+	}
+	switch cfg.Schema {
+	case SchemaAD:
+		modifyReq := &ldap.ModifyRequest{
+			DN: entries[0].DN,
+		}
+
+		for field, vals := range currentValues {
+			modifyReq.Delete(field.String(), vals)
+		}
+		for field, vals := range newValues {
+			modifyReq.Add(field.String(), vals)
+		}
+		return conn.Modify(modifyReq)
+	case SchemaOpenLDAP:
+		var oldPassword, newPassword string
+		for f, vals := range currentValues {
+			if f == FieldRegistry.UserPassword && len(vals) > 0 {
+				oldPassword = vals[0]
+			}
+		}
+		for f, vals := range newValues {
+			if f == FieldRegistry.UserPassword && len(vals) > 0 {
+				newPassword = vals[0]
+			}
+		}
+		if oldPassword == "" || newPassword == "" {
+			return errors.New("both current and new password must be provided")
+		}
+		req := ldap.NewPasswordModifyRequest(entries[0].DN, oldPassword, newPassword)
+		pmConn, ok := conn.(interface {
+			PasswordModify(*ldap.PasswordModifyRequest) (*ldap.PasswordModifyResult, error)
+		})
+		if !ok {
+			// Fallback: try privileged replace (may fail if self-change perms required)
+			return c.UpdateEntry(cfg, cfg.BindDN, scope, filters, newValues)
+		}
+		_, err = pmConn.PasswordModify(req)
+		return err
+	default:
+		return fmt.Errorf("configured schema %s not valid", cfg.Schema)
+	}
+}
+
 // toString turns the following map of filters into LDAP search filter strings
 // For example: "(cn=Ellen Jones)"
 // when multiple filters are applied, they get AND'ed together.

@@ -88,29 +88,29 @@ func (c *Client) UpdateUserPassword(conf *client.Config, username string, newPas
 	return c.ldap.UpdatePassword(conf, conf.UserDN, ldap.ScopeWholeSubtree, newValues, filters)
 }
 
-func (c *Client) UpdateSelfDNPassword(conf *client.Config, dn, currentPassword, newPassword string) error {
+func (c *Client) UpdateSelfDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
 	if dn == "" {
 		// Optionally implement a search to resolve DN from username, userdn, userattr in cfg.
 		return fmt.Errorf("user DN resolution not implemented")
 	}
 
-	// newValues, err := client.GetSchemaFieldRegistry(conf, newPassword)
-	// if err != nil {
-	// 	return fmt.Errorf("error updating password: %s", err)
-	// }
-	conn, err := c.ldap.DialLDAP(conf.ConfigEntry)
-	if err != nil {
-		return err
+	scope := ldap.ScopeBaseObject
+	filters := map[*client.Field][]string{
+		client.FieldRegistry.ObjectClass: {"*"},
 	}
-	defer conn.Close()
+	currentValues, err := client.GetSchemaFieldRegistry(conf, currentPassword)
+	if err != nil {
+		return fmt.Errorf("error updating password: %s", err)
+	}
+	newValues, err := client.GetSchemaFieldRegistry(conf, newPassword)
+	if err != nil {
+		return fmt.Errorf("error updating password: %s", err)
+	}
+	rotationConf := *conf
+	rotationConf.BindDN = dn
+	rotationConf.BindPassword = currentPassword
 
-	// Use Password Modify Extended Operation (RFC 3062)
-	req := ldap.NewPasswordModifyRequest(dn, currentPassword, newPassword)
-	_, err = conn.PasswordModify(req)
-	if err != nil {
-		return fmt.Errorf("password modify failed: %w", err)
-	}
-	return nil
+	return c.ldap.UpdateSelManagedPassword(&rotationConf, scope, currentValues, newValues, filters)
 }
 
 func (c *Client) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {

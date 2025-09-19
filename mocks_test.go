@@ -28,6 +28,11 @@ func (m *mockLDAPClient) UpdateUserPassword(conf *client.Config, user string, ne
 	return args.Error(0)
 }
 
+func (m *mockLDAPClient) UpdateSelfDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
+	args := m.Called(conf, dn, currentPassword, newPassword)
+	return args.Error(0)
+}
+
 func (m *mockLDAPClient) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {
 	args := m.Called(conf, entries, continueOnError)
 	return args.Error(0)

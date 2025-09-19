@@ -118,6 +118,14 @@ func (f *fakeLdapClient) UpdateDNPassword(_ *client.Config, _ string, _ string) 
 	return err
 }
 
+func (f *fakeLdapClient) UpdateSelfDNPassword(_ *client.Config, _ string, _ string, _ string) error {
+	var err error
+	if f.throwErrs {
+		err = errors.New("forced error")
+	}
+	return err
+}
+
 func (f *fakeLdapClient) Execute(_ *client.Config, _ []*ldif.Entry, _ bool) error {
 	var err error
 	if f.throwErrs {

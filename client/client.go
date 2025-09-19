@@ -121,7 +121,7 @@ func (c *Client) UpdatePassword(cfg *Config, baseDN string, scope int, newValues
 	return c.UpdateEntry(cfg, baseDN, scope, filters, newValues)
 }
 
-// ChangePassword uses a Modify call under the hood for AD with Delete/Add and NewPasswordModifyRequest for OpenLDAP.
+// UpdateSelManagedPassword uses a Modify call under the hood for AD with Delete/Add and NewPasswordModifyRequest for OpenLDAP.
 // This is for usage of self managed password since Replace modification like the one done in `UpdateEntry` requires extra permissions.
 func (c *Client) UpdateSelManagedPassword(cfg *Config, scope int, currentValues map[*Field][]string, newValues map[*Field][]string, filters map[*Field][]string) error {
 	entries, err := c.Search(cfg, cfg.BindDN, scope, filters)

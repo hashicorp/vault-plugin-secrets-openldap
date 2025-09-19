@@ -118,7 +118,7 @@ func (f *fakeLdapClient) UpdateDNPassword(_ *client.Config, _ string, _ string) 
 	return err
 }
 
-func (f *fakeLdapClient) UpdateSelfDNPassword(_ *client.Config, _ string, _ string, _ string) error {
+func (f *fakeLdapClient) UpdateSelfManagedDNPassword(_ *client.Config, _ string, _ string, _ string) error {
 	var err error
 	if f.throwErrs {
 		err = errors.New("forced error")

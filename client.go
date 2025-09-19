@@ -18,7 +18,7 @@ import (
 type ldapClient interface {
 	UpdateDNPassword(conf *client.Config, dn string, newPassword string) error
 	UpdateUserPassword(conf *client.Config, user, newPassword string) error
-	UpdateSelfDNPassword(conf *client.Config, dn, currentPassword, newPassword string) error
+	UpdateSelfManagedDNPassword(conf *client.Config, dn, currentPassword, newPassword string) error
 	Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) error
 }
 
@@ -89,7 +89,7 @@ func (c *Client) UpdateUserPassword(conf *client.Config, username string, newPas
 	return c.ldap.UpdatePassword(conf, conf.UserDN, ldap.ScopeWholeSubtree, newValues, filters)
 }
 
-func (c *Client) UpdateSelfDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
+func (c *Client) UpdateSelfManagedDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
 	if dn == "" {
 		// Optionally implement a search to resolve DN from username, userdn, userattr in cfg.
 		return errors.New("user DN resolution not implemented")

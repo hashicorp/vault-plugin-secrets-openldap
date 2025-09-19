@@ -213,6 +213,43 @@ func Test_UpdateUserPassword(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func Test_UpdateSelfManagedDNPassword_MissingPrameters(t *testing.T) {
+	config := &client.Config{
+		ConfigEntry: &ldaputil.ConfigEntry{
+			Url:          "ldap://ldap.com:389",
+			BindDN:       "cn=admin,dc=example,dc=org",
+			BindPassword: "admin",
+		},
+		Schema: client.SchemaOpenLDAP,
+	}
+
+	c := NewClient(hclog.NewNullLogger())
+	newPassword := "newpassword"
+	err := c.UpdateSelfManagedDNPassword(config, "cn=user1,dc=example,dc=org", "", newPassword)
+	assert.Error(t, err)
+	err = c.UpdateSelfManagedDNPassword(config, "", "currentpassword", newPassword)
+	assert.Error(t, err)
+	err = c.UpdateSelfManagedDNPassword(config, "cn=user1,dc=example,dc=org", "currentpassword", "")
+	assert.Error(t, err)
+}
+
+func Test_UpdateSelfManagedDNPassword(t *testing.T) {
+	ldapServer := setupDockerLDAP(t)
+	config := &client.Config{
+		ConfigEntry: &ldaputil.ConfigEntry{
+			Url:          ldapServer,
+			BindDN:       "cn=admin,dc=example,dc=org",
+			BindPassword: "admin",
+		},
+		Schema: client.SchemaOpenLDAP,
+	}
+
+	c := NewClient(hclog.NewNullLogger())
+	newPassword := "newpassword"
+	err := c.UpdateSelfManagedDNPassword(config, "cn=admin,dc=example,dc=org", "admin", newPassword)
+	assert.NoError(t, err)
+}
+
 func setupDockerLDAP(t *testing.T) string {
 	t.Helper()
 	pool, err := dockertest.NewPool("")

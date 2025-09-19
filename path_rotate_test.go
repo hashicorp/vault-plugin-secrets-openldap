@@ -213,7 +213,7 @@ func (f *failingRollbackClient) UpdateDNPassword(conf *client.Config, dn string,
 	return fmt.Errorf("some error")
 }
 
-func (f *failingRollbackClient) UpdateSelfDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
+func (f *failingRollbackClient) UpdateSelfManagedDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
 	panic("nope")
 }
 

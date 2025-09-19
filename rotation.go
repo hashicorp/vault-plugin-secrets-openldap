@@ -414,7 +414,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		if input.Role.StaticAccount.DN == "" {
 			return output, fmt.Errorf("self-managed static role %q requires DN for rotation (no search path implemented)", input.Role.StaticAccount.Username)
 		}
-		err = b.client.UpdateSelfDNPassword(
+		err = b.client.UpdateSelfManagedDNPassword(
 			config.LDAP,
 			input.Role.StaticAccount.DN,
 			input.Role.StaticAccount.Password,

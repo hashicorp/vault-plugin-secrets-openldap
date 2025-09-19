@@ -28,7 +28,7 @@ func (m *mockLDAPClient) UpdateUserPassword(conf *client.Config, user string, ne
 	return args.Error(0)
 }
 
-func (m *mockLDAPClient) UpdateSelfDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
+func (m *mockLDAPClient) UpdateSelfManagedDNPassword(conf *client.Config, dn string, currentPassword string, newPassword string) error {
 	args := m.Called(conf, dn, currentPassword, newPassword)
 	return args.Error(0)
 }

@@ -414,18 +414,22 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		if input.Role.StaticAccount.DN == "" {
 			return output, fmt.Errorf("self-managed static role %q requires DN for rotation (no search path implemented)", input.Role.StaticAccount.Username)
 		}
-		// change the config to use the static account
-		rotateConfig.BindDN = input.Role.StaticAccount.DN
-		rotateConfig.BindPassword = input.Role.StaticAccount.Password
-	}
-	// Perform the LDAP search with the DN if it's configured. DN-based search
-	// targets the object directly. Otherwise, search using the userdn, userattr,
-	// and username. UserDN-based search targets the object by searching the whole
-	// subtree rooted at the userDN.
-	if input.Role.StaticAccount.DN != "" {
-		err = b.client.UpdateDNPassword(&rotateConfig, input.Role.StaticAccount.DN, newPassword)
+		err = b.client.UpdateSelfDNPassword(
+			config.LDAP,
+			input.Role.StaticAccount.DN,
+			input.Role.StaticAccount.Password,
+			newPassword,
+		)
 	} else {
-		err = b.client.UpdateUserPassword(&rotateConfig, input.Role.StaticAccount.Username, newPassword)
+		// Perform the LDAP search with the DN if it's configured. DN-based search
+		// targets the object directly. Otherwise, search using the userdn, userattr,
+		// and username. UserDN-based search targets the object by searching the whole
+		// subtree rooted at the userDN.
+		if input.Role.StaticAccount.DN != "" {
+			err = b.client.UpdateDNPassword(&rotateConfig, input.Role.StaticAccount.DN, newPassword)
+		} else {
+			err = b.client.UpdateUserPassword(&rotateConfig, input.Role.StaticAccount.Username, newPassword)
+		}
 	}
 	if err != nil {
 		// Special handling for self-managed invalid credential errors:

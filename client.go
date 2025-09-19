@@ -17,6 +17,7 @@ import (
 type ldapClient interface {
 	UpdateDNPassword(conf *client.Config, dn string, newPassword string) error
 	UpdateUserPassword(conf *client.Config, user, newPassword string) error
+	UpdateSelfDNPassword(conf *client.Config, dn, currentPassword, newPassword string) error
 	Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) error
 }
 
@@ -85,6 +86,31 @@ func (c *Client) UpdateUserPassword(conf *client.Config, username string, newPas
 	}
 
 	return c.ldap.UpdatePassword(conf, conf.UserDN, ldap.ScopeWholeSubtree, newValues, filters)
+}
+
+func (c *Client) UpdateSelfDNPassword(conf *client.Config, dn, currentPassword, newPassword string) error {
+	if dn == "" {
+		// Optionally implement a search to resolve DN from username, userdn, userattr in cfg.
+		return fmt.Errorf("user DN resolution not implemented")
+	}
+
+	// newValues, err := client.GetSchemaFieldRegistry(conf, newPassword)
+	// if err != nil {
+	// 	return fmt.Errorf("error updating password: %s", err)
+	// }
+	conn, err := c.ldap.DialLDAP(conf.ConfigEntry)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	// Use Password Modify Extended Operation (RFC 3062)
+	req := ldap.NewPasswordModifyRequest(dn, currentPassword, newPassword)
+	_, err = conn.PasswordModify(req)
+	if err != nil {
+		return fmt.Errorf("password modify failed: %w", err)
+	}
+	return nil
 }
 
 func (c *Client) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {

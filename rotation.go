@@ -378,7 +378,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
 			}
 			output.WALID = ""
-		case input.Role.StaticAccount.SelfManaged && !input.Role.StaticAccount.PasswordModifiedExternally && wal.Attempt >= wal.MaxAttempts:
+		case input.Role.StaticAccount.SelfManaged && wal.Attempt >= wal.MaxAttempts:
 			b.Logger().Error("max rotation attempts reached for role; suppressing further automatic rotations", "role", input.RoleName, "WAL ID", output.WALID, "attempts", wal.Attempt)
 			return output, ErrMaxRotationAttempts
 		case wal.NewPassword != "" && wal.PasswordPolicy != config.PasswordPolicy:

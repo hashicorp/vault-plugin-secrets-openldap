@@ -372,7 +372,13 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 			b.Logger().Error("expected role to have WAL, but WAL not found in storage", "role", input.RoleName, "WAL ID", output.WALID)
 			// Generate a new WAL entry and credential
 			output.WALID = ""
-		case input.Role.StaticAccount.SelfManaged && wal.MaxAttempts > 0 && wal.Attempt >= wal.MaxAttempts:
+		case input.Role.StaticAccount.SelfManaged && input.Role.StaticAccount.PasswordModifiedExternally:
+			b.Logger().Info("detected password change outside of Vault; proceeding with rotation using new password", "role", input.RoleName, "WAL ID", output.WALID)
+			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
+			}
+			output.WALID = ""
+		case input.Role.StaticAccount.SelfManaged && !input.Role.StaticAccount.PasswordModifiedExternally && wal.Attempt >= wal.MaxAttempts:
 			b.Logger().Error("max rotation attempts reached for role; suppressing further automatic rotations", "role", input.RoleName, "WAL ID", output.WALID, "attempts", wal.Attempt)
 			return output, ErrMaxRotationAttempts
 		case wal.NewPassword != "" && wal.PasswordPolicy != config.PasswordPolicy:
@@ -494,6 +500,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	input.Role.StaticAccount.SetNextVaultRotation(lvr)
 	input.Role.StaticAccount.LastPassword = input.Role.StaticAccount.Password
 	input.Role.StaticAccount.Password = newPassword
+	input.Role.StaticAccount.PasswordModifiedExternally = false
 	output.RotationTime = lvr
 
 	entry, err := logical.StorageEntryJSON(staticRolePath+input.RoleName, input.Role)

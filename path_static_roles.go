@@ -332,6 +332,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// If user explicitly set false while also providing password, honor explicit false.
 		role.StaticAccount.SelfManaged = sm
 	}
+	if role.StaticAccount.SelfManaged && !isCreate && passwordInput != "" && passwordInput != role.StaticAccount.Password {
+		role.StaticAccount.PasswordModifiedExternally = true
+	} else {
+		role.StaticAccount.PasswordModifiedExternally = false
+	}
 	if maxInvalidRaw, ok := data.GetOk("self_managed_max_invalid_attempts"); ok {
 		maxInvalid := maxInvalidRaw.(int)
 		if !isCreate && maxInvalid != role.StaticAccount.SelfManagedMaxInvalidAttempts {
@@ -520,6 +525,12 @@ type staticAccount struct {
 	// SelfManagedMaxInvalidAttempts is the maximum number of invalid attempts allowed for self-managed accounts.
 	// A value less than or equal to 0 means use the default (or unlimited if negative).
 	SelfManagedMaxInvalidAttempts int `json:"self_managed_max_invalid_attempts"`
+
+	// PasswordModifiedExternally is true when Vault has detected (or has been
+	// informed) that the LDAP account password was modified outside of Vault's
+	// managed rotation workflow (an out-of-band / external change). When set,
+	// reconciliation logic can re-assume management or trigger a fresh rotation.
+	PasswordModifiedExternally bool `json:"password_modified_externally"`
 }
 
 // NextRotationTime calculates the next rotation by adding the Rotation Period

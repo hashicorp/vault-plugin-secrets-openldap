@@ -18,6 +18,8 @@ import (
 
 const (
 	staticRolePath = "static-role/"
+	// Default max consecutive invalid current-password attempts for self-managed accounts (if role field unset)
+	defaultSelfManagedMaxInvalidAttempts = 5
 )
 
 // genericNameWithForwardSlashRegex is a regex which requires a role name. The
@@ -155,6 +157,11 @@ func staticFields() map[string]*framework.FieldSchema {
 			Description: "If true, Vault performs rotations by authenticating as this account using its current password (no privileged bind DN). Immutable after creation. Requires password on create.",
 			Default:     false,
 		},
+		"self_managed_max_invalid_attempts": {
+			Type:        framework.TypeInt,
+			Description: "Maximum number of invalid current-password attempts for self-managed accounts. A value less than or equal to 0 means use the default. Immutable after creation.",
+			Default:     defaultSelfManagedMaxInvalidAttempts,
+		},
 	}
 	return fields
 }
@@ -234,9 +241,10 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 	}
 
 	data := map[string]interface{}{
-		"dn":           role.StaticAccount.DN,
-		"username":     role.StaticAccount.Username,
-		"self_managed": role.StaticAccount.SelfManaged,
+		"dn":                                role.StaticAccount.DN,
+		"username":                          role.StaticAccount.Username,
+		"self_managed":                      role.StaticAccount.SelfManaged,
+		"self_managed_max_invalid_attempts": role.StaticAccount.SelfManagedMaxInvalidAttempts,
 	}
 
 	data["rotation_period"] = role.StaticAccount.RotationPeriod.Seconds()
@@ -323,6 +331,16 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 		// If user explicitly set false while also providing password, honor explicit false.
 		role.StaticAccount.SelfManaged = sm
+	}
+	if maxInvalidRaw, ok := data.GetOk("self_managed_max_invalid_attempts"); ok {
+		maxInvalid := maxInvalidRaw.(int)
+		if !isCreate && maxInvalid != role.StaticAccount.SelfManagedMaxInvalidAttempts {
+			return logical.ErrorResponse("cannot change self_managed_max_invalid_attempts after creation"), nil
+		}
+		if maxInvalid <= 0 {
+			maxInvalid = defaultSelfManagedMaxInvalidAttempts
+		}
+		role.StaticAccount.SelfManagedMaxInvalidAttempts = maxInvalid
 	}
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
 	if !ok && isCreate {
@@ -498,6 +516,10 @@ type staticAccount struct {
 	// whether the account is self-managed or Vault-managed (i.e. rotated by a privileged bind account).
 	// this is currently only set at account creation time and cannot be changed
 	SelfManaged bool `json:"self_managed"`
+
+	// SelfManagedMaxInvalidAttempts is the maximum number of invalid attempts allowed for self-managed accounts.
+	// A value less than or equal to 0 means use the default (or unlimited if negative).
+	SelfManagedMaxInvalidAttempts int `json:"self_managed_max_invalid_attempts"`
 }
 
 // NextRotationTime calculates the next rotation by adding the Rotation Period

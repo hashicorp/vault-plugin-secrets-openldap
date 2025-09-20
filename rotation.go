@@ -28,6 +28,8 @@ const (
 	staticWALKey = "staticRotationKey"
 )
 
+var ErrMaxRotationAttempts = errors.New("max rotation attempts reached")
+
 // populateQueue loads the priority queue with existing static accounts. This
 // occurs at initialization, after any WAL entries of failed or interrupted
 // rotations have been processed. It lists the roles from storage and searches
@@ -148,6 +150,8 @@ type setCredentialsWAL struct {
 	DN                string    `json:"dn" mapstructure:"dn"`
 	PasswordPolicy    string    `json:"password_policy" mapstructure:"password_policy"`
 	LastVaultRotation time.Time `json:"last_vault_rotation" mapstructure:"last_vault_rotation"`
+	Attempt           int       `json:"attempt" mapstructure:"attempt"`
+	MaxAttempts       int       `json:"max_attempts" mapstructure:"max_attempts"`
 
 	// Private fields which will not be included in json.Marshal/Unmarshal.
 	walID        string
@@ -230,6 +234,11 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 
 	resp, err := b.setStaticAccountPassword(ctx, s, input)
 	if err != nil {
+		if errors.Is(err, ErrMaxRotationAttempts) {
+			b.Logger().Error("max rotation attempts reached; suppressing further automatic rotations", "role", item.Key)
+			// Do not requeue (admin must intervene: reset attempts by deleting WAL or forcing manual rotation)
+			return true
+		}
 		b.Logger().Error("unable to rotate credentials in periodic function", "name", item.Key, "error", err)
 		// Increment the priority enough so that the next call to this method
 		// likely will not attempt to rotate it, as a back-off of sorts
@@ -351,24 +360,26 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 
 	var newPassword string
 	var usedCredentialFromPreviousRotation bool
+	var currentWAL *setCredentialsWAL
 	if output.WALID != "" {
 		wal, err := b.findStaticWAL(ctx, s, output.WALID)
 		if err != nil {
 			return output, fmt.Errorf("error retrieving WAL entry: %w", err)
 		}
-
+		currentWAL = wal
 		switch {
 		case wal == nil:
 			b.Logger().Error("expected role to have WAL, but WAL not found in storage", "role", input.RoleName, "WAL ID", output.WALID)
-
 			// Generate a new WAL entry and credential
 			output.WALID = ""
+		case input.Role.StaticAccount.SelfManaged && wal.MaxAttempts > 0 && wal.Attempt >= wal.MaxAttempts:
+			b.Logger().Error("max rotation attempts reached for role; suppressing further automatic rotations", "role", input.RoleName, "WAL ID", output.WALID, "attempts", wal.Attempt)
+			return output, ErrMaxRotationAttempts
 		case wal.NewPassword != "" && wal.PasswordPolicy != config.PasswordPolicy:
 			b.Logger().Debug("password policy changed, generating new password", "role", input.RoleName, "WAL ID", output.WALID)
 			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
 				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
 			}
-
 			// Generate a new WAL entry and credential
 			output.WALID = ""
 		default:
@@ -383,18 +394,22 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		if err != nil {
 			return output, err
 		}
-		output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, &setCredentialsWAL{
+		wal := &setCredentialsWAL{
 			RoleName:          input.RoleName,
 			Username:          input.Role.StaticAccount.Username,
 			DN:                input.Role.StaticAccount.DN,
 			NewPassword:       newPassword,
 			LastVaultRotation: input.Role.StaticAccount.LastVaultRotation,
 			PasswordPolicy:    config.PasswordPolicy,
-		})
+			Attempt:           0,
+			MaxAttempts:       input.Role.StaticAccount.SelfManagedMaxInvalidAttempts,
+		}
+		output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, wal)
 		b.Logger().Debug("wrote WAL", "role", input.RoleName, "WAL ID", output.WALID)
 		if err != nil {
 			return output, fmt.Errorf("error writing WAL entry: %w", err)
 		}
+		currentWAL = wal
 	}
 
 	if newPassword == "" {
@@ -435,9 +450,28 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		// Special handling for self-managed invalid credential errors:
 		if input.Role.StaticAccount.SelfManaged && isInvalidCredErr(err) {
 			// Likely the stored current password is stale (changed out-of-band).
-			// Keep the WAL (if any) so we can retry after correction; just return error.
-			b.Logger().Error("self-managed rotation failed due to invalid current password; WAL retained",
-				"role", input.RoleName, "WAL ID", output.WALID, "error", err)
+			if currentWAL != nil && currentWAL.walID != "" {
+				if currentWAL.Attempt < currentWAL.MaxAttempts { // Retry allowed
+					b.Logger().Warn("self-managed rotation failed due to invalid current password; will retry",
+						"role", input.RoleName, "WAL ID", output.WALID, "attempt", currentWAL.Attempt, "max_attempts", currentWAL.MaxAttempts, "error", err)
+					// Update Attempt count in WAL
+					newID, uErr := updateAttemptsInWAL(ctx, s, currentWAL, b)
+					if uErr != nil {
+						b.Logger().Warn("failed to update rotation attempt count in WAL", "role", input.RoleName, "error", uErr)
+					} else {
+						b.Logger().Debug("updated rotation attempt count in WAL", "role", input.RoleName, "WAL ID", output.WALID, "new WAL ID", newID, "attempt", currentWAL.Attempt)
+						output.WALID = newID
+					}
+				} else { // Max attempts reached
+					// delete wal so that is user pushes new updated password it will be used
+					if delErr := framework.DeleteWAL(ctx, s, output.WALID); delErr != nil {
+						b.Logger().Warn("failed deleting WAL after max attempts", "role", input.RoleName, "WAL ID", output.WALID, "error", delErr)
+					}
+					b.Logger().Error("max rotation attempts reached for self-managed role; suppressing further automatic rotations", "role", input.RoleName, "WAL ID", output.WALID, "attempts", currentWAL.Attempt)
+					// returning this error stops further automatic rotations
+					return output, ErrMaxRotationAttempts
+				}
+			}
 			return output, err
 		}
 		if usedCredentialFromPreviousRotation {
@@ -488,6 +522,16 @@ func isInvalidCredErr(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "invalid credentials") ||
 		strings.Contains(msg, "ldap result code 49")
+}
+
+// Rewrite WAL with incremented Attempts (delete old, create new)
+func updateAttemptsInWAL(ctx context.Context, s logical.Storage, wal *setCredentialsWAL, b *backend) (string, error) {
+	if delErr := framework.DeleteWAL(ctx, s, wal.walID); delErr != nil {
+		b.Logger().Warn("failed deleting WAL prior to rewrite", "role", wal.RoleName, "WAL ID", wal.walID, "error", delErr)
+		return wal.walID, delErr
+	}
+	wal.Attempt++
+	return framework.PutWAL(ctx, s, staticWALKey, wal)
 }
 
 func (b *backend) GeneratePassword(ctx context.Context, cfg *config) (string, error) {

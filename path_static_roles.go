@@ -293,7 +293,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	// cannot be modified after creation. If given, it will take precedence
 	// over username for LDAP search during password rotation.
 	// For self-managed: DN is required
-	if dnRaw, ok := data.GetOk("dn"); ok {
+	dnRaw, ok := data.GetOk("dn")
+	if !ok && isCreate && role.StaticAccount.SelfManaged {
+		return logical.ErrorResponse("dn is a required field to assume management of a self-managed static account"), nil
+	}
+	if ok {
 		dn := dnRaw.(string)
 		if !isCreate && dn != "" && dn != role.StaticAccount.DN {
 			return logical.ErrorResponse("cannot update static account distinguished name (dn)"), nil
@@ -304,7 +308,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		role.StaticAccount.DN = dn
 	}
 	passwordModifiedExternally := false
-	if passwordRaw, ok := data.GetOk("password"); ok {
+	passwordRaw, ok := data.GetOk("password")
+	if !ok && isCreate && role.StaticAccount.SelfManaged {
+		return logical.ErrorResponse("password is a required field to assume management of a self-managed static account"), nil
+	}
+	if ok {
 		passwordInput := passwordRaw.(string)
 		if !isCreate && passwordInput != "" && passwordInput != role.StaticAccount.Password {
 			b.Logger().Debug("external password change for static role", "role", name)

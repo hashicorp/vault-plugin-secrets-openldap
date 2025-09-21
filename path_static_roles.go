@@ -292,7 +292,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	// For non-self managed: DN is optional Unless it is unset via providing the empty string, it
 	// cannot be modified after creation. If given, it will take precedence
 	// over username for LDAP search during password rotation.
-	// For self-managed: DN is required
+	// For self-managed: DN is required.
 	dnRaw, ok := data.GetOk("dn")
 	if !ok && isCreate && role.StaticAccount.SelfManaged {
 		return logical.ErrorResponse("dn is a required field to assume management of a self-managed static account"), nil
@@ -318,7 +318,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			b.Logger().Debug("external password change for static role", "role", name)
 			passwordModifiedExternally = true
 		}
-		if role.StaticAccount.SelfManaged && passwordInput != "" && role.StaticAccount.DN != "" {
+		if role.StaticAccount.SelfManaged && passwordInput != "" {
 			role.StaticAccount.Password = passwordInput
 		} else if role.StaticAccount.SelfManaged && passwordInput == "" { // dont allow to provide empty password for self-managed accounts
 			return logical.ErrorResponse("cannot provide empty password parameter for self-managed accounts"), nil

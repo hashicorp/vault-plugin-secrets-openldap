@@ -293,32 +293,30 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 
 		role.StaticAccount.DN = dn
 	}
-	passwordInput := ""
-	if passwordRaw, ok := data.GetOk("password"); ok {
-		passwordInput = passwordRaw.(string)
-	}
-	passwordModifiedExternally := false
-	if !isCreate && passwordInput != "" && passwordInput != role.StaticAccount.Password {
-		b.Logger().Debug("external password change for static role", "role", name)
-		passwordModifiedExternally = true
-	}
 	if smRaw, ok := data.GetOk("self_managed"); ok {
 		sm := smRaw.(bool)
 		if !isCreate && sm != role.StaticAccount.SelfManaged {
 			return logical.ErrorResponse("cannot change self_managed after creation"), nil
 		}
-		// only set password provided if it is self_managed
-		if sm && passwordInput != "" && role.StaticAccount.DN != "" {
+		role.StaticAccount.SelfManaged = sm
+	}
+	if role.StaticAccount.SelfManaged && role.StaticAccount.DN == "" {
+		return logical.ErrorResponse("cannot set self_managed to true without a distinguished name (dn)"), nil
+	}
+	passwordModifiedExternally := false
+	if passwordRaw, ok := data.GetOk("password"); ok {
+		passwordInput := passwordRaw.(string)
+		if !isCreate && passwordInput != "" && passwordInput != role.StaticAccount.Password {
+			b.Logger().Debug("external password change for static role", "role", name)
+			passwordModifiedExternally = true
+		}
+		if role.StaticAccount.SelfManaged && passwordInput != "" && role.StaticAccount.DN != "" {
 			role.StaticAccount.Password = passwordInput
-		} else if sm && passwordInput == "" {
-			return logical.ErrorResponse("password is required for self-managed static accounts"), nil
-		} else if sm && role.StaticAccount.DN == "" {
-			return logical.ErrorResponse("cannot set self_managed to true without a distinguished name (dn)"), nil
-		} else if !sm && passwordInput != "" {
+		} else if role.StaticAccount.SelfManaged && passwordInput == "" { // dont allow to provide empty password for self-managed accounts
+			return logical.ErrorResponse("cannot provide empty password parameter for self-managed accounts"), nil
+		} else if !role.StaticAccount.SelfManaged && passwordInput != "" {
 			return logical.ErrorResponse("cannot set password for non-self-managed static accounts"), nil
 		}
-		// If user explicitly set false while also providing password, honor explicit false.
-		role.StaticAccount.SelfManaged = sm
 	}
 	if maxInvalidRaw, ok := data.GetOk("self_managed_max_invalid_attempts"); ok {
 		maxInvalid := maxInvalidRaw.(int)

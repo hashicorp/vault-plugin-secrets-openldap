@@ -151,7 +151,6 @@ type setCredentialsWAL struct {
 	PasswordPolicy    string    `json:"password_policy" mapstructure:"password_policy"`
 	LastVaultRotation time.Time `json:"last_vault_rotation" mapstructure:"last_vault_rotation"`
 	Attempt           int       `json:"attempt" mapstructure:"attempt"`
-	MaxAttempts       int       `json:"max_attempts" mapstructure:"max_attempts"`
 
 	// Private fields which will not be included in json.Marshal/Unmarshal.
 	walID        string

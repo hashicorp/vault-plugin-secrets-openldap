@@ -302,7 +302,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		if !isCreate && dn != "" && dn != role.StaticAccount.DN {
 			return logical.ErrorResponse("cannot update static account distinguished name (dn)"), nil
 		}
-		if role.StaticAccount.SelfManaged && role.StaticAccount.DN == "" {
+		if role.StaticAccount.SelfManaged && dn == "" {
 			return logical.ErrorResponse("cannot set self_managed to true without a distinguished name (dn)"), nil
 		}
 		role.StaticAccount.DN = dn

@@ -152,6 +152,66 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 				"rotation_period": float64(25),
 			},
 		},
+		{
+			name: "modified self-managed static role with empty dn results in update error",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+				"self_managed":    true,
+				"password":        "InitialPassword!23",
+			},
+			updateData: map[string]interface{}{
+				"dn": "",
+			},
+			wantUpdateErr: true,
+		},
+		{
+			name: "create self-managed static role with empty dn results in create error",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"dn":              "",
+				"rotation_period": float64(5),
+				"self_managed":    true,
+				"password":        "InitialPassword!23",
+			},
+			wantCreateErr: true,
+		},
+		{
+			name: "create self-managed static role with empty password results in create error",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+				"self_managed":    true,
+				"password":        "",
+			},
+			wantCreateErr: true,
+		},
+		{
+			name: "modified self-managed static role with empty password results in update error",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+				"self_managed":    true,
+				"password":        "InitialPassword!23",
+			},
+			updateData: map[string]interface{}{
+				"password": "",
+			},
+			wantUpdateErr: true,
+		},
+		{
+			name: "create non self-managed static role with empty password results in create error",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+				"password":        "InitialPassword!23",
+			},
+			wantCreateErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -186,6 +246,9 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 
 			// assert response has expected fields
 			for key, expected := range tt.createData {
+				if key == "password" {
+					continue
+				}
 				actual := resp.Data[key]
 				if actual != expected {
 					t.Fatalf("expected %v to be %v, got %v", key, expected, actual)
@@ -215,6 +278,9 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 
 			// assert response has expected fields
 			for key, expected := range tt.updateData {
+				if key == "password" {
+					continue
+				}
 				actual := resp.Data[key]
 				if actual != expected {
 					t.Fatalf("expected %v to be %v, got %v", key, expected, actual)

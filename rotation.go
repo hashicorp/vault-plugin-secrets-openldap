@@ -236,7 +236,7 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 	if err != nil {
 		if errors.Is(err, ErrMaxRotationAttempts) {
 			b.Logger().Error("max rotation attempts reached; suppressing further automatic rotations", "role", item.Key)
-			// Do not requeue (admin must intervene: reset attempts by deleting WAL or forcing manual rotation)
+			// Do not requeue this one and go to next item
 			return true
 		}
 		b.Logger().Error("unable to rotate credentials in periodic function", "name", item.Key, "error", err)

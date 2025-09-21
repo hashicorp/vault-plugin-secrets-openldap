@@ -282,17 +282,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		role.StaticAccount.Username = username
 	}
 
-	// DN is optional. Unless it is unset via providing the empty string, it
-	// cannot be modified after creation. If given, it will take precedence
-	// over username for LDAP search during password rotation.
-	if dnRaw, ok := data.GetOk("dn"); ok {
-		dn := dnRaw.(string)
-		if !isCreate && dn != "" && dn != role.StaticAccount.DN {
-			return logical.ErrorResponse("cannot update static account distinguished name (dn)"), nil
-		}
-
-		role.StaticAccount.DN = dn
-	}
 	if smRaw, ok := data.GetOk("self_managed"); ok {
 		sm := smRaw.(bool)
 		if !isCreate && sm != role.StaticAccount.SelfManaged {
@@ -300,8 +289,19 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 		role.StaticAccount.SelfManaged = sm
 	}
-	if role.StaticAccount.SelfManaged && role.StaticAccount.DN == "" {
-		return logical.ErrorResponse("cannot set self_managed to true without a distinguished name (dn)"), nil
+	// For non-self managed: DN is optional Unless it is unset via providing the empty string, it
+	// cannot be modified after creation. If given, it will take precedence
+	// over username for LDAP search during password rotation.
+	// For self-managed: DN is required
+	if dnRaw, ok := data.GetOk("dn"); ok {
+		dn := dnRaw.(string)
+		if !isCreate && dn != "" && dn != role.StaticAccount.DN {
+			return logical.ErrorResponse("cannot update static account distinguished name (dn)"), nil
+		}
+		if role.StaticAccount.SelfManaged && role.StaticAccount.DN == "" {
+			return logical.ErrorResponse("cannot set self_managed to true without a distinguished name (dn)"), nil
+		}
+		role.StaticAccount.DN = dn
 	}
 	passwordModifiedExternally := false
 	if passwordRaw, ok := data.GetOk("password"); ok {

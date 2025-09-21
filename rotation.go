@@ -357,6 +357,9 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	// Create a copy of the config to modify for rotation
 	rotateConfig := *config.LDAP
 	selfManagedMaxInvalidAttempts := input.Role.StaticAccount.SelfManagedMaxInvalidAttempts
+	if selfManagedMaxInvalidAttempts == 0 {
+		selfManagedMaxInvalidAttempts = defaultSelfManagedMaxInvalidAttempts
+	}
 
 	var newPassword string
 	var usedCredentialFromPreviousRotation bool

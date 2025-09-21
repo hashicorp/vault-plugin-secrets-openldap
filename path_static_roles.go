@@ -313,24 +313,21 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		return logical.ErrorResponse("password is a required field to assume management of a self-managed static account"), nil
 	}
 	if ok {
-		passwordInput := passwordRaw.(string)
-		if !isCreate && passwordInput != "" && passwordInput != role.StaticAccount.Password {
+		password := passwordRaw.(string)
+		if !isCreate && password != "" && password != role.StaticAccount.Password {
 			b.Logger().Debug("external password change for static role", "role", name)
 			passwordModifiedExternally = true
 		}
-		if role.StaticAccount.SelfManaged && passwordInput != "" {
-			role.StaticAccount.Password = passwordInput
-		} else if role.StaticAccount.SelfManaged && passwordInput == "" { // dont allow to provide empty password for self-managed accounts
+		if role.StaticAccount.SelfManaged && password != "" {
+			role.StaticAccount.Password = password
+		} else if role.StaticAccount.SelfManaged && password == "" { // dont allow to provide empty password for self-managed accounts
 			return logical.ErrorResponse("cannot provide empty password parameter for self-managed accounts"), nil
-		} else if !role.StaticAccount.SelfManaged && passwordInput != "" {
+		} else if !role.StaticAccount.SelfManaged && password != "" {
 			return logical.ErrorResponse("cannot set password for non-self-managed static accounts"), nil
 		}
 	}
 	if maxInvalidRaw, ok := data.GetOk("self_managed_max_invalid_attempts"); ok {
 		maxInvalid := maxInvalidRaw.(int)
-		if maxInvalid == 0 {
-			maxInvalid = defaultSelfManagedMaxInvalidAttempts
-		}
 		role.StaticAccount.SelfManagedMaxInvalidAttempts = maxInvalid
 	}
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")

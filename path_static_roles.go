@@ -159,7 +159,7 @@ func staticFields() map[string]*framework.FieldSchema {
 		},
 		"self_managed_max_invalid_attempts": {
 			Type:        framework.TypeInt,
-			Description: "Maximum number of invalid current-password attempts for self-managed accounts. A value less than or equal to 0 means use the default. Immutable after creation.",
+			Description: "Maximum number of invalid current-password attempts for self-managed accounts. A value equal to 0 means use the default, and a negative value means unlimited attempts.",
 			Default:     defaultSelfManagedMaxInvalidAttempts,
 		},
 	}
@@ -207,28 +207,11 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 	defer b.managedUserLock.Unlock()
 	delete(b.managedUsers, role.StaticAccount.Username)
 
-	walIDs, err := framework.ListWAL(ctx, req.Storage)
-	if err != nil {
+	if err := deleteWALsForRole(ctx, b, req.Storage, name); err != nil {
 		return nil, err
 	}
-	var merr *multierror.Error
-	for _, walID := range walIDs {
-		wal, err := b.findStaticWAL(ctx, req.Storage, walID)
-		if err != nil {
-			merr = multierror.Append(merr, err)
-			continue
-		}
-		if wal != nil && name == wal.RoleName {
-			b.Logger().Debug("deleting WAL for deleted role", "WAL ID", walID, "role", name)
-			err = framework.DeleteWAL(ctx, req.Storage, walID)
-			if err != nil {
-				b.Logger().Debug("failed to delete WAL for deleted role", "WAL ID", walID, "error", err)
-				merr = multierror.Append(merr, err)
-			}
-		}
-	}
 
-	return nil, merr.ErrorOrNil()
+	return nil, err
 }
 
 func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
@@ -314,6 +297,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	if passwordRaw, ok := data.GetOk("password"); ok {
 		passwordInput = passwordRaw.(string)
 	}
+	passwordModifiedExternally := false
+	if !isCreate && passwordInput != "" && passwordInput != role.StaticAccount.Password {
+		b.Logger().Debug("external password change for static role", "role", name)
+		passwordModifiedExternally = true
+	}
 	if smRaw, ok := data.GetOk("self_managed"); ok {
 		sm := smRaw.(bool)
 		if !isCreate && sm != role.StaticAccount.SelfManaged {
@@ -332,17 +320,9 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// If user explicitly set false while also providing password, honor explicit false.
 		role.StaticAccount.SelfManaged = sm
 	}
-	if role.StaticAccount.SelfManaged && !isCreate && passwordInput != "" && passwordInput != role.StaticAccount.Password {
-		role.StaticAccount.PasswordModifiedExternally = true
-	} else {
-		role.StaticAccount.PasswordModifiedExternally = false
-	}
 	if maxInvalidRaw, ok := data.GetOk("self_managed_max_invalid_attempts"); ok {
 		maxInvalid := maxInvalidRaw.(int)
-		if !isCreate && maxInvalid != role.StaticAccount.SelfManagedMaxInvalidAttempts {
-			return logical.ErrorResponse("cannot change self_managed_max_invalid_attempts after creation"), nil
-		}
-		if maxInvalid <= 0 {
+		if maxInvalid == 0 {
 			maxInvalid = defaultSelfManagedMaxInvalidAttempts
 		}
 		role.StaticAccount.SelfManagedMaxInvalidAttempts = maxInvalid
@@ -447,6 +427,14 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			}
 		}
 	case logical.UpdateOperation:
+		if passwordModifiedExternally && role.StaticAccount.SelfManaged {
+			// If the password was modified outside of Vault, and this is a self-managed role
+			// we should cleanup any existing WALs so that we re-assume management with the new password and zero attempts
+			// on the next rotation.
+			if err := deleteWALsForRole(ctx, b, req.Storage, name); err != nil {
+				return nil, err
+			}
+		}
 		// if lastVaultRotation is zero, the role had `skip_import_rotation` set
 		if lastVaultRotation.IsZero() {
 			lastVaultRotation = time.Now()
@@ -483,6 +471,33 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	b.managedUsers[role.StaticAccount.Username] = struct{}{}
 
 	return nil, nil
+}
+
+// deleteWALsForRole deletes all Write-Ahead-Log (WAL) entries associated with the given role name.
+// It returns any errors encountered during the process.
+func deleteWALsForRole(ctx context.Context, b *backend, storage logical.Storage, name string) error {
+	walIDs, err := framework.ListWAL(ctx, storage)
+	if err != nil {
+		return err
+	}
+	var merr *multierror.Error
+	for _, walID := range walIDs {
+		wal, err := b.findStaticWAL(ctx, storage, walID)
+		if err != nil {
+			merr = multierror.Append(merr, err)
+			continue
+		}
+		if wal != nil && name == wal.RoleName {
+			b.Logger().Debug("deleting WAL for deleted role", "WAL ID", walID, "role", name)
+			err = framework.DeleteWAL(ctx, storage, walID)
+			if err != nil {
+				b.Logger().Debug("failed to delete WAL for deleted role", "WAL ID", walID, "error", err)
+				merr = multierror.Append(merr, err)
+			}
+		}
+	}
+
+	return merr.ErrorOrNil()
 }
 
 type roleEntry struct {
@@ -525,12 +540,6 @@ type staticAccount struct {
 	// SelfManagedMaxInvalidAttempts is the maximum number of invalid attempts allowed for self-managed accounts.
 	// A value less than or equal to 0 means use the default (or unlimited if negative).
 	SelfManagedMaxInvalidAttempts int `json:"self_managed_max_invalid_attempts"`
-
-	// PasswordModifiedExternally is true when Vault has detected (or has been
-	// informed) that the LDAP account password was modified outside of Vault's
-	// managed rotation workflow (an out-of-band / external change). When set,
-	// reconciliation logic can re-assume management or trigger a fresh rotation.
-	PasswordModifiedExternally bool `json:"password_modified_externally"`
 }
 
 // NextRotationTime calculates the next rotation by adding the Rotation Period
@@ -607,9 +616,27 @@ when searching for the user can be configured with the "userattr" configuration 
 The "dn" parameter is optional and configures the distinguished name to use 
 when managing the existing entry. If the "dn" parameter is set, it will take 
 precedence over the "username" when LDAP searches are performed.
+This parameter is required if "self_managed" is true.
 
 The "rotation_period' parameter is required and configures how often, in seconds, 
 the credentials should be automatically rotated by Vault.  The minimum is 5 seconds (5s).
+
+The "skip_import_rotation" parameter is optional and only has effect during role creation. 
+If true, Vault will skip the initial password rotation when creating the role, and will manage the existing password. 
+If false (the default), Vault will rotate the password when the role is created. This parameter has no effect during role updates.
+
+The "self_managed" parameter is optional and indicates whether the role manages its own password rotation. 
+If true, Vault will perform rotations by authenticating as this account using its current password (no privileged bind DN).
+This requires the "password" parameter to be set on creation, and the "dn" parameter to be set as well. 
+This field is immutable after creation. If false (the default), Vault will use the configured bind DN to perform rotations.
+
+The "password" parameter is required only if "self_managed" is true, and configures the current password for the entry. 
+This allows Vault to assume management of an existing account. The password will be rotated on creation unless 
+the "skip_import_rotation" parameter is set to true. The password is not returned in read operations.
+
+The "self_managed_max_invalid_attempts" parameter is optional and configures the maximum number of invalid current-password attempts for self-managed accounts. 
+A value equal to 0 means use the default (5), and a negative value means unlimited attempts. 
+When the maximum number of attempts is reached, automatic rotation is suspended until the password is updated via the "password" parameter.
 `
 
 const staticRolesListHelpDescription = `

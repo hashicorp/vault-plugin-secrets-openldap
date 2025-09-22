@@ -159,7 +159,7 @@ func staticFields() map[string]*framework.FieldSchema {
 		},
 		"self_managed_max_invalid_attempts": {
 			Type:        framework.TypeInt,
-			Description: "Maximum number of invalid current-password attempts for self-managed accounts. A value equal to 0 means use the default, and a negative value means unlimited attempts.",
+			Description: "Maximum number of invalid current-password attempts for self-managed accounts. A value equal to 0 means use the default, and a negative value means unlimited attempts. Immutable after creation.",
 			Default:     defaultSelfManagedMaxInvalidAttempts,
 		},
 	}
@@ -328,6 +328,12 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	}
 	if maxInvalidRaw, ok := data.GetOk("self_managed_max_invalid_attempts"); ok {
 		maxInvalid := maxInvalidRaw.(int)
+		if !role.StaticAccount.SelfManaged {
+			return logical.ErrorResponse("cannot set self_managed_max_invalid_attempts for non-self-managed static accounts"), nil
+		}
+		if !isCreate && maxInvalid != role.StaticAccount.SelfManagedMaxInvalidAttempts {
+			return logical.ErrorResponse("cannot change self_managed_max_invalid_attempts after creation"), nil
+		}
 		role.StaticAccount.SelfManagedMaxInvalidAttempts = maxInvalid
 	}
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
@@ -645,6 +651,7 @@ the "skip_import_rotation" parameter is set to true. The password is not returne
 The "self_managed_max_invalid_attempts" parameter is optional and configures the maximum number of invalid current-password attempts for self-managed accounts. 
 A value equal to 0 means use the default (5), and a negative value means unlimited attempts. 
 When the maximum number of attempts is reached, automatic rotation is suspended until the password is updated via the "password" parameter.
+This field is immutable after creation.
 `
 
 const staticRolesListHelpDescription = `

@@ -354,8 +354,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	if config == nil {
 		return output, errors.New("the config is currently unset")
 	}
-	// Create a copy of the config to modify for rotation
-	rotateConfig := *config.LDAP
+
 	selfManagedMaxInvalidAttempts := input.Role.StaticAccount.SelfManagedMaxInvalidAttempts
 	if selfManagedMaxInvalidAttempts == 0 {
 		selfManagedMaxInvalidAttempts = defaultSelfManagedMaxInvalidAttempts
@@ -443,9 +442,9 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 		// and username. UserDN-based search targets the object by searching the whole
 		// subtree rooted at the userDN.
 		if input.Role.StaticAccount.DN != "" {
-			err = b.client.UpdateDNPassword(&rotateConfig, input.Role.StaticAccount.DN, newPassword)
+			err = b.client.UpdateDNPassword(config.LDAP, input.Role.StaticAccount.DN, newPassword)
 		} else {
-			err = b.client.UpdateUserPassword(&rotateConfig, input.Role.StaticAccount.Username, newPassword)
+			err = b.client.UpdateUserPassword(config.LDAP, input.Role.StaticAccount.Username, newPassword)
 		}
 	}
 	if err != nil {

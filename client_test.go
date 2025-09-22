@@ -247,6 +247,9 @@ func Test_UpdateSelfManagedDNPassword(t *testing.T) {
 	c := NewClient(hclog.NewNullLogger())
 	err := c.UpdateSelfManagedDNPassword(config, "cn=User1,dc=example,dc=org", "password1", "newpassword")
 	assert.NoError(t, err)
+	// validate client didnt change
+	assert.Equal(t, "cn=admin,dc=example,dc=org", config.BindDN)
+	assert.Equal(t, "admin", config.BindPassword)
 }
 
 func setupDockerLDAP(t *testing.T) string {

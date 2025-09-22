@@ -461,7 +461,12 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// TODO: Add retry logic
 		item, err = b.popFromRotationQueueByKey(name)
 		if err != nil {
-			return nil, err
+			if err.Error() == "queue is empty" && passwordModifiedExternally && role.StaticAccount.SelfManaged {
+				b.Logger().Debug("detected that self-managed role is not queued likely due to invalid credentials supression, re-adding to queue", "role", name)
+				item = &queue.Item{Key: name}
+			} else {
+				return nil, err
+			}
 		}
 	}
 	item.Priority = role.StaticAccount.NextVaultRotation.Unix()

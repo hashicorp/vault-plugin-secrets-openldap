@@ -411,6 +411,7 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 			return output, fmt.Errorf("error writing WAL entry: %w", err)
 		}
 		currentWAL = wal
+		currentWAL.walID = output.WALID
 	}
 
 	if newPassword == "" {

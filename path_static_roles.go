@@ -461,7 +461,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// TODO: Add retry logic
 		item, err = b.popFromRotationQueueByKey(name)
 		if err != nil {
-			if err.Error() == "queue is empty" && passwordModifiedExternally && role.StaticAccount.SelfManaged {
+			if item == nil && err.Error() == "queue is empty" && passwordModifiedExternally && role.StaticAccount.SelfManaged {
 				b.Logger().Debug("detected that self-managed role is not queued likely due to invalid credentials supression, re-adding to queue", "role", name)
 				item = &queue.Item{Key: name}
 			} else {

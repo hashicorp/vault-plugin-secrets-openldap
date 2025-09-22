@@ -778,7 +778,11 @@ func TestSelfManagedMaxInvalidAttemptsStopsAutoRotation(t *testing.T) {
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
-	// TODO validate rotation worked on import
+	// validate password was changed on import
+	role, err := b.staticRole(ctx, storage, roleName)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.NotEqual(t, "CurrentPassw0rd!", role.StaticAccount.Password)
 
 	// Make LDAP client return "invalid credentials"
 	ldapClient := b.client.(*fakeLdapClient)
@@ -835,7 +839,7 @@ func TestSelfManagedMaxInvalidAttemptsStopsAutoRotation(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 	ldapClient.throwsInvalidCredentialsErr = false
-	// Ensure role queued after update
+	// Ensure role readded to queue after update
 	item, err = b.popFromRotationQueueByKey(roleName)
 	require.NoError(t, err)
 	require.NotNil(t, item)
@@ -851,7 +855,7 @@ func TestSelfManagedMaxInvalidAttemptsStopsAutoRotation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, item)
 	// validate password was changed
-	role, err := b.staticRole(ctx, storage, roleName)
+	role, err = b.staticRole(ctx, storage, roleName)
 	require.NoError(t, err)
 	require.NotNil(t, role)
 	require.NotEqual(t, "NewValidPassw0rd!", role.StaticAccount.Password)

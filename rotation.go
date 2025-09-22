@@ -233,8 +233,8 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 
 	resp, err := b.setStaticAccountPassword(ctx, s, input)
 	if err != nil {
-		if errors.Is(err, ErrMaxRotationAttempts) {
-			b.Logger().Error("max rotation attempts reached; suppressing further automatic rotations", "role", item.Key)
+		if errors.Is(err, ErrMaxRotationAttempts) && input.Role.StaticAccount.SelfManaged {
+			b.Logger().Error("self-managed role max rotation attempts reached; suppressing further automatic rotations", "role", item.Key)
 			// Do not requeue this one and go to next item
 			return true
 		}

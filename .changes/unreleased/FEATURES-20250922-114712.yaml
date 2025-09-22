@@ -1,0 +1,5 @@
+kind: FEATURES
+body: 'Added support for self-managed static roles. Vault can now rotate credentials using the roles own password, without requiring a privileged bind DN.
+time: 2025-09-22T11:47:12.201827-07:00
+custom:
+    Issue: "212"

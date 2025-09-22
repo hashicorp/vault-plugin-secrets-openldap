@@ -111,10 +111,11 @@ func (c *Client) UpdateSelfManagedDNPassword(conf *client.Config, dn string, cur
 		return fmt.Errorf("error updating password: %s", err)
 	}
 	// Use a copy of the config to avoid modifying the original with the bind dn/password for rotation
+	rotationConfEntry := *conf.ConfigEntry
+	rotationConfEntry.BindDN = dn
+	rotationConfEntry.BindPassword = currentPassword
 	rotationConf := *conf
-	rotationConf.BindDN = dn
-	rotationConf.BindPassword = currentPassword
-
+	rotationConf.ConfigEntry = &rotationConfEntry
 	return c.ldap.UpdateSelfManagedPassword(&rotationConf, scope, currentValues, newValues, filters)
 }
 

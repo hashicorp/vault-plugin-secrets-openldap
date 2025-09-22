@@ -1009,8 +1009,8 @@ func TestWALsDeletedOnSelfManagedPasswordUpdate(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	// Fail to rotate the roles
-	generateWALFromInvalidCredRotation(t, b, storage, roleName)
+	// Fail to rotate the role
+	generateWALFromFailedRotation(t, b, storage, roleName)
 
 	// Should have 1 WAL hanging around
 	requireWALs(t, storage, 1)
@@ -1047,7 +1047,7 @@ func TestWALsNotDeletedOnSelfManagedUpdate(t *testing.T) {
 	}
 
 	// Fail to rotate the roles
-	generateWALFromInvalidCredRotation(t, b, storage, roleName)
+	generateWALFromFailedRotation(t, b, storage, roleName)
 
 	// Should have 1 WAL hanging around
 	requireWALs(t, storage, 1)

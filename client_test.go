@@ -243,10 +243,9 @@ func Test_UpdateSelfManagedDNPassword(t *testing.T) {
 		},
 		Schema: client.SchemaOpenLDAP,
 	}
-
+	// self rotate this user
 	c := NewClient(hclog.NewNullLogger())
-	newPassword := "newpassword"
-	err := c.UpdateSelfManagedDNPassword(config, "cn=admin,dc=example,dc=org", "admin", newPassword)
+	err := c.UpdateSelfManagedDNPassword(config, "cn=User1,dc=example,dc=org", "password1", "newpassword")
 	assert.NoError(t, err)
 }
 

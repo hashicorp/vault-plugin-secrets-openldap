@@ -307,16 +307,16 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 		role.StaticAccount.DN = dn
 	}
-	passwordModifiedExternally := false
+	hasExternalPasswordBeenSet := false
 	passwordRaw, ok := data.GetOk("password")
 	if !ok && isCreate && role.StaticAccount.SelfManaged {
 		return logical.ErrorResponse("password is a required field to assume management of a self-managed static account"), nil
 	}
 	if ok {
 		password := passwordRaw.(string)
-		if !isCreate && password != "" && password != role.StaticAccount.Password {
+		if !isCreate && password != "" {
 			b.Logger().Debug("external password change for static role", "role", name)
-			passwordModifiedExternally = true
+			hasExternalPasswordBeenSet = true
 		}
 		if role.StaticAccount.SelfManaged && password != "" {
 			role.StaticAccount.Password = password
@@ -436,8 +436,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			}
 		}
 	case logical.UpdateOperation:
-		if passwordModifiedExternally && role.StaticAccount.SelfManaged {
-			// If the password was modified outside of Vault, and this is a self-managed role
+		if hasExternalPasswordBeenSet && role.StaticAccount.SelfManaged {
+			// If the password was set outside of Vault, and this is a self-managed role
 			// we should cleanup any existing WALs so that we re-assume management with the new password and zero attempts
 			// on the next rotation.
 			if err := deleteWALsForRole(ctx, b, req.Storage, name); err != nil {
@@ -467,7 +467,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// TODO: Add retry logic
 		item, err = b.popFromRotationQueueByKey(name)
 		if err != nil {
-			if item == nil && err.Error() == "queue is empty" && passwordModifiedExternally && role.StaticAccount.SelfManaged {
+			if item == nil && err.Error() == "queue is empty" && hasExternalPasswordBeenSet && role.StaticAccount.SelfManaged {
 				b.Logger().Debug("detected that self-managed role is not queued likely due to invalid credentials supression, re-adding to queue", "role", name)
 				item = &queue.Item{Key: name}
 			} else {

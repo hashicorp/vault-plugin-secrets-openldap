@@ -772,6 +772,26 @@ func generateWALFromFailedRotation(t *testing.T, b *backend, storage logical.Sto
 	}
 }
 
+func generateWALFromInvalidCredRotation(t *testing.T, b *backend, storage logical.Storage, roleName string) {
+	t.Helper()
+	// Fail to rotate the roles
+	ldapClient := b.client.(*fakeLdapClient)
+	originalValue := ldapClient.throwsInvalidCredentialsErr
+	ldapClient.throwsInvalidCredentialsErr = true
+	defer func() {
+		ldapClient.throwsInvalidCredentialsErr = originalValue
+	}()
+
+	_, err := b.HandleRequest(context.Background(), &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "rotate-role/" + roleName,
+		Storage:   storage,
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 // returns a slice of the WAL IDs in storage
 func requireWALs(t *testing.T, storage logical.Storage, expectedCount int) []string {
 	t.Helper()

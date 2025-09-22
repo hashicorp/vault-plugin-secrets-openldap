@@ -99,7 +99,7 @@ func testBackendConfig() *logical.BackendConfig {
 var _ ldapClient = (*fakeLdapClient)(nil)
 
 type fakeLdapClient struct {
-	throwErrs bool
+	throwErrs                   bool
 	throwsInvalidCredentialsErr bool
 }
 

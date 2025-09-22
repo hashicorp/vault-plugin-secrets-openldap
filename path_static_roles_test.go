@@ -988,6 +988,87 @@ func TestWALsDeletedOnRoleDeletion(t *testing.T) {
 	requireWALs(t, storage, 1)
 }
 
+func TestWALsDeletedOnSelfManagedPasswordUpdate(t *testing.T) {
+	ctx := context.Background()
+	b, storage := getBackend(false)
+	defer b.Cleanup(ctx)
+	configureOpenLDAPMount(t, b, storage)
+
+	roleName := "hashicorp"
+	data := map[string]interface{}{
+		"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+		"rotation_period":      float64(5),
+		"username":             "hashicorp",
+		"password":             "initialPassword!23",
+		"self_managed":         true,
+		"skip_import_rotation": true, // so we can validate wal is deleted on update
+	}
+
+	resp, err := createStaticRoleWithData(t, b, storage, roleName, data)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Fail to rotate the roles
+	generateWALFromInvalidCredRotation(t, b, storage, roleName)
+
+	// Should have 1 WAL hanging around
+	requireWALs(t, storage, 1)
+
+	// Update the self-managed static role's password
+	updateStaticRoleWithData(t, b, storage, roleName, map[string]interface{}{
+		"password": "NewValidPassword!23",
+	})
+
+	// 1 WAL should be cleared by the delete
+	requireWALs(t, storage, 0)
+}
+
+// ofr self managed account if it is an update witn no new password then dont delete wal
+func TestWALsNotDeletedOnSelfManagedUpdate(t *testing.T) {
+	ctx := context.Background()
+	b, storage := getBackend(false)
+	defer b.Cleanup(ctx)
+	configureOpenLDAPMount(t, b, storage)
+
+	roleName := "hashicorp"
+	data := map[string]interface{}{
+		"dn":                   "uid=hashicorp,ou=users,dc=hashicorp,dc=com",
+		"rotation_period":      float64(5),
+		"username":             "hashicorp",
+		"password":             "initialPassword!23",
+		"self_managed":         true,
+		"skip_import_rotation": true, // so we can validate wal is not deleted on update if password not changed
+	}
+
+	resp, err := createStaticRoleWithData(t, b, storage, roleName, data)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Fail to rotate the roles
+	generateWALFromInvalidCredRotation(t, b, storage, roleName)
+
+	// Should have 1 WAL hanging around
+	requireWALs(t, storage, 1)
+
+	// Update the self-managed static role's password
+	updateStaticRoleWithData(t, b, storage, roleName, map[string]interface{}{
+		"rotation_period": float64(10),
+	})
+
+	// 1 WAL should still be there
+	requireWALs(t, storage, 1)
+
+	// Update the self-managed static role's with same password
+	updateStaticRoleWithData(t, b, storage, roleName, map[string]interface{}{
+		"password": "initialPassword!23",
+	})
+
+	// 1 WAL should still be there
+	requireWALs(t, storage, 1)
+}
+
 func configureOpenLDAPMount(t *testing.T, b *backend, storage logical.Storage) {
 	t.Helper()
 

@@ -69,18 +69,6 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 			wantUpdateErr: true,
 		},
 		{
-			name: "modified self_managed results in update error",
-			createData: map[string]interface{}{
-				"username":        "bob",
-				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
-				"rotation_period": float64(5),
-			},
-			updateData: map[string]interface{}{
-				"self_managed": true,
-			},
-			wantUpdateErr: true,
-		},
-		{
 			name: "including skip_import_rotation is an update error",
 			createData: map[string]interface{}{
 				"username":        "bob",
@@ -151,6 +139,28 @@ func Test_backend_pathStaticRoleLifecycle(t *testing.T) {
 				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
 				"rotation_period": float64(25),
 			},
+		},
+		{
+			name: "successful creation of self-managed static role",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+				"self_managed":    true,
+				"password":        "InitialPassword!23",
+			},
+		},
+		{
+			name: "modified self_managed results in update error",
+			createData: map[string]interface{}{
+				"username":        "bob",
+				"dn":              "uid=bob,ou=users,dc=hashicorp,dc=com",
+				"rotation_period": float64(5),
+			},
+			updateData: map[string]interface{}{
+				"self_managed": true,
+			},
+			wantUpdateErr: true,
 		},
 		{
 			name: "modified self-managed static role with empty dn results in update error",

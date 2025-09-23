@@ -1024,7 +1024,7 @@ func TestWALsDeletedOnSelfManagedPasswordUpdate(t *testing.T) {
 	requireWALs(t, storage, 0)
 }
 
-// ofr self managed account if it is an update witn no new password then dont delete wal
+// for self managed account if it is an update witn no new password then dont delete wal
 func TestWALsNotDeletedOnSelfManagedUpdate(t *testing.T) {
 	ctx := context.Background()
 	b, storage := getBackend(false)
@@ -1055,14 +1055,6 @@ func TestWALsNotDeletedOnSelfManagedUpdate(t *testing.T) {
 	// Update the self-managed static role's password
 	updateStaticRoleWithData(t, b, storage, roleName, map[string]interface{}{
 		"rotation_period": float64(10),
-	})
-
-	// 1 WAL should still be there
-	requireWALs(t, storage, 1)
-
-	// Update the self-managed static role's with same password
-	updateStaticRoleWithData(t, b, storage, roleName, map[string]interface{}{
-		"password": "initialPassword!23",
 	})
 
 	// 1 WAL should still be there

@@ -121,8 +121,13 @@ func (c *Client) UpdatePassword(cfg *Config, baseDN string, scope int, newValues
 	return c.UpdateEntry(cfg, baseDN, scope, filters, newValues)
 }
 
-// UpdateSelfManagedPassword uses a Modify call under the hood for AD with Delete/Add and NewPasswordModifyRequest for OpenLDAP.
-// This is for usage of self managed password since Replace modification like the one done in `UpdateEntry` requires extra permissions.
+// UpdateSelfManagedPassword performs a least‑privilege, self‑service password change.
+// Behavior by schema:
+//   - Active Directory: issues a Delete (current value) followed by an Add (new value)
+//     because a direct Replace (like the one done in `UpdateEntry`) typically requires elevated privileges.
+//   - OpenLDAP: uses the RFC 3062 PasswordModify extended operation. If the underlying
+//     connection does not support it, falls back to UpdateEntry (privileged replace).
+//   - RACF: falls back to UpdateEntry.
 func (c *Client) UpdateSelfManagedPassword(cfg *Config, scope int, currentValues map[*Field][]string, newValues map[*Field][]string, filters map[*Field][]string) error {
 	// perform self search to validate account exists and current password is correct
 	entries, err := c.Search(cfg, cfg.BindDN, scope, filters)

@@ -367,19 +367,19 @@ changetype: delete`,
 		t.Fatalf("expected 3 events, got %d", len(eventSender.Events))
 	}
 
-	if string(eventSender.Events[0].Type) != "ldap/dynamic-role-create" {
-		t.Errorf("expected event type ldap/dynamic-role-create, got %s", eventSender.Events[0].Type)
+	if string(eventSender.Events[0].Type) != "ldap/role-create" {
+		t.Errorf("expected event type ldap/role-create, got %s", eventSender.Events[0].Type)
 	}
 	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testrole" {
 		t.Errorf("expected name testrole, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
 	}
 
-	if string(eventSender.Events[1].Type) != "ldap/dynamic-role-update" {
-		t.Errorf("expected event type ldap/dynamic-role-update, got %s", eventSender.Events[1].Type)
+	if string(eventSender.Events[1].Type) != "ldap/role-update" {
+		t.Errorf("expected event type ldap/role-update, got %s", eventSender.Events[1].Type)
 	}
 
-	if string(eventSender.Events[2].Type) != "ldap/dynamic-role-delete" {
-		t.Errorf("expected event type ldap/dynamic-role-delete, got %s", eventSender.Events[2].Type)
+	if string(eventSender.Events[2].Type) != "ldap/role-delete" {
+		t.Errorf("expected event type ldap/role-delete, got %s", eventSender.Events[2].Type)
 	}
 }
 

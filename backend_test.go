@@ -464,19 +464,129 @@ func TestBackend_Events_LibrarySet(t *testing.T) {
 		t.Fatalf("expected 3 events, got %d", len(eventSender.Events))
 	}
 
-	if string(eventSender.Events[0].Type) != "ldap/library-set-create" {
-		t.Errorf("expected event type ldap/library-set-create, got %s", eventSender.Events[0].Type)
+	if string(eventSender.Events[0].Type) != "ldap/set-create" {
+		t.Errorf("expected event type ldap/set-create, got %s", eventSender.Events[0].Type)
 	}
 	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testset" {
 		t.Errorf("expected name testset, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
 	}
 
-	if string(eventSender.Events[1].Type) != "ldap/library-set-update" {
-		t.Errorf("expected event type ldap/library-set-update, got %s", eventSender.Events[1].Type)
+	if string(eventSender.Events[1].Type) != "ldap/set-update" {
+		t.Errorf("expected event type ldap/set-update, got %s", eventSender.Events[1].Type)
 	}
 
-	if string(eventSender.Events[2].Type) != "ldap/library-set-delete" {
-		t.Errorf("expected event type ldap/library-set-delete, got %s", eventSender.Events[2].Type)
+	if string(eventSender.Events[2].Type) != "ldap/set-delete" {
+		t.Errorf("expected event type ldap/set-delete, got %s", eventSender.Events[2].Type)
+	}
+}
+
+// TestBackend_Events_CheckOutCheckIn tests that check-out and check-in operations emit the correct events
+func TestBackend_Events_CheckOutCheckIn(t *testing.T) {
+	// Create backend config with event sender
+	config := testBackendConfig()
+	eventSender := logical.NewMockEventSender()
+	config.EventsSender = eventSender
+
+	b, _ := getBackendWithConfig(config, false)
+
+	// Create config first
+	configData := map[string]interface{}{
+		"binddn":       "cn=admin,dc=example,dc=org",
+		"bindpass":     "admin-password",
+		"url":          "ldap://localhost:389",
+		"schema":       "openldap",
+		"userattr":     "cn",
+		"userdn":       "ou=users,dc=example,dc=org",
+		"insecure_tls": true,
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "config",
+		Storage:   config.StorageView,
+		Data:      configData,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Create library set
+	setData := map[string]interface{}{
+		"service_account_names": []string{"testaccount1", "testaccount2"},
+		"ttl":                   86400,
+		"max_ttl":               86400,
+	}
+
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "library/testset",
+		Storage:   config.StorageView,
+		Data:      setData,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Clear events from config and set creation
+	eventSender.Events = nil
+
+	// Check out a service account
+	req = &logical.Request{
+		Operation:   logical.UpdateOperation,
+		Path:        "library/testset/check-out",
+		Storage:     config.StorageView,
+		EntityID:    "test-entity-id",
+		ClientToken: "test-token",
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+	if resp == nil || resp.Secret == nil {
+		t.Fatal("expected secret in response")
+	}
+
+	// Verify check-out event
+	if len(eventSender.Events) != 1 {
+		t.Fatalf("expected 1 event after check-out, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[0].Type) != "ldap/check-out" {
+		t.Errorf("expected event type ldap/check-out, got %s", eventSender.Events[0].Type)
+	}
+	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testset" {
+		t.Errorf("expected name testset, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
+	}
+
+	// Check in the service account
+	req = &logical.Request{
+		Operation:   logical.UpdateOperation,
+		Path:        "library/testset/check-in",
+		Storage:     config.StorageView,
+		EntityID:    "test-entity-id",
+		ClientToken: "test-token",
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Verify check-in event
+	if len(eventSender.Events) != 2 {
+		t.Fatalf("expected 2 events after check-in, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[1].Type) != "ldap/check-in" {
+		t.Errorf("expected event type ldap/check-in, got %s", eventSender.Events[1].Type)
+	}
+	if eventSender.Events[1].Event.Metadata.AsMap()["name"] != "testset" {
+		t.Errorf("expected name testset, got %s", eventSender.Events[1].Event.Metadata.AsMap()["name"])
 	}
 }
 

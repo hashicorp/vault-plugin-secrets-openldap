@@ -383,6 +383,103 @@ changetype: delete`,
 	}
 }
 
+// TestBackend_Events_LibrarySet tests that library set operations emit the correct events
+func TestBackend_Events_LibrarySet(t *testing.T) {
+	// Create backend config with event sender
+	config := testBackendConfig()
+	eventSender := logical.NewMockEventSender()
+	config.EventsSender = eventSender
+
+	b, _ := getBackendWithConfig(config, false)
+
+	// Create config first
+	configData := map[string]interface{}{
+		"binddn":       "cn=admin,dc=example,dc=org",
+		"bindpass":     "admin-password",
+		"url":          "ldap://localhost:389",
+		"schema":       "openldap",
+		"userattr":     "cn",
+		"userdn":       "ou=users,dc=example,dc=org",
+		"insecure_tls": true,
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "config",
+		Storage:   config.StorageView,
+		Data:      configData,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Clear events from config creation
+	eventSender.Events = nil
+
+	// Create library set
+	setData := map[string]interface{}{
+		"service_account_names": []string{"testaccount1", "testaccount2"},
+		"ttl":                   86400,
+		"max_ttl":               86400,
+	}
+
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "library/testset",
+		Storage:   config.StorageView,
+		Data:      setData,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Update library set
+	setData["max_ttl"] = 172800
+	req.Operation = logical.UpdateOperation
+	req.Data = setData
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Delete library set
+	req = &logical.Request{
+		Operation: logical.DeleteOperation,
+		Path:      "library/testset",
+		Storage:   config.StorageView,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Verify events
+	if len(eventSender.Events) != 3 {
+		t.Fatalf("expected 3 events, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[0].Type) != "ldap/library-set-create" {
+		t.Errorf("expected event type ldap/library-set-create, got %s", eventSender.Events[0].Type)
+	}
+	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testset" {
+		t.Errorf("expected name testset, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
+	}
+
+	if string(eventSender.Events[1].Type) != "ldap/library-set-update" {
+		t.Errorf("expected event type ldap/library-set-update, got %s", eventSender.Events[1].Type)
+	}
+
+	if string(eventSender.Events[2].Type) != "ldap/library-set-delete" {
+		t.Errorf("expected event type ldap/library-set-delete, got %s", eventSender.Events[2].Type)
+	}
+}
+
 const validCertificate = `
 -----BEGIN CERTIFICATE-----
 MIIF7zCCA9egAwIBAgIJAOY2qjn64Qq5MA0GCSqGSIb3DQEBCwUAMIGNMQswCQYD

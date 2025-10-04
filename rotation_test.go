@@ -824,6 +824,11 @@ func TestSelfManagedMaxInvalidAttemptsStopsAutoRotation(t *testing.T) {
 	// Additional ticks should do nothing because queue is empty
 	b.rotateCredentials(ctx, storage)
 	requireWALs(t, storage, 0)
+	// validate rotation_suspended flag set
+	role, err = b.staticRole(ctx, storage, roleName)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.True(t, role.StaticAccount.RotationSuspended)
 
 	// update role password externally to simulate user fixing invalid password
 	updateReq := &logical.Request{
@@ -838,6 +843,12 @@ func TestSelfManagedMaxInvalidAttemptsStopsAutoRotation(t *testing.T) {
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
+	// validate rotation_suspended flag set
+	role, err = b.staticRole(ctx, storage, roleName)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.False(t, role.StaticAccount.RotationSuspended)
+	// Make LDAP client work again
 	ldapClient.throwsInvalidCredentialsErr = false
 	// Ensure role readded to queue after update
 	item, err = b.popFromRotationQueueByKey(roleName)
@@ -859,6 +870,8 @@ func TestSelfManagedMaxInvalidAttemptsStopsAutoRotation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, role)
 	require.NotEqual(t, "NewValidPassw0rd!", role.StaticAccount.Password)
+	// validate rotation_suspended flag cleared
+	require.False(t, role.StaticAccount.RotationSuspended)
 }
 
 func generateWALFromFailedRotation(t *testing.T, b *backend, storage logical.Storage, roleName string) {

@@ -229,6 +229,9 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 		"self_managed":                      role.StaticAccount.SelfManaged,
 		"self_managed_max_invalid_attempts": role.StaticAccount.SelfManagedMaxInvalidAttempts,
 	}
+	if role.StaticAccount.SelfManaged {
+		data["rotation_suspended"] = role.StaticAccount.RotationSuspended
+	}
 
 	data["rotation_period"] = role.StaticAccount.RotationPeriod.Seconds()
 	if !role.StaticAccount.LastVaultRotation.IsZero() {
@@ -443,6 +446,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			if err := deleteWALsForRole(ctx, b, req.Storage, name); err != nil {
 				return nil, err
 			}
+			role.StaticAccount.RotationSuspended = false // reset rotation suspension on password change
 		}
 		// if lastVaultRotation is zero, the role had `skip_import_rotation` set
 		if lastVaultRotation.IsZero() {
@@ -554,6 +558,13 @@ type staticAccount struct {
 	// SelfManagedMaxInvalidAttempts is the maximum number of invalid attempts allowed for self-managed accounts.
 	// A value less than or equal to 0 means use the default (or unlimited if negative).
 	SelfManagedMaxInvalidAttempts int `json:"self_managed_max_invalid_attempts"`
+
+	// RotationSuspended indicates that automatic rotation is currently suspended
+	// for this static account due to too many invalid current-password attempts
+	// on self-managed accounts.
+	// It is returned on read operations to indicate the current state of the
+	// account.
+	RotationSuspended bool `json:"rotation_suspended,omitempty"`
 }
 
 // NextRotationTime calculates the next rotation by adding the Rotation Period
@@ -652,6 +663,8 @@ The "self_managed_max_invalid_attempts" parameter is optional and configures the
 A value equal to 0 means use the default (5), and a negative value means unlimited attempts. 
 When the maximum number of attempts is reached, automatic rotation is suspended until the password is updated via the "password" parameter.
 This field is immutable after creation.
+
+The "rotation_suspended" field is only returned in read operations and indicates whether automatic rotation is currently suspended for this static account due to too many invalid current-password attempts on self-managed accounts.
 `
 
 const staticRolesListHelpDescription = `

@@ -471,6 +471,13 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 						b.Logger().Error("failed deleting WAL after max attempts", "role", input.RoleName, "WAL ID", output.WALID, "error", delErr)
 					}
 					b.Logger().Error("max rotation attempts reached for self-managed role; suppressing further automatic rotations", "role", input.RoleName, "WAL ID", output.WALID, "attempts", currentWAL.Attempt)
+					input.Role.StaticAccount.RotationSuspended = true
+					entry, err := logical.StorageEntryJSON(staticRolePath+input.RoleName, input.Role)
+					if err != nil {
+						b.Logger().Warn("failed to build write storage entry to mark rotation suspended", "error", err, "role", input.RoleName)
+					} else if err := s.Put(ctx, entry); err != nil {
+						b.Logger().Warn("failed to write storage entry to mark rotation suspended", "error", err, "role", input.RoleName)
+					}
 					// returning this error stops further automatic rotations
 					return output, ErrMaxRotationAttempts
 				}
@@ -497,6 +504,8 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	input.Role.StaticAccount.SetNextVaultRotation(lvr)
 	input.Role.StaticAccount.LastPassword = input.Role.StaticAccount.Password
 	input.Role.StaticAccount.Password = newPassword
+	// Clear rotation suspended flag on successful rotation
+	input.Role.StaticAccount.RotationSuspended = false
 	output.RotationTime = lvr
 
 	entry, err := logical.StorageEntryJSON(staticRolePath+input.RoleName, input.Role)

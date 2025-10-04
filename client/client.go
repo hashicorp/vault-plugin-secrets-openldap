@@ -121,6 +121,73 @@ func (c *Client) UpdatePassword(cfg *Config, baseDN string, scope int, newValues
 	return c.UpdateEntry(cfg, baseDN, scope, filters, newValues)
 }
 
+// UpdateSelfManagedPassword performs a least‑privilege, self‑service password change.
+// Behavior by schema:
+//   - Active Directory: issues a Delete (current value) followed by an Add (new value)
+//     because a direct Replace (like the one done in `UpdateEntry`) typically requires elevated privileges.
+//   - OpenLDAP: uses the RFC 3062 PasswordModify extended operation. If the underlying
+//     connection does not support it, falls back to UpdateEntry (privileged replace).
+//   - RACF: falls back to UpdateEntry.
+func (c *Client) UpdateSelfManagedPassword(cfg *Config, scope int, currentValues map[*Field][]string, newValues map[*Field][]string, filters map[*Field][]string) error {
+	// perform self search to validate account exists and current password is correct
+	entries, err := c.Search(cfg, cfg.BindDN, scope, filters)
+	if err != nil {
+		return err
+	}
+	if len(entries) != 1 {
+		return fmt.Errorf("expected one matching entry, but received %d", len(entries))
+	}
+	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if err := bind(cfg, conn); err != nil {
+		return err
+	}
+	switch cfg.Schema {
+	case SchemaAD:
+		modifyReq := &ldap.ModifyRequest{
+			DN: entries[0].DN,
+		}
+
+		for field, vals := range currentValues {
+			modifyReq.Delete(field.String(), vals)
+		}
+		for field, vals := range newValues {
+			modifyReq.Add(field.String(), vals)
+		}
+		return conn.Modify(modifyReq)
+	case SchemaOpenLDAP:
+		var currentPassword, newPassword string
+		for f, vals := range currentValues {
+			if f == FieldRegistry.UserPassword && len(vals) == 1 {
+				currentPassword = vals[0]
+			}
+		}
+		for f, vals := range newValues {
+			if f == FieldRegistry.UserPassword && len(vals) == 1 {
+				newPassword = vals[0]
+			}
+		}
+		req := ldap.NewPasswordModifyRequest(entries[0].DN, currentPassword, newPassword)
+		pmConn, ok := conn.(interface {
+			PasswordModify(*ldap.PasswordModifyRequest) (*ldap.PasswordModifyResult, error)
+		})
+		if !ok {
+			// Fallback: try privileged replace (may fail if self-change perms required)
+			return c.UpdateEntry(cfg, cfg.BindDN, scope, filters, newValues)
+		}
+		_, err = pmConn.PasswordModify(req)
+		return err
+	case SchemaRACF:
+		return c.UpdateEntry(cfg, cfg.BindDN, scope, filters, newValues)
+	default:
+		return fmt.Errorf("configured schema %s not valid", cfg.Schema)
+	}
+}
+
 // toString turns the following map of filters into LDAP search filter strings
 // For example: "(cn=Ellen Jones)"
 // when multiple filters are applied, they get AND'ed together.

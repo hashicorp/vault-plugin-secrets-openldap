@@ -99,7 +99,8 @@ func testBackendConfig() *logical.BackendConfig {
 var _ ldapClient = (*fakeLdapClient)(nil)
 
 type fakeLdapClient struct {
-	throwErrs bool
+	throwErrs                   bool
+	throwsInvalidCredentialsErr bool
 }
 
 func (f *fakeLdapClient) UpdateUserPassword(_ *client.Config, _ string, _ string) error {
@@ -114,6 +115,16 @@ func (f *fakeLdapClient) UpdateDNPassword(_ *client.Config, _ string, _ string) 
 	var err error
 	if f.throwErrs {
 		err = errors.New("forced error")
+	}
+	return err
+}
+
+func (f *fakeLdapClient) UpdateSelfManagedDNPassword(_ *client.Config, _ string, _ string, _ string) error {
+	var err error
+	if f.throwErrs {
+		err = errors.New("forced error")
+	} else if f.throwsInvalidCredentialsErr {
+		err = errors.New("invalid credentials")
 	}
 	return err
 }

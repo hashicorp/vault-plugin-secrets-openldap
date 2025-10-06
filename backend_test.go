@@ -553,11 +553,11 @@ func TestBackend_Events_CheckOutCheckIn(t *testing.T) {
 
 	// Verify check-out event
 	if len(eventSender.Events) != 1 {
-		t.Fatalf("expected 1 event after check-out, got %d", len(eventSender.Events))
+		t.Fatalf("expected 1 event after library-check-out, got %d", len(eventSender.Events))
 	}
 
-	if string(eventSender.Events[0].Type) != "ldap/check-out" {
-		t.Errorf("expected event type ldap/check-out, got %s", eventSender.Events[0].Type)
+	if string(eventSender.Events[0].Type) != "ldap/library-check-out" {
+		t.Errorf("expected event type ldap/library-check-out, got %s", eventSender.Events[0].Type)
 	}
 	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testset" {
 		t.Errorf("expected name testset, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
@@ -579,11 +579,11 @@ func TestBackend_Events_CheckOutCheckIn(t *testing.T) {
 
 	// Verify check-in event
 	if len(eventSender.Events) != 2 {
-		t.Fatalf("expected 2 events after check-in, got %d", len(eventSender.Events))
+		t.Fatalf("expected 2 events after library-check-in, got %d", len(eventSender.Events))
 	}
 
-	if string(eventSender.Events[1].Type) != "ldap/check-in" {
-		t.Errorf("expected event type ldap/check-in, got %s", eventSender.Events[1].Type)
+	if string(eventSender.Events[1].Type) != "ldap/library-check-in" {
+		t.Errorf("expected event type ldap/library-check-in, got %s", eventSender.Events[1].Type)
 	}
 	if eventSender.Events[1].Event.Metadata.AsMap()["name"] != "testset" {
 		t.Errorf("expected name testset, got %s", eventSender.Events[1].Event.Metadata.AsMap()["name"])

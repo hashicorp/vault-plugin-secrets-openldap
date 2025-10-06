@@ -111,7 +111,7 @@ func (b *backend) operationSetCheckOut(ctx context.Context, req *logical.Request
 		resp.Secret.TTL = ttl
 		resp.Secret.MaxTTL = set.MaxTTL
 
-		b.ldapEvent(ctx, "check-out", req.Path, setName, true, "service_account", serviceAccountName)
+		b.ldapEvent(ctx, "library-check-out", req.Path, setName, true, "service_account", serviceAccountName)
 
 		return resp, nil
 	}
@@ -324,7 +324,7 @@ func (b *backend) operationCheckIn(overrideCheckInEnforcement bool) framework.Op
 
 		// Send event for each checked-in service account
 		for _, serviceAccountName := range toCheckIn {
-			b.ldapEvent(ctx, "check-in", req.Path, setName, true, "service_account", serviceAccountName)
+			b.ldapEvent(ctx, "library-check-in", req.Path, setName, true, "service_account", serviceAccountName)
 		}
 
 		return &logical.Response{

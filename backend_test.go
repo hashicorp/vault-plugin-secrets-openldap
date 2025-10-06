@@ -464,19 +464,19 @@ func TestBackend_Events_LibrarySet(t *testing.T) {
 		t.Fatalf("expected 3 events, got %d", len(eventSender.Events))
 	}
 
-	if string(eventSender.Events[0].Type) != "ldap/set-create" {
-		t.Errorf("expected event type ldap/set-create, got %s", eventSender.Events[0].Type)
+	if string(eventSender.Events[0].Type) != "ldap/library-create" {
+		t.Errorf("expected event type ldap/library-create, got %s", eventSender.Events[0].Type)
 	}
 	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testset" {
 		t.Errorf("expected name testset, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
 	}
 
-	if string(eventSender.Events[1].Type) != "ldap/set-update" {
-		t.Errorf("expected event type ldap/set-update, got %s", eventSender.Events[1].Type)
+	if string(eventSender.Events[1].Type) != "ldap/library-update" {
+		t.Errorf("expected event type ldap/library-update, got %s", eventSender.Events[1].Type)
 	}
 
-	if string(eventSender.Events[2].Type) != "ldap/set-delete" {
-		t.Errorf("expected event type ldap/set-delete, got %s", eventSender.Events[2].Type)
+	if string(eventSender.Events[2].Type) != "ldap/library-delete" {
+		t.Errorf("expected event type ldap/library-delete, got %s", eventSender.Events[2].Type)
 	}
 }
 

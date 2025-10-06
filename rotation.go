@@ -230,6 +230,7 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 	resp, err := b.setStaticAccountPassword(ctx, s, input)
 	if err != nil {
 		b.Logger().Error("unable to rotate credentials in periodic function", "name", item.Key, "error", err)
+		b.ldapEvent(ctx, "rotate-fail", "", item.Key, false)
 		// Increment the priority enough so that the next call to this method
 		// likely will not attempt to rotate it, as a back-off of sorts
 		item.Priority = time.Now().Add(10 * time.Second).Unix()
@@ -261,6 +262,7 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 	}
 
 	b.Logger().Info("successfully rotated in periodic function", "name", item.Key)
+	b.ldapEvent(ctx, "rotate", "", item.Key, true)
 	return true
 }
 

@@ -282,6 +282,30 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) (map[
 	return roles, nil
 }
 
+// ldapEvent sends an event notification for LDAP operations.
+// Following the pattern from the database backend in Vault core.
+func (b *backend) ldapEvent(ctx context.Context,
+	operation string,
+	path string,
+	name string,
+	modified bool,
+	additionalMetadataPairs ...string,
+) {
+	metadata := []string{
+		logical.EventMetadataModified, fmt.Sprintf("%t", modified),
+		logical.EventMetadataOperation, operation,
+		"path", path,
+	}
+	if name != "" {
+		metadata = append(metadata, "name", name)
+	}
+	metadata = append(metadata, additionalMetadataPairs...)
+	err := logical.SendEvent(ctx, b, fmt.Sprintf("ldap/%s", operation), metadata...)
+	if err != nil && err != framework.ErrNoEvents {
+		b.Logger().Error("Error sending event", "error", err)
+	}
+}
+
 const backendHelp = `
 The LDAP backend supports managing existing LDAP entry passwords by providing:
 

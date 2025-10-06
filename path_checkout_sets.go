@@ -229,6 +229,8 @@ func (b *backend) operationSetCreate(ctx context.Context, req *logical.Request, 
 		b.managedUsers[name] = struct{}{}
 	}
 
+	b.ldapEvent(ctx, "library-create", req.Path, setName, true)
+
 	return nil, nil
 }
 
@@ -351,6 +353,8 @@ func (b *backend) operationSetUpdate(ctx context.Context, req *logical.Request, 
 		b.managedUsers[name] = struct{}{}
 	}
 
+	b.ldapEvent(ctx, "library-update", req.Path, setName, true)
+
 	return nil, nil
 }
 
@@ -422,6 +426,8 @@ func (b *backend) operationSetDelete(ctx context.Context, req *logical.Request, 
 	for _, name := range set.ServiceAccountNames {
 		delete(b.managedUsers, name)
 	}
+
+	b.ldapEvent(ctx, "library-delete", req.Path, setName, true)
 
 	return nil, nil
 }

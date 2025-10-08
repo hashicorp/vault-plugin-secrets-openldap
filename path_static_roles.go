@@ -412,7 +412,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		// so it's important to keep the existing item rather than recreate it.
 		// TODO: Add retry logic
 		item, err = b.popFromRotationQueueByKey(name)
-		if err != nil {
+		// treat an empty queue or missing item as non-fatal in case storage and in-memory queue are out of sync
+		if err != nil && err!= queue.ErrEmpty {
 			return nil, err
 		}
 	}

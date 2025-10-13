@@ -80,6 +80,35 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 	return nil, err
 }
 
+func (b *backend) autoRotateCredential(ctx context.Context, req *logical.Request) error {
+	b.Logger().Debug("autoRotateCredential", "req.Path", req.Path)
+	if strings.HasPrefix(req.Path, "static-role/") {
+
+		// simulate config read from storage
+		config, err := readConfig(ctx, req.Storage)
+		if err != nil {
+			return err
+		}
+		if config == nil {
+			return errors.New("the config is currently unset")
+		}
+
+		// simulate time delay for password update
+		time.Sleep(2 * time.Second)
+		b.Logger().Debug("autoRotateCredential static")
+
+		// simulate storage update
+		if pwdStoringErr := storePassword(ctx, req.Storage, config); pwdStoringErr != nil {
+			return fmt.Errorf("unable to update password due to storage err: %s", pwdStoringErr)
+		}
+
+		// Respond with a 204.
+		return nil
+	}
+	b.Logger().Debug("autoRotateCredential root")
+	return b.rotateRootCredential(ctx, req)
+}
+
 func (b *backend) rotateRootCredential(ctx context.Context, req *logical.Request) error {
 	if _, hasTimeout := ctx.Deadline(); !hasTimeout {
 		var cancel func()

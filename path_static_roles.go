@@ -11,9 +11,10 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
 	"github.com/hashicorp/vault/sdk/helper/locksutil"
 	"github.com/hashicorp/vault/sdk/logical"
-	"github.com/hashicorp/vault/sdk/queue"
+	"github.com/hashicorp/vault/sdk/rotation"
 )
 
 const (
@@ -163,14 +164,6 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 	lock.Lock()
 	defer lock.Unlock()
 
-	// TODO: Add retry logic
-
-	// Remove the item from the queue
-	_, err := b.popFromRotationQueueByKey(name)
-	if err != nil {
-		return nil, err
-	}
-
 	role, err := b.staticRole(ctx, req.Storage, name)
 	if err != nil {
 		return nil, err
@@ -226,10 +219,11 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 		"username": role.StaticAccount.Username,
 	}
 
-	data["rotation_period"] = role.StaticAccount.RotationPeriod.Seconds()
 	if !role.StaticAccount.LastVaultRotation.IsZero() {
 		data["last_vault_rotation"] = role.StaticAccount.LastVaultRotation
 	}
+
+	role.StaticAccount.PopulateAutomatedRotationData(data)
 
 	return &logical.Response{Data: data}, nil
 }
@@ -237,8 +231,6 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	name := data.Get("name").(string)
 
-	// Grab the exclusive lock as well potentially pop and re-push the queue item
-	// for this role
 	lock := locksutil.LockForKey(b.roleLocks, name)
 	lock.Lock()
 	defer lock.Unlock()
@@ -290,21 +282,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		role.StaticAccount.DN = dn
 	}
 
-	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
-	if !ok && isCreate {
-		return logical.ErrorResponse("rotation_period is required to create static accounts"), nil
-	}
-	if ok {
-		rotationPeriodSeconds := rotationPeriodSecondsRaw.(int)
-		if rotationPeriodSeconds < queueTickSeconds {
-			// If rotation frequency is specified the value must be at least
-			// that of the constant queueTickSeconds (5 seconds at time of writing),
-			// otherwise we won't be able to rotate in time
-			return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil
-		}
-		role.StaticAccount.RotationPeriod = time.Duration(rotationPeriodSeconds) * time.Second
-	}
-
 	skipRotation := false
 	skipRotationRaw, ok := data.GetOk("skip_import_rotation")
 	if ok {
@@ -326,42 +303,26 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		skipRotation = c.SkipStaticRoleImportRotation
 	}
 
+	err = role.StaticAccount.ParseAutomatedRotationFields(data)
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+
+	if role.StaticAccount.RotationPeriod < queueTickInterval {
+		// If rotation frequency is specified the value must be at least
+		// that of the constant queueTickSeconds (5 seconds at time of writing),
+		// otherwise we won't be able to rotate in time
+		return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil
+	}
+
 	lastVaultRotation := role.StaticAccount.LastVaultRotation
 
 	// Only call setStaticAccountPassword if we're creating the role for the first time
-	var item *queue.Item
 	switch req.Operation {
 	case logical.CreateOperation:
 		if skipRotation {
 			b.Logger().Debug("skipping static role import rotation", "role", name)
 
-			// Synthetically set lastVaultRotation to now so that it gets
-			// queued correctly.
-			// NOTE: We intentionally do not set role.StaticAccount.LastVaultRotation
-			// because the zero value indicates Vault has not rotated the
-			// password yet.
-			lastVaultRotation = time.Now()
-
-			// NextVaultRotation allows calculating the TTL on GET /static-creds
-			// requests and to calculate the queue priority in populateQueue()
-			// across restarts. We can't rely on LastVaultRotation in these
-			// cases because, when import rotation is skipped, LastVaultRotation
-			// is set to a zero value in storage.
-			role.StaticAccount.SetNextVaultRotation(lastVaultRotation)
-
-			// we were told not to rotate, just add the entry
-			entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
-			if err != nil {
-				return nil, err
-			}
-			if err := req.Storage.Put(ctx, entry); err != nil {
-				return nil, err
-			}
-
-			// set the item
-			item = &queue.Item{
-				Key: name,
-			}
 			break
 		} else {
 			// setStaticAccountPassword calls Storage.Put and saves the role to storage
@@ -385,9 +346,6 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			}
 			// guard against RotationTime not being set or zero-value
 			lastVaultRotation = resp.RotationTime
-			item = &queue.Item{
-				Key: name,
-			}
 		}
 	case logical.UpdateOperation:
 		// if lastVaultRotation is zero, the role had `skip_import_rotation` set
@@ -406,26 +364,63 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		if err := req.Storage.Put(ctx, entry); err != nil {
 			return nil, err
 		}
+	}
 
-		// In case this is an update, remove any previous version of the item from
-		// the queue. The existing item could be tracking a WAL ID for this role,
-		// so it's important to keep the existing item rather than recreate it.
-		// TODO: Add retry logic
-		item, err = b.popFromRotationQueueByKey(name)
+	var rotOp string
+	if role.StaticAccount.ShouldDeregisterRotationJob() {
+		rotOp = rotation.PerformedDeregistration
+		deregisterReq := &rotation.RotationJobDeregisterRequest{
+			MountPoint: req.MountPoint,
+			ReqPath:    req.Path,
+		}
+		err := b.System().DeregisterRotationJob(ctx, deregisterReq)
 		if err != nil {
-			return nil, err
+			return logical.ErrorResponse("error de-registering rotation job: %s", err), nil
+		}
+	} else if role.StaticAccount.ShouldRegisterRotationJob() {
+		rotOp = rotation.PerformedRegistration
+		req := &rotation.RotationJobConfigureRequest{
+			Name:             rootRotationJobName,
+			MountPoint:       req.MountPoint,
+			ReqPath:          req.Path,
+			RotationSchedule: role.StaticAccount.RotationSchedule,
+			RotationWindow:   role.StaticAccount.RotationWindow,
+			RotationPeriod:   role.StaticAccount.RotationPeriod,
+		}
+
+		_, err := b.System().RegisterRotationJob(ctx, req)
+		if err != nil {
+			return logical.ErrorResponse("error registering rotation job: %s", err), nil
 		}
 	}
-	item.Priority = role.StaticAccount.NextVaultRotation.Unix()
 
-	// Add their rotation to the queue
-	if err := b.pushItem(item); err != nil {
-		return nil, err
+	err = writeRole(ctx, req.Storage, name, *role)
+	if err != nil {
+		wrappedError := err
+		if rotOp != "" {
+			b.Logger().Error("write to storage failed but the rotation manager still succeeded.",
+				"operation", rotOp, "mount", req.MountPoint, "path", req.Path)
+			wrappedError = fmt.Errorf("write to storage failed but the rotation manager still succeeded; "+
+				"operation=%s, mount=%s, path=%s, storageError=%s", rotOp, req.MountPoint, req.Path, err)
+		}
+		return nil, wrappedError
 	}
 
 	b.managedUsers[role.StaticAccount.Username] = struct{}{}
 
 	return nil, nil
+}
+
+func writeRole(ctx context.Context, storage logical.Storage, name string, role roleEntry) (err error) {
+	entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
+	if err != nil {
+		return err
+	}
+	err = storage.Put(ctx, entry)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 type roleEntry struct {
@@ -456,10 +451,7 @@ type staticAccount struct {
 	// the password
 	NextVaultRotation time.Time `json:"next_vault_rotation"`
 
-	// RotationPeriod is number in seconds between each rotation, effectively a
-	// "time to live". This value is compared to the LastVaultRotation to
-	// determine if a password needs to be rotated
-	RotationPeriod time.Duration `json:"rotation_period"`
+	automatedrotationutil.AutomatedRotationParams
 }
 
 // NextRotationTime calculates the next rotation by adding the Rotation Period

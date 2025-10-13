@@ -95,10 +95,10 @@ func (b *backend) rotateRootCredential(ctx context.Context, req *logical.Request
 		return errors.New("the config is currently unset")
 	}
 
-	newPassword, err := b.GeneratePassword(ctx, config)
-	if err != nil {
-		return err
-	}
+	//newPassword, err := b.GeneratePassword(ctx, config)
+	//if err != nil {
+	//	return err
+	//}
 	oldPassword := config.LDAP.BindPassword
 
 	// Take out the backend lock since we are swapping out the connection
@@ -106,12 +106,15 @@ func (b *backend) rotateRootCredential(ctx context.Context, req *logical.Request
 	defer b.Unlock()
 
 	// Update the password remotely.
-	if err := b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, newPassword); err != nil {
-		return err
-	}
-	config.LDAP.BindPassword = newPassword
-	config.LDAP.LastBindPassword = oldPassword
-	config.LDAP.LastBindPasswordRotation = time.Now()
+	//if err := b.client.UpdateDNPassword(config.LDAP, config.LDAP.BindDN, newPassword); err != nil {
+	//	return err
+	//}
+	//config.LDAP.BindPassword = newPassword
+	//config.LDAP.LastBindPassword = oldPassword
+	//config.LDAP.LastBindPasswordRotation = time.Now()
+
+	// simulate time delay for password update
+	time.Sleep(2 * time.Second)
 
 	// Update the password locally.
 	if pwdStoringErr := storePassword(ctx, req.Storage, config); pwdStoringErr != nil {

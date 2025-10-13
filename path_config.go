@@ -262,6 +262,9 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 		return nil, wrappedError
 	}
 
+	// Send event notification for config write
+	b.ldapEvent(ctx, "config-write", req.Path, "", true)
+
 	// Respond with a 204.
 	return nil, nil
 }
@@ -351,6 +354,10 @@ func (b *backend) configDeleteOperation(ctx context.Context, req *logical.Reques
 	if err := req.Storage.Delete(ctx, configPath); err != nil {
 		return nil, err
 	}
+
+	// Send event notification for config delete
+	b.ldapEvent(ctx, "config-delete", req.Path, "", true)
+
 	return nil, nil
 }
 

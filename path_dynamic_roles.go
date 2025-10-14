@@ -169,6 +169,9 @@ func (b *backend) pathDynamicRoleCreateUpdate(ctx context.Context, req *logical.
 		return nil, fmt.Errorf("failed to save dynamic role: %w", err)
 	}
 
+	// Send event notification for role create/update
+	b.ldapEvent(ctx, fmt.Sprintf("role-%s", req.Operation), req.Path, roleName, true)
+
 	return nil, nil
 }
 
@@ -317,5 +320,9 @@ func (b *backend) pathDynamicRoleDelete(ctx context.Context, req *logical.Reques
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete role: %w", err)
 	}
+
+	// Send event notification for role delete
+	b.ldapEvent(ctx, "role-delete", req.Path, roleName, true)
+
 	return nil, nil
 }

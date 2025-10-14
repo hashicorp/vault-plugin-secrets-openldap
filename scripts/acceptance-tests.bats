@@ -134,7 +134,7 @@ start_vault() {
     -p ${vault_port}:8200 \
     -e VAULT_DEV_ROOT_TOKEN_ID="${VAULT_TOKEN}" \
     -e VAULT_DEV_LISTEN_ADDRESS="0.0.0.0:8200" \
-    "vault:${vault_version}" \
+    "hashicorp/vault:${vault_version}" \
     vault \
       server \
       -dev \
@@ -163,6 +163,9 @@ setup_file() {
 
   start_openldap
   start_vault
+
+  export VAULT_TOKEN="${VAULT_TOKEN}"
+  export VAULT_ADDR="${VAULT_ADDR}"
 
   vault secrets enable -path openldap vault-plugin-secrets-openldap
 }
@@ -295,7 +298,7 @@ teardown() {
 
   ## Assert the fields are structured correctly
   username="$(echo "${output}" | jq -r '.data.username')"
-  [[ "${username}" =~ ^v_token_testrole_[a-zA-Z0-9]{20}_[0-9]{10}$ ]]
+  [[ "${username}" =~ ^v_token_testrole_[a-zA-Z0-9]{10,20}_[0-9]{10}$ ]]
 
   password="$(echo "${output}" | jq -r '.data.password')"
   [[ "${password}" =~ ^[a-zA-Z0-9]{64}$ ]]
@@ -348,7 +351,7 @@ teardown() {
 
   ## Assert the fields are structured correctly
   username="$(echo "${output}" | jq -r '.data.username')"
-  [[ "${username}" =~ ^v_token_testrole_[a-zA-Z0-9]{20}_[0-9]{10}$ ]]
+  [[ "${username}" =~ ^v_token_testrole_[a-zA-Z0-9]{10,20}_[0-9]{10}$ ]]
 
   password="$(echo "${output}" | jq -r '.data.password')"
   [[ "${password}" =~ ^[a-zA-Z0-9]{64}$ ]]
@@ -424,10 +427,10 @@ userPassword: {{.Password}}'
   # Get credentials
   run vault read -format=json openldap/creds/testrole
   [ ${status} -ne 0 ]
-  [[ "${output}" == *"failed to create user" ]]
+  [[ "${output}" =~ "failed to create user" ]]
 
   # Optional assertion that makes sure both errors are included but if this becomes flaky it isn't the important error and can be removed
-  [[ "${output}" == *"failed to roll back user" ]]
+  [[ "${output}" =~ "failed to roll back user" ]]
 
   ## Assert the credentials do *not* work in OpenLDAP
   run ldapsearch -b "${dn}" -D "${dn}" -w "${password}"

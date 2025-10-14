@@ -210,6 +210,8 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 	if err := deleteWALsForRole(ctx, b, req.Storage, name); err != nil {
 		return nil, err
 	}
+	// Send event notification for static role delete
+	b.ldapEvent(ctx, "static-role-delete", req.Path, name, true)
 
 	return nil, err
 }
@@ -487,6 +489,9 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	}
 
 	b.managedUsers[role.StaticAccount.Username] = struct{}{}
+
+	// Send event notification for static role create/update
+	b.ldapEvent(ctx, fmt.Sprintf("static-role-%s", req.Operation), req.Path, name, true)
 
 	return nil, nil
 }

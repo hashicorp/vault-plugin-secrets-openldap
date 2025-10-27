@@ -1,3 +1,22 @@
+## v0.17.0
+### October 7, 2025
+
+* Update go versions to 1.25.1 (#217)
+* Fix tests to run to completion (#215)
+* Automated dependency upgrades (#214)
+* Bump github.com/go-viper/mapstructure/v2 from 2.1.0 to 2.4.0 (#202)
+* Add Event Notification Support to Vault OpenLDAP Plugin (#211)
+* init changie (#209)
+* Bump docker indirect dep and update changelog (#206)
+* [COMPLIANCE] Add Copyright and License Headers (#186)
+* Add backport assistant workflow (#187)
+* log static and root rotations (#183)
+* Add terraform test bootstrap for RACF static roles (#185)
+* Support RACF password phrase management for static roles (#184)
+* Add backport assistant workflow (#182)
+* [Compliance] - PR Template Changes Required (#178)
+* Add RACF Passphrase Support (#170)
+
 ## v0.16.1
 ### August 21, 2025
 

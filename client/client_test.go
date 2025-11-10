@@ -273,6 +273,8 @@ func TestUpdateSelfManagedPasswordOpenLDAP(t *testing.T) {
 
 	config := emptyConfig()
 	config.Schema = SchemaOpenLDAP
+	config.BindDN = "cn=admin,dc=example,dc=org"
+	config.BindPassword = "admin"
 	dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
 
 	conn := &ldapifc.FakeLDAPConnection{
@@ -298,6 +300,9 @@ func TestUpdateSelfManagedPasswordOpenLDAP(t *testing.T) {
 	if err := client.UpdateSelfManagedPassword(config, dn, ldap.ScopeBaseObject, currentPass, testPass, filters); err != nil {
 		t.Fatal(err)
 	}
+	// validate client didnt change
+	assert.Equal(t, "cn=admin,dc=example,dc=org", config.BindDN)
+	assert.Equal(t, "admin", config.BindPassword)
 }
 
 func TestUpdateSelfManagedPasswordAD(t *testing.T) {

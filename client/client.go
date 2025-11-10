@@ -139,31 +139,31 @@ func (c *Client) UpdateSelfManagedPassword(cfg *Config, dn string, scope int, cu
 	rotationConf := *cfg
 	rotationConf.ConfigEntry = &rotationConfEntry
 	// perform self search to validate account exists and current password is correct
-	entries, err := c.Search(cfg, dn, scope, filters)
+	entries, err := c.Search(&rotationConf, dn, scope, filters)
 	if err != nil {
 		return err
 	}
 	if len(entries) != 1 {
 		return fmt.Errorf("expected one matching entry, but received %d", len(entries))
 	}
-	conn, err := c.ldap.DialLDAP(cfg.ConfigEntry)
+	conn, err := c.ldap.DialLDAP(rotationConf.ConfigEntry)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	if err := bind(cfg, conn); err != nil {
+	if err := bind(&rotationConf, conn); err != nil {
 		return err
 	}
-	currentSchemaValues, err := GetSchemaFieldRegistry(cfg, currentValue)
+	currentSchemaValues, err := GetSchemaFieldRegistry(&rotationConf, currentValue)
 	if err != nil {
 		return fmt.Errorf("error updating password: %s", err)
 	}
-	newSchemaValues, err := GetSchemaFieldRegistry(cfg, newValue)
+	newSchemaValues, err := GetSchemaFieldRegistry(&rotationConf, newValue)
 	if err != nil {
 		return fmt.Errorf("error updating password: %s", err)
 	}
-	switch cfg.Schema {
+	switch rotationConf.Schema {
 	case SchemaAD:
 		modifyReq := &ldap.ModifyRequest{
 			DN: entries[0].DN,
@@ -189,7 +189,7 @@ func (c *Client) UpdateSelfManagedPassword(cfg *Config, dn string, scope int, cu
 	case SchemaRACF:
 		return fmt.Errorf("self managed password changes not supported for RACF schema")
 	default:
-		return fmt.Errorf("configured schema %s not valid", cfg.Schema)
+		return fmt.Errorf("configured schema %s not valid", rotationConf.Schema)
 	}
 }
 

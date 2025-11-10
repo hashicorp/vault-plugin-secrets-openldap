@@ -272,9 +272,8 @@ func TestUpdateSelfManagedPasswordOpenLDAP(t *testing.T) {
 	currentPass := "dogs"
 
 	config := emptyConfig()
+	config.Schema = SchemaOpenLDAP
 	dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
-	config.BindDN = dn
-	config.BindPassword = currentPass
 
 	conn := &ldapifc.FakeLDAPConnection{
 		SearchRequestToExpect: testSearchRequest(),
@@ -296,106 +295,8 @@ func TestUpdateSelfManagedPasswordOpenLDAP(t *testing.T) {
 	filters := map[*Field][]string{
 		FieldRegistry.ObjectClass: {"*"},
 	}
-
-	config.Schema = SchemaOpenLDAP
-	currentValues, err := GetSchemaFieldRegistry(config, currentPass)
-	if err != nil {
+	if err := client.UpdateSelfManagedPassword(config, dn, ldap.ScopeBaseObject, currentPass, testPass, filters); err != nil {
 		t.Fatal(err)
-	}
-	newValues, err := GetSchemaFieldRegistry(config, testPass)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := client.UpdateSelfManagedPassword(config, ldap.ScopeBaseObject, currentValues, newValues, filters); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestUpdateSelfManagedPasswordRACF(t *testing.T) {
-	testPassword := "pass1234"
-	testPhrase := "this is a much longer passphrase for racfPassPhrase"
-
-	tests := []struct {
-		name           string
-		password       string
-		credentialType CredentialType
-		expectedFields map[*Field][]string
-	}{
-		{
-			name:           "password",
-			password:       testPassword,
-			credentialType: CredentialTypePassword,
-			expectedFields: map[*Field][]string{
-				FieldRegistry.RACFPassword:   {testPassword},
-				FieldRegistry.RACFAttributes: {"noexpired"},
-			},
-		},
-		{
-			name:           "passphrase",
-			password:       testPhrase,
-			credentialType: CredentialTypePhrase,
-			expectedFields: map[*Field][]string{
-				FieldRegistry.RACFPassphrase: {testPhrase},
-				FieldRegistry.RACFAttributes: {"noexpired"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			currentPass := "dogs"
-			dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
-			config := emptyConfig()
-			config.BindDN = dn
-			config.BindPassword = currentPass
-			config.Schema = SchemaRACF
-			config.CredentialType = tt.credentialType
-
-			conn := &ldapifc.FakeLDAPConnection{
-				SearchRequestToExpect: testSearchRequest(),
-				SearchResultToReturn:  testSearchResult(),
-			}
-
-			conn.ModifyRequestToExpect = &ldap.ModifyRequest{
-				DN: dn,
-			}
-
-			// Set up expected modifications based on the test case
-			for field, values := range tt.expectedFields {
-				conn.ModifyRequestToExpect.Replace(field.String(), values)
-			}
-
-			ldapClient := &ldaputil.Client{
-				Logger: hclog.NewNullLogger(),
-				LDAP:   &ldapifc.FakeLDAPClient{conn},
-			}
-
-			client := &Client{ldapClient}
-
-			filters := map[*Field][]string{
-				FieldRegistry.ObjectClass: {"*"},
-			}
-
-			currentValues, err := GetSchemaFieldRegistry(config, currentPass)
-			require.NoError(t, err)
-
-			newValues, err := GetSchemaFieldRegistry(config, tt.password)
-			require.NoError(t, err)
-
-			// verify that the fields are set correctly in newValues
-			for field, expectedValues := range tt.expectedFields {
-				actualValues, exists := newValues[field]
-				if !exists {
-					t.Fatalf("Expected field %s to exist in newValues", field.String())
-				}
-
-				require.Equal(t, expectedValues, actualValues)
-			}
-
-			err = client.UpdateSelfManagedPassword(config, ldap.ScopeBaseObject, currentValues, newValues, filters)
-			require.NoError(t, err)
-		})
 	}
 }
 
@@ -413,8 +314,7 @@ func TestUpdateSelfManagedPasswordAD(t *testing.T) {
 	}
 
 	config := emptyConfig()
-	config.BindDN = dn
-	config.BindPassword = currentPass
+	config.Schema = SchemaAD
 
 	conn := &ldapifc.FakeLDAPConnection{
 		SearchRequestToExpect: testSearchRequest(),
@@ -438,24 +338,7 @@ func TestUpdateSelfManagedPasswordAD(t *testing.T) {
 		FieldRegistry.ObjectClass: {"*"},
 	}
 
-	config.Schema = SchemaAD
-	currentValues, err := GetSchemaFieldRegistry(config, currentPass)
-	if err != nil {
-		t.Fatal(err)
-	}
-	newValues, err := GetSchemaFieldRegistry(config, testPass)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p, ok := newValues[FieldRegistry.UnicodePassword]; !ok {
-		t.Fatal("Expected unicodePwd field to be populated")
-	} else if len(p) != 1 {
-		t.Fatalf("Expected exactly one entry for unicodePwd but got %d", len(p))
-	} else if p[0] != encodedTestPass {
-		t.Fatalf("Expected unicodePwd field equal to %q but got %q", encodedTestPass, p[0])
-	}
-
-	if err := client.UpdateSelfManagedPassword(config, ldap.ScopeBaseObject, currentValues, newValues, filters); err != nil {
+	if err := client.UpdateSelfManagedPassword(config, dn, ldap.ScopeBaseObject, currentPass, testPass, filters); err != nil {
 		t.Fatal(err)
 	}
 }

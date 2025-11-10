@@ -127,10 +127,19 @@ func (c *Client) UpdatePassword(cfg *Config, baseDN string, scope int, newValues
 //     because a direct Replace (like the one done in `UpdateEntry`) typically requires elevated privileges.
 //   - OpenLDAP: uses the RFC 3062 PasswordModify extended operation. If the underlying
 //     connection does not support it, falls back to UpdateEntry (privileged replace).
-//   - RACF: falls back to UpdateEntry.
-func (c *Client) UpdateSelfManagedPassword(cfg *Config, scope int, currentValues map[*Field][]string, newValues map[*Field][]string, filters map[*Field][]string) error {
+//   - RACF: not implamneted yet.
+func (c *Client) UpdateSelfManagedPassword(cfg *Config, dn string, scope int, currentValue string, newValue string, filters map[*Field][]string) error {
+	if currentValue == "" || newValue == "" {
+		return fmt.Errorf("both current and new password must be provided for self-managed password changes on dn: %s", dn)
+	}
+	// Use a copy of the config to avoid modifying the original with the bind dn/password for rotation
+	rotationConfEntry := *cfg.ConfigEntry
+	rotationConfEntry.BindDN = dn
+	rotationConfEntry.BindPassword = currentValue
+	rotationConf := *cfg
+	rotationConf.ConfigEntry = &rotationConfEntry
 	// perform self search to validate account exists and current password is correct
-	entries, err := c.Search(cfg, cfg.BindDN, scope, filters)
+	entries, err := c.Search(cfg, dn, scope, filters)
 	if err != nil {
 		return err
 	}
@@ -146,43 +155,39 @@ func (c *Client) UpdateSelfManagedPassword(cfg *Config, scope int, currentValues
 	if err := bind(cfg, conn); err != nil {
 		return err
 	}
+	currentSchemaValues, err := GetSchemaFieldRegistry(cfg, currentValue)
+	if err != nil {
+		return fmt.Errorf("error updating password: %s", err)
+	}
+	newSchemaValues, err := GetSchemaFieldRegistry(cfg, newValue)
+	if err != nil {
+		return fmt.Errorf("error updating password: %s", err)
+	}
 	switch cfg.Schema {
 	case SchemaAD:
 		modifyReq := &ldap.ModifyRequest{
 			DN: entries[0].DN,
 		}
-
-		for field, vals := range currentValues {
+		for field, vals := range currentSchemaValues {
 			modifyReq.Delete(field.String(), vals)
 		}
-		for field, vals := range newValues {
+		for field, vals := range newSchemaValues {
 			modifyReq.Add(field.String(), vals)
 		}
 		return conn.Modify(modifyReq)
 	case SchemaOpenLDAP:
-		var currentPassword, newPassword string
-		for f, vals := range currentValues {
-			if f == FieldRegistry.UserPassword && len(vals) == 1 {
-				currentPassword = vals[0]
-			}
-		}
-		for f, vals := range newValues {
-			if f == FieldRegistry.UserPassword && len(vals) == 1 {
-				newPassword = vals[0]
-			}
-		}
-		req := ldap.NewPasswordModifyRequest(entries[0].DN, currentPassword, newPassword)
+		req := ldap.NewPasswordModifyRequest(entries[0].DN, currentValue, newValue)
 		pmConn, ok := conn.(interface {
 			PasswordModify(*ldap.PasswordModifyRequest) (*ldap.PasswordModifyResult, error)
 		})
 		if !ok {
 			// Fallback: try privileged replace (may fail if self-change perms required)
-			return c.UpdateEntry(cfg, cfg.BindDN, scope, filters, newValues)
+			return c.UpdateEntry(&rotationConf, dn, scope, filters, newSchemaValues)
 		}
 		_, err = pmConn.PasswordModify(req)
 		return err
 	case SchemaRACF:
-		return c.UpdateEntry(cfg, cfg.BindDN, scope, filters, newValues)
+		return fmt.Errorf("self managed password changes not supported for RACF schema")
 	default:
 		return fmt.Errorf("configured schema %s not valid", cfg.Schema)
 	}

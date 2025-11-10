@@ -102,21 +102,7 @@ func (c *Client) UpdateSelfManagedDNPassword(conf *client.Config, dn string, cur
 	filters := map[*client.Field][]string{
 		client.FieldRegistry.ObjectClass: {"*"},
 	}
-	currentValues, err := client.GetSchemaFieldRegistry(conf, currentPassword)
-	if err != nil {
-		return fmt.Errorf("error updating password: %s", err)
-	}
-	newValues, err := client.GetSchemaFieldRegistry(conf, newPassword)
-	if err != nil {
-		return fmt.Errorf("error updating password: %s", err)
-	}
-	// Use a copy of the config to avoid modifying the original with the bind dn/password for rotation
-	rotationConfEntry := *conf.ConfigEntry
-	rotationConfEntry.BindDN = dn
-	rotationConfEntry.BindPassword = currentPassword
-	rotationConf := *conf
-	rotationConf.ConfigEntry = &rotationConfEntry
-	return c.ldap.UpdateSelfManagedPassword(&rotationConf, scope, currentValues, newValues, filters)
+	return c.ldap.UpdateSelfManagedPassword(conf, dn, scope, currentPassword, newPassword, filters)
 }
 
 func (c *Client) Execute(conf *client.Config, entries []*ldif.Entry, continueOnError bool) (err error) {

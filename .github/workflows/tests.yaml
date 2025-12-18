@@ -1,8 +1,8 @@
 # copy of https://github.com/hashicorp/vault-workflows-common/blob/main/.github/workflows/tests.yaml
-name: Tests
+name: Run Tests
 
 on:
-  workflow_call: {}
+  push:
 
 permissions:
   contents: read

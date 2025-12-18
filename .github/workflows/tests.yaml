@@ -3,6 +3,7 @@ name: Run Tests
 
 on:
   push:
+    branches: [ "main" ]
   pull_request:
 
 permissions:
@@ -26,7 +27,7 @@ jobs:
 
       - name: Print Coverage Summary
         # Parses the profile and prints per-function coverage to stdout
-        run: go tool cover -func=coverage.out
+        run: go tool cover -func=coverage.txt
 
   code_coverage:
     name: "Code coverage report"

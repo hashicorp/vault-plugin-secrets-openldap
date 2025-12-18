@@ -43,7 +43,7 @@ tools:
 .PHONY: test
 test: tools fmtcheck
 	gotestsum --format github-actions \
-	-- ./... $(TESTARGS) -timeout=20m -race -coverprofile=coverage.out
+	-- ./... $(TESTARGS) -timeout=20m -race -coverprofile=coverage.txt
 
 .PHONY: tools fmtcheck
 fmtcheck:

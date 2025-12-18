@@ -31,7 +31,7 @@ jobs:
     name: "Code coverage report"
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    needs: coverage
+    needs: run-tests
     permissions:
       contents:      read
       actions:       read

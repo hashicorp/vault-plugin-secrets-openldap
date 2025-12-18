@@ -32,3 +32,4 @@ at `openldap`. To enable this in a running Vault server:
 $ vault secrets enable openldap
 Success! Enabled the openldap secrets engine at: openldap/
 ```
+

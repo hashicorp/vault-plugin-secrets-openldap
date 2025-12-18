@@ -165,18 +165,18 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 
 	// TODO: Add retry logic
 
-	// Remove the item from the queue
-	_, err := b.popFromRotationQueueByKey(name)
-	if err != nil {
-		return nil, err
-	}
-
 	role, err := b.staticRole(ctx, req.Storage, name)
 	if err != nil {
 		return nil, err
 	}
 	if role == nil {
 		return nil, nil
+	}
+
+	// Remove the item from the queue
+	_, err = b.popFromRotationQueueByKey(name)
+	if err != nil {
+		return nil, err
 	}
 
 	err = req.Storage.Delete(ctx, staticRolePath+name)
@@ -208,6 +208,9 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 			}
 		}
 	}
+
+	// Send event notification for static role delete
+	b.ldapEvent(ctx, "static-role-delete", req.Path, name, true)
 
 	return nil, merr.ErrorOrNil()
 }
@@ -424,6 +427,9 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	}
 
 	b.managedUsers[role.StaticAccount.Username] = struct{}{}
+
+	// Send event notification for static role create/update
+	b.ldapEvent(ctx, fmt.Sprintf("static-role-%s", req.Operation), req.Path, name, true)
 
 	return nil, nil
 }

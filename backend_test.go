@@ -6,6 +6,7 @@ package openldap
 import (
 	"context"
 	"errors"
+	"testing"
 	"time"
 
 	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
@@ -124,6 +125,469 @@ func (f *fakeLdapClient) Execute(_ *client.Config, _ []*ldif.Entry, _ bool) erro
 		err = errors.New("forced error")
 	}
 	return err
+}
+
+// TestBackend_Events_Config tests that config operations emit the correct events
+func TestBackend_Events_Config(t *testing.T) {
+	// Create backend config with event sender
+	config := testBackendConfig()
+	eventSender := logical.NewMockEventSender()
+	config.EventsSender = eventSender
+
+	b, _ := getBackendWithConfig(config, false)
+
+	// Create config
+	configData := map[string]interface{}{
+		"binddn":       "cn=admin,dc=example,dc=org",
+		"bindpass":     "admin-password",
+		"url":          "ldap://localhost:389",
+		"schema":       "openldap",
+		"userattr":     "cn",
+		"userdn":       "ou=users,dc=example,dc=org",
+		"certificate":  "",
+		"insecure_tls": true,
+		"starttls":     false,
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "config",
+		Storage:   config.StorageView,
+		Data:      configData,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Update config
+	configData["userattr"] = "uid"
+	req.Operation = logical.UpdateOperation
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Delete config
+	req = &logical.Request{
+		Operation: logical.DeleteOperation,
+		Path:      "config",
+		Storage:   config.StorageView,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Verify events
+	if len(eventSender.Events) != 3 {
+		t.Fatalf("expected 3 events, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[0].Type) != "ldap/config-write" {
+		t.Errorf("expected event type ldap/config-write, got %s", eventSender.Events[0].Type)
+	}
+	if eventSender.Events[0].Event.Metadata.AsMap()["path"] != "config" {
+		t.Errorf("expected path config, got %s", eventSender.Events[0].Event.Metadata.AsMap()["path"])
+	}
+	if eventSender.Events[0].Event.Metadata.AsMap()["modified"] != "true" {
+		t.Errorf("expected modified true, got %s", eventSender.Events[0].Event.Metadata.AsMap()["modified"])
+	}
+
+	if string(eventSender.Events[1].Type) != "ldap/config-write" {
+		t.Errorf("expected event type ldap/config-write, got %s", eventSender.Events[1].Type)
+	}
+
+	if string(eventSender.Events[2].Type) != "ldap/config-delete" {
+		t.Errorf("expected event type ldap/config-delete, got %s", eventSender.Events[2].Type)
+	}
+}
+
+// TestBackend_Events_StaticRole tests that static role operations emit the correct events
+func TestBackend_Events_StaticRole(t *testing.T) {
+	// Create backend config with event sender
+	config := testBackendConfig()
+	eventSender := logical.NewMockEventSender()
+	config.EventsSender = eventSender
+
+	b, _ := getBackendWithConfig(config, false)
+
+	// Create config first
+	configData := map[string]interface{}{
+		"binddn":       "cn=admin,dc=example,dc=org",
+		"bindpass":     "admin-password",
+		"url":          "ldap://localhost:389",
+		"schema":       "openldap",
+		"userattr":     "cn",
+		"userdn":       "ou=users,dc=example,dc=org",
+		"insecure_tls": true,
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "config",
+		Storage:   config.StorageView,
+		Data:      configData,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Clear events from config creation
+	eventSender.Events = nil
+
+	// Create static role
+	roleData := map[string]interface{}{
+		"username":             "testuser",
+		"dn":                   "cn=testuser,ou=users,dc=example,dc=org",
+		"rotation_period":      "24h",
+		"skip_import_rotation": true,
+	}
+
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "static-role/testrole",
+		Storage:   config.StorageView,
+		Data:      roleData,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Update static role
+	roleData["rotation_period"] = "48h"
+	delete(roleData, "skip_import_rotation") // Remove this field as it causes an error on updates
+	req.Operation = logical.UpdateOperation
+	req.Data = roleData
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Delete static role
+	req = &logical.Request{
+		Operation: logical.DeleteOperation,
+		Path:      "static-role/testrole",
+		Storage:   config.StorageView,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Verify events
+	if len(eventSender.Events) != 3 {
+		t.Fatalf("expected 3 events, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[0].Type) != "ldap/static-role-create" {
+		t.Errorf("expected event type ldap/static-role-create, got %s", eventSender.Events[0].Type)
+	}
+	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testrole" {
+		t.Errorf("expected name testrole, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
+	}
+
+	if string(eventSender.Events[1].Type) != "ldap/static-role-update" {
+		t.Errorf("expected event type ldap/static-role-update, got %s", eventSender.Events[1].Type)
+	}
+
+	if string(eventSender.Events[2].Type) != "ldap/static-role-delete" {
+		t.Errorf("expected event type ldap/static-role-delete, got %s", eventSender.Events[2].Type)
+	}
+}
+
+// TestBackend_Events_DynamicRole tests that dynamic role operations emit the correct events
+func TestBackend_Events_DynamicRole(t *testing.T) {
+	// Create backend config with event sender
+	config := testBackendConfig()
+	eventSender := logical.NewMockEventSender()
+	config.EventsSender = eventSender
+
+	b, _ := getBackendWithConfig(config, false)
+
+	// Create dynamic role
+	roleData := map[string]interface{}{
+		"creation_ldif": `dn: cn={{.Username}},ou=users,dc=example,dc=org
+objectClass: person
+objectClass: top
+cn: {{.Username}}
+sn: {{.Username}}
+userPassword: {{.Password}}`,
+		"deletion_ldif": `dn: cn={{.Username}},ou=users,dc=example,dc=org
+changetype: delete`,
+		"rollback_ldif": "",
+		"default_ttl":   "1h",
+		"max_ttl":       "24h",
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "role/testrole",
+		Storage:   config.StorageView,
+		Data:      roleData,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Update dynamic role
+	roleData["default_ttl"] = "2h"
+	req.Operation = logical.UpdateOperation
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Delete dynamic role
+	req = &logical.Request{
+		Operation: logical.DeleteOperation,
+		Path:      "role/testrole",
+		Storage:   config.StorageView,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Verify events
+	if len(eventSender.Events) != 3 {
+		t.Fatalf("expected 3 events, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[0].Type) != "ldap/role-create" {
+		t.Errorf("expected event type ldap/role-create, got %s", eventSender.Events[0].Type)
+	}
+	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testrole" {
+		t.Errorf("expected name testrole, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
+	}
+
+	if string(eventSender.Events[1].Type) != "ldap/role-update" {
+		t.Errorf("expected event type ldap/role-update, got %s", eventSender.Events[1].Type)
+	}
+
+	if string(eventSender.Events[2].Type) != "ldap/role-delete" {
+		t.Errorf("expected event type ldap/role-delete, got %s", eventSender.Events[2].Type)
+	}
+}
+
+// TestBackend_Events_LibrarySet tests that library set operations emit the correct events
+func TestBackend_Events_LibrarySet(t *testing.T) {
+	// Create backend config with event sender
+	config := testBackendConfig()
+	eventSender := logical.NewMockEventSender()
+	config.EventsSender = eventSender
+
+	b, _ := getBackendWithConfig(config, false)
+
+	// Create config first
+	configData := map[string]interface{}{
+		"binddn":       "cn=admin,dc=example,dc=org",
+		"bindpass":     "admin-password",
+		"url":          "ldap://localhost:389",
+		"schema":       "openldap",
+		"userattr":     "cn",
+		"userdn":       "ou=users,dc=example,dc=org",
+		"insecure_tls": true,
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "config",
+		Storage:   config.StorageView,
+		Data:      configData,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Clear events from config creation
+	eventSender.Events = nil
+
+	// Create library set
+	setData := map[string]interface{}{
+		"service_account_names": []string{"testaccount1", "testaccount2"},
+		"ttl":                   86400,
+		"max_ttl":               86400,
+	}
+
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "library/testset",
+		Storage:   config.StorageView,
+		Data:      setData,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Update library set
+	setData["max_ttl"] = 172800
+	req.Operation = logical.UpdateOperation
+	req.Data = setData
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Delete library set
+	req = &logical.Request{
+		Operation: logical.DeleteOperation,
+		Path:      "library/testset",
+		Storage:   config.StorageView,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Verify events
+	if len(eventSender.Events) != 3 {
+		t.Fatalf("expected 3 events, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[0].Type) != "ldap/library-create" {
+		t.Errorf("expected event type ldap/library-create, got %s", eventSender.Events[0].Type)
+	}
+	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testset" {
+		t.Errorf("expected name testset, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
+	}
+
+	if string(eventSender.Events[1].Type) != "ldap/library-update" {
+		t.Errorf("expected event type ldap/library-update, got %s", eventSender.Events[1].Type)
+	}
+
+	if string(eventSender.Events[2].Type) != "ldap/library-delete" {
+		t.Errorf("expected event type ldap/library-delete, got %s", eventSender.Events[2].Type)
+	}
+}
+
+// TestBackend_Events_CheckOutCheckIn tests that check-out and check-in operations emit the correct events
+func TestBackend_Events_CheckOutCheckIn(t *testing.T) {
+	// Create backend config with event sender
+	config := testBackendConfig()
+	eventSender := logical.NewMockEventSender()
+	config.EventsSender = eventSender
+
+	b, _ := getBackendWithConfig(config, false)
+
+	// Create config first
+	configData := map[string]interface{}{
+		"binddn":       "cn=admin,dc=example,dc=org",
+		"bindpass":     "admin-password",
+		"url":          "ldap://localhost:389",
+		"schema":       "openldap",
+		"userattr":     "cn",
+		"userdn":       "ou=users,dc=example,dc=org",
+		"insecure_tls": true,
+	}
+
+	req := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "config",
+		Storage:   config.StorageView,
+		Data:      configData,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Create library set
+	setData := map[string]interface{}{
+		"service_account_names": []string{"testaccount1", "testaccount2"},
+		"ttl":                   86400,
+		"max_ttl":               86400,
+	}
+
+	req = &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      "library/testset",
+		Storage:   config.StorageView,
+		Data:      setData,
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Clear events from config and set creation
+	eventSender.Events = nil
+
+	// Check out a service account
+	req = &logical.Request{
+		Operation:   logical.UpdateOperation,
+		Path:        "library/testset/check-out",
+		Storage:     config.StorageView,
+		EntityID:    "test-entity-id",
+		ClientToken: "test-token",
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+	if resp == nil || resp.Secret == nil {
+		t.Fatal("expected secret in response")
+	}
+
+	// Verify check-out event
+	if len(eventSender.Events) != 1 {
+		t.Fatalf("expected 1 event after library-check-out, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[0].Type) != "ldap/library-check-out" {
+		t.Errorf("expected event type ldap/library-check-out, got %s", eventSender.Events[0].Type)
+	}
+	if eventSender.Events[0].Event.Metadata.AsMap()["name"] != "testset" {
+		t.Errorf("expected name testset, got %s", eventSender.Events[0].Event.Metadata.AsMap()["name"])
+	}
+
+	// Check in the service account
+	req = &logical.Request{
+		Operation:   logical.UpdateOperation,
+		Path:        "library/testset/check-in",
+		Storage:     config.StorageView,
+		EntityID:    "test-entity-id",
+		ClientToken: "test-token",
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	// Verify check-in event
+	if len(eventSender.Events) != 2 {
+		t.Fatalf("expected 2 events after library-check-in, got %d", len(eventSender.Events))
+	}
+
+	if string(eventSender.Events[1].Type) != "ldap/library-check-in" {
+		t.Errorf("expected event type ldap/library-check-in, got %s", eventSender.Events[1].Type)
+	}
+	if eventSender.Events[1].Event.Metadata.AsMap()["name"] != "testset" {
+		t.Errorf("expected name testset, got %s", eventSender.Events[1].Event.Metadata.AsMap()["name"])
+	}
 }
 
 const validCertificate = `

@@ -1,7 +1,29 @@
-## Unreleased
+## v0.17.0
+### October 7, 2025
+
+* Update go versions to 1.25.1 (#217)
+* Fix tests to run to completion (#215)
+* Automated dependency upgrades (#214)
+* Bump github.com/go-viper/mapstructure/v2 from 2.1.0 to 2.4.0 (#202)
+* Add Event Notification Support to Vault OpenLDAP Plugin (#211)
+* init changie (#209)
+* Bump docker indirect dep and update changelog (#206)
+* [COMPLIANCE] Add Copyright and License Headers (#186)
+* Add backport assistant workflow (#187)
+* log static and root rotations (#183)
+* Add terraform test bootstrap for RACF static roles (#185)
+* Support RACF password phrase management for static roles (#184)
+* Add backport assistant workflow (#182)
+* [Compliance] - PR Template Changes Required (#178)
+* Add RACF Passphrase Support (#170)
+
+## v0.16.1
+### August 21, 2025
 
 FEATURES:
+
 * Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
+* Have rotations actions log success or failure
 
 ## v0.16.0
 ### June 4, 2025
@@ -18,6 +40,13 @@ IMPROVEMENTS:
 BUG FIXES:
 
 * Fix issue where roles created before 0.14.5 had a nil NextVaultRotation value: [GH-156](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/156)
+
+## v0.15.5
+
+FEATURES:
+
+* Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
+* Have rotations actions log success or failure
 
 ## v0.15.4
 
@@ -58,6 +87,12 @@ IMPROVEMENTS:
 BUG FIXES:
 
 * Fix a bug where static role passwords are erroneously rotated across backend restarts when using skip import rotation. (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/140)
+
+## v0.14.7
+
+FEATURES:
+
+* Support RACF password phrase management for static roles (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/184)
 
 ## v0.14.6
 
@@ -150,12 +185,12 @@ FEATURES:
 
 IMPROVEMENTS:
 * Updated dependencies (https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/101):
-   * `github.com/go-ldap/ldap/v3` v3.4.4 -> v3.4.6
-   * `github.com/hashicorp/go-hclog` v1.5.0 -> v1.6.2
-   * `github.com/hashicorp/go-secure-stdlib/parseutil` v0.1.7 -> v0.1.8
-   * `github.com/hashicorp/vault/api` v1.9.2 -> v1.13.0
-   * `github.com/hashicorp/vault/sdk` v0.11.1-0.20240325190132-c20eae3e84c5 -> v0.12.0
-   * `github.com/stretchr/testify` v1.8.4 -> v1.9.0
+  * `github.com/go-ldap/ldap/v3` v3.4.4 -> v3.4.6
+  * `github.com/hashicorp/go-hclog` v1.5.0 -> v1.6.2
+  * `github.com/hashicorp/go-secure-stdlib/parseutil` v0.1.7 -> v0.1.8
+  * `github.com/hashicorp/vault/api` v1.9.2 -> v1.13.0
+  * `github.com/hashicorp/vault/sdk` v0.11.1-0.20240325190132-c20eae3e84c5 -> v0.12.0
+  * `github.com/stretchr/testify` v1.8.4 -> v1.9.0
 
 ## v0.12.6
 
@@ -200,7 +235,7 @@ IMPROVEMENTS:
 
 ### FEATURES:
 * add `skip_static_role_import_rotation` and `skip_import_rotation` to allow users to retain the existing role password
-on import (note: Vault will not know the role password until it is rotated) [GH-83](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/83)
+  on import (note: Vault will not know the role password until it is rotated) [GH-83](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/83)
 
 ### BUG FIXES:
 * Revert back to armon/go-metrics [GH-88](https://github.com/hashicorp/vault-plugin-secrets-openldap/pull/88)

@@ -42,7 +42,7 @@ tools:
 
 .PHONY: test
 test: tools fmtcheck
-	CGO_ENABLED=0 gotestsum --format github-actions \
+	gotestsum --format github-actions \
 	-- ./... $(TESTARGS) -timeout=20m -race -coverprofile=coverage.out
 
 .PHONY: tools fmtcheck

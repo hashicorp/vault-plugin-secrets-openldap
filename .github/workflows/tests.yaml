@@ -24,5 +24,17 @@ jobs:
         run: make dev
 
       - name: Print Coverage Summary
-          # Parses the profile and prints per-function coverage to stdout
-          run: go tool cover -func=coverage.out
+        # Parses the profile and prints per-function coverage to stdout
+        run: go tool cover -func=coverage.out
+
+  code_coverage:
+    name: "Code coverage report"
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: coverage
+    permissions:
+      contents:      read
+      actions:       read
+      pull-requests: write
+    steps:
+      - uses: fgrosse/go-coverage-report@8c1d1a09864211d258937b1b1a5b849f7e4f2682 # v1.2.0

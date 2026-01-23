@@ -121,6 +121,78 @@ func (c *Client) UpdatePassword(cfg *Config, baseDN string, scope int, newValues
 	return c.UpdateEntry(cfg, baseDN, scope, filters, newValues)
 }
 
+// UpdateSelfManagedPassword performs a least‑privilege, self‑service password change.
+// Behavior by schema:
+//   - Active Directory: issues a Delete (current value) followed by an Add (new value)
+//     because a direct Replace (like the one done in `UpdateEntry`) typically requires elevated privileges.
+//   - OpenLDAP: uses the RFC 3062 PasswordModify extended operation. If the underlying
+//     connection does not support it, falls back to UpdateEntry (privileged replace).
+//   - RACF: not implamneted yet.
+func (c *Client) UpdateSelfManagedPassword(cfg *Config, dn string, scope int, currentValue string, newValue string, filters map[*Field][]string) error {
+	if currentValue == "" || newValue == "" {
+		return fmt.Errorf("both current and new password must be provided for self-managed password changes on dn: %s", dn)
+	}
+	// Use a copy of the config to avoid modifying the original with the bind dn/password for rotation
+	rotationConfEntry := *cfg.ConfigEntry
+	rotationConfEntry.BindDN = dn
+	rotationConfEntry.BindPassword = currentValue
+	rotationConf := *cfg
+	rotationConf.ConfigEntry = &rotationConfEntry
+	// perform self search to validate account exists and current password is correct
+	entries, err := c.Search(&rotationConf, dn, scope, filters)
+	if err != nil {
+		return err
+	}
+	if len(entries) != 1 {
+		return fmt.Errorf("expected one matching entry, but received %d", len(entries))
+	}
+	conn, err := c.ldap.DialLDAP(rotationConf.ConfigEntry)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if err := bind(&rotationConf, conn); err != nil {
+		return err
+	}
+	currentSchemaValues, err := GetSchemaFieldRegistry(&rotationConf, currentValue)
+	if err != nil {
+		return fmt.Errorf("error updating password: %s", err)
+	}
+	newSchemaValues, err := GetSchemaFieldRegistry(&rotationConf, newValue)
+	if err != nil {
+		return fmt.Errorf("error updating password: %s", err)
+	}
+	switch rotationConf.Schema {
+	case SchemaAD:
+		modifyReq := &ldap.ModifyRequest{
+			DN: entries[0].DN,
+		}
+		for field, vals := range currentSchemaValues {
+			modifyReq.Delete(field.String(), vals)
+		}
+		for field, vals := range newSchemaValues {
+			modifyReq.Add(field.String(), vals)
+		}
+		return conn.Modify(modifyReq)
+	case SchemaOpenLDAP:
+		req := ldap.NewPasswordModifyRequest(entries[0].DN, currentValue, newValue)
+		pmConn, ok := conn.(interface {
+			PasswordModify(*ldap.PasswordModifyRequest) (*ldap.PasswordModifyResult, error)
+		})
+		if !ok {
+			// Fallback: try privileged replace (may fail if self-change perms required)
+			return c.UpdateEntry(&rotationConf, dn, scope, filters, newSchemaValues)
+		}
+		_, err = pmConn.PasswordModify(req)
+		return err
+	case SchemaRACF:
+		return fmt.Errorf("self managed password changes not supported for RACF schema")
+	default:
+		return fmt.Errorf("configured schema %s not valid", rotationConf.Schema)
+	}
+}
+
 // toString turns the following map of filters into LDAP search filter strings
 // For example: "(cn=Ellen Jones)"
 // when multiple filters are applied, they get AND'ed together.

@@ -1,7 +1,36 @@
+# copy of https://github.com/hashicorp/vault-workflows-common/blob/main/.github/workflows/tests.yaml
 name: Run Tests
+
 on:
   push:
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   run-tests:
-    # using `main` as the ref will keep your workflow up-to-date
-    uses: hashicorp/vault-workflows-common/.github/workflows/tests.yaml@main
+    name: "Run Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version-file: .go-version
+
+      - name: Run Build
+        run: make dev
+
+      - name: Run Tests
+        run: make test
+
+      - name: Print Coverage Summary
+        # Parses the profile and prints per-function coverage to stdout
+        run: go tool cover -func=coverage.txt
+
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: code-coverage
+          path: coverage.txt

@@ -35,12 +35,17 @@ bootstrap:
         go mod edit -module github.com/hashicorp/$(REPO_DIR); \
 	fi
 
+.PHONY: tools
+tools:
+	@which gofumpt > /dev/null || (echo "Installing gofumpt..." && go install mvdan.cc/gofumpt@latest)
+	@which gotestsum > /dev/null || (echo "Installing gotestsum..." && go install gotest.tools/gotestsum@latest)
 
 .PHONY: test
-test: fmtcheck
-	CGO_ENABLED=0 go test ./... $(TESTARGS) -timeout=20m
+test: tools fmtcheck
+	gotestsum --format github-actions \
+	-- ./... $(TESTARGS) -timeout=20m -race -coverprofile=coverage.txt
 
-.PHONY: fmtcheck
+.PHONY: tools fmtcheck
 fmtcheck:
 	@sh -c "'$(CURDIR)/scripts/gofmtcheck.sh'"
 

@@ -75,6 +75,20 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 		b.Logger().Error("failed to rotate root credential on user request", "path", req.Path, "error", err.Error())
 		b.ldapEvent(ctx, "root-rotate-fail", req.Path, "", false)
 	} else {
+		// dev setup for manual root rotation case
+		config, err := readConfig(ctx, req.Storage)
+		if err != nil {
+			return nil, err
+		}
+		if config == nil {
+			return nil, errors.New("the config is currently unset")
+		}
+
+		// Update the creation time to now since we just rotated
+		config.SetLastVaultRotation()
+
+		err = storePassword(ctx, req.Storage, config)
+
 		b.Logger().Info("succesfully rotated root credential on user request", "path", req.Path)
 		b.ldapEvent(ctx, "root-rotate", req.Path, "", true)
 	}
@@ -114,6 +128,13 @@ func (b *backend) rotateRootCredential(ctx context.Context, req *logical.Request
 	config.LDAP.BindPassword = newPassword
 	config.LDAP.LastBindPassword = oldPassword
 	config.LDAP.LastBindPasswordRotation = time.Now()
+
+	// Update rotation info when successfully rotating the credential
+	// This is only used by the rotation manager callback, as RotationInfo is not
+	// available when manually rotating.
+	if req.RotationInfo != nil {
+		config.SetRotationInfo(req.RotationInfo)
+	}
 
 	// Update the password locally.
 	if pwdStoringErr := storePassword(ctx, req.Storage, config); pwdStoringErr != nil {

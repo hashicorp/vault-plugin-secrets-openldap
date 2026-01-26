@@ -2,6 +2,8 @@ module github.com/hashicorp/vault-plugin-secrets-openldap
 
 go 1.25.1
 
+replace github.com/hashicorp/vault/sdk => /Users/vinayg/Desktop/vault-projects/vault-enterprise/sdk
+
 require (
 	github.com/go-ldap/ldap/v3 v3.4.12
 	github.com/go-ldap/ldif v0.0.0-20250910174327-aa3bc3095c92
@@ -16,7 +18,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/text v0.29.0
+	golang.org/x/text v0.31.0
 )
 
 require (
@@ -125,10 +127,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
-	golang.org/x/net v0.42.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/api v0.221.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250207221924-e9438ea467c6 // indirect

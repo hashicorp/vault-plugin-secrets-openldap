@@ -242,12 +242,16 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 			RotationSchedule: conf.RotationSchedule,
 			RotationWindow:   conf.RotationWindow,
 			RotationPeriod:   conf.RotationPeriod,
+			RotationPolicy:   conf.RotationPolicy,
 		}
 
-		_, err := b.System().RegisterRotationJob(ctx, req)
+		resp, err := b.System().RegisterRotationJobWithResponse(ctx, req)
 		if err != nil {
 			return logical.ErrorResponse("error registering rotation job: %s", err), nil
 		}
+
+		// Update RotationInfo on registering
+		conf.SetRotationInfo(resp)
 	}
 
 	err = writeConfig(ctx, req.Storage, *conf)
@@ -343,6 +347,8 @@ func (b *backend) configReadOperation(ctx context.Context, req *logical.Request,
 	}
 
 	config.PopulateAutomatedRotationData(configMap)
+	config.PopulateRotationInfo(configMap)
+	configMap["ttl"] = config.GetTTL()
 
 	resp := &logical.Response{
 		Data: configMap,
@@ -367,6 +373,7 @@ type config struct {
 	SkipStaticRoleImportRotation bool   `json:"skip_static_role_import_rotation"`
 
 	automatedrotationutil.AutomatedRotationParams
+	automatedrotationutil.RotationInfoResponseParams
 
 	// Deprecated
 	PasswordLength int `json:"length,omitempty"`

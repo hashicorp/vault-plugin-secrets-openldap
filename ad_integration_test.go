@@ -429,3 +429,88 @@ func TestAD_DualAccountUsernameOnlyMode(t *testing.T) {
 	t.Logf("Username-only dual-account mode works: active=%s, state=%s",
 		resp.Data["active_account"], resp.Data["rotation_state"])
 }
+
+// TestAD_LibrarySetConflict verifies that dual-account roles and library sets
+// correctly prevent username conflicts against a real AD backend.
+func TestAD_LibrarySetConflict(t *testing.T) {
+	url, bindDN, bindPW, _, _ := adTestConfig(t)
+	ctx := context.Background()
+
+	t.Run("library_blocks_dual_account_username_b", func(t *testing.T) {
+		b, storage := getADBackend(t)
+		defer b.Cleanup(ctx)
+		configureADMount(t, b, storage, url, bindDN, bindPW)
+
+		// Create a library set with svc-single
+		resp, err := b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      "library/ad-lib-test",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"service_account_names": []string{"svc-single"},
+				"ttl":                   "10h",
+				"max_ttl":               "11h",
+			},
+		})
+		require.NoError(t, err)
+		require.Nil(t, resp, "library set creation should succeed")
+
+		// Try creating a dual-account role with username_b matching the library user
+		resp, err = b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      staticRolePath + "conflict-dual",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"username":          "svc-rotate-a",
+				"username_b":        "svc-single",
+				"rotation_period":   "3600s",
+				"dual_account_mode": true,
+				"grace_period":      "1800s",
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.IsError(), "username_b conflicting with library set should be rejected")
+		require.Contains(t, resp.Data["error"], "already managed")
+		t.Logf("Correctly rejected: %s", resp.Data["error"])
+	})
+
+	t.Run("dual_account_blocks_library_set", func(t *testing.T) {
+		b, storage := getADBackend(t)
+		defer b.Cleanup(ctx)
+		configureADMount(t, b, storage, url, bindDN, bindPW)
+
+		// Create a dual-account role first
+		resp, err := b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      staticRolePath + "dual-first",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"username":          "svc-rotate-a",
+				"username_b":        "svc-rotate-b",
+				"rotation_period":   "3600s",
+				"dual_account_mode": true,
+				"grace_period":      "1800s",
+			},
+		})
+		require.NoError(t, err)
+		require.False(t, resp != nil && resp.IsError(), "dual-account role should succeed: %v", resp)
+
+		// Try creating a library set with username_b
+		resp, err = b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      "library/conflict-lib",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"service_account_names": []string{"svc-rotate-b"},
+				"ttl":                   "10h",
+				"max_ttl":               "11h",
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.IsError(), "library set conflicting with dual-account username_b should be rejected")
+		require.Contains(t, resp.Data["error"], "already managed")
+		t.Logf("Correctly rejected: %s", resp.Data["error"])
+	})
+}

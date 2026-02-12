@@ -520,3 +520,191 @@ func TestDualAccountRole_UsernameB_AlreadyManaged(t *testing.T) {
 	require.NotNil(t, resp2)
 	require.True(t, resp2.IsError(), "expected error when username_b is already managed")
 }
+
+// TestDualAccountRole_LibrarySetConflict verifies that dual-account roles and
+// library sets correctly prevent username conflicts in both directions.
+func TestDualAccountRole_LibrarySetConflict(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("library_user_blocks_dual_account_username_b", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+
+		// Create a library set with a service account
+		resp, err := b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      "library/test-lib",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"service_account_names": []string{"svc-lib-account"},
+				"ttl":                   "10h",
+				"max_ttl":               "11h",
+			},
+		})
+		require.NoError(t, err)
+		require.Nil(t, resp, "library set creation should succeed")
+
+		// Try creating a dual-account role with username_b matching the library user
+		data := map[string]interface{}{
+			"username":          "svc-blue",
+			"username_b":        "svc-lib-account",
+			"rotation_period":   60,
+			"dual_account_mode": true,
+			"grace_period":      10,
+		}
+		resp, err = createStaticRoleWithData(t, b, storage, "conflict-role", data)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.IsError(), "username_b conflicting with library set should be rejected")
+		require.Contains(t, resp.Data["error"], "already managed")
+	})
+
+	t.Run("library_user_blocks_dual_account_primary_username", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+
+		// Create a library set
+		resp, err := b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      "library/test-lib",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"service_account_names": []string{"svc-lib-account"},
+				"ttl":                   "10h",
+				"max_ttl":               "11h",
+			},
+		})
+		require.NoError(t, err)
+		require.Nil(t, resp)
+
+		// Try creating a dual-account role with primary username matching library user
+		data := map[string]interface{}{
+			"username":          "svc-lib-account",
+			"username_b":        "svc-green",
+			"rotation_period":   60,
+			"dual_account_mode": true,
+			"grace_period":      10,
+		}
+		resp, err = createStaticRoleWithData(t, b, storage, "conflict-role", data)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.IsError(), "primary username conflicting with library set should be rejected")
+		require.Contains(t, resp.Data["error"], "already managed")
+	})
+
+	t.Run("dual_account_blocks_library_set_username_b", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+
+		// Create a dual-account role first
+		data := map[string]interface{}{
+			"username":          "svc-blue",
+			"username_b":        "svc-green",
+			"rotation_period":   60,
+			"dual_account_mode": true,
+			"grace_period":      10,
+		}
+		resp, err := createStaticRoleWithData(t, b, storage, "dual-role", data)
+		require.NoError(t, err)
+		if resp != nil {
+			require.False(t, resp.IsError(), "dual-account role creation should succeed: %v", resp)
+		}
+
+		// Try creating a library set with username_b
+		resp, err = b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      "library/conflict-lib",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"service_account_names": []string{"svc-green"},
+				"ttl":                   "10h",
+				"max_ttl":               "11h",
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.IsError(), "library set conflicting with dual-account username_b should be rejected")
+		require.Contains(t, resp.Data["error"], "already managed")
+	})
+
+	t.Run("dual_account_blocks_library_set_primary_username", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+
+		// Create a dual-account role first
+		data := map[string]interface{}{
+			"username":          "svc-blue",
+			"username_b":        "svc-green",
+			"rotation_period":   60,
+			"dual_account_mode": true,
+			"grace_period":      10,
+		}
+		resp, err := createStaticRoleWithData(t, b, storage, "dual-role", data)
+		require.NoError(t, err)
+		if resp != nil {
+			require.False(t, resp.IsError(), "dual-account role creation should succeed: %v", resp)
+		}
+
+		// Try creating a library set with the primary username
+		resp, err = b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      "library/conflict-lib",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"service_account_names": []string{"svc-blue"},
+				"ttl":                   "10h",
+				"max_ttl":               "11h",
+			},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.IsError(), "library set conflicting with dual-account primary username should be rejected")
+		require.Contains(t, resp.Data["error"], "already managed")
+	})
+
+	t.Run("delete_dual_account_frees_both_usernames_for_library", func(t *testing.T) {
+		b, storage := getBackend(false)
+		defer b.Cleanup(ctx)
+		configureOpenLDAPMount(t, b, storage)
+
+		// Create a dual-account role
+		data := map[string]interface{}{
+			"username":          "svc-blue",
+			"username_b":        "svc-green",
+			"rotation_period":   60,
+			"dual_account_mode": true,
+			"grace_period":      10,
+		}
+		resp, err := createStaticRoleWithData(t, b, storage, "dual-role", data)
+		require.NoError(t, err)
+		if resp != nil {
+			require.False(t, resp.IsError(), "dual-account role creation should succeed: %v", resp)
+		}
+
+		// Delete the dual-account role
+		resp, err = b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.DeleteOperation,
+			Path:      staticRolePath + "dual-role",
+			Storage:   storage,
+		})
+		require.NoError(t, err)
+
+		// Now both usernames should be available for a library set
+		resp, err = b.HandleRequest(ctx, &logical.Request{
+			Operation: logical.CreateOperation,
+			Path:      "library/reclaim-lib",
+			Storage:   storage,
+			Data: map[string]interface{}{
+				"service_account_names": []string{"svc-blue", "svc-green"},
+				"ttl":                   "10h",
+				"max_ttl":               "11h",
+			},
+		})
+		require.NoError(t, err)
+		require.Nil(t, resp, "library set should succeed after dual-account role is deleted")
+	})
+}

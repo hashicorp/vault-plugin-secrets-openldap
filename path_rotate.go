@@ -172,7 +172,11 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 			item.Value = resp.WALID
 		}
 	} else {
-		item.Priority = resp.RotationTime.Add(role.StaticAccount.RotationPeriod).Unix()
+		if role.StaticAccount.DualAccountMode {
+			item.Priority = role.StaticAccount.GracePeriodEnd.Unix()
+		} else {
+			item.Priority = resp.RotationTime.Add(role.StaticAccount.RotationPeriod).Unix()
+		}
 		// Clear any stored WAL ID as we must have successfully deleted our WAL to get here.
 		item.Value = ""
 	}

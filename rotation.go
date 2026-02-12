@@ -84,6 +84,11 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage, roles ma
 			Priority: role.StaticAccount.NextRotationTime().Unix(),
 		}
 
+		// For dual-account roles in grace_period state, schedule at grace period end
+		if role.StaticAccount.DualAccountMode && role.StaticAccount.RotationState == "grace_period" && !role.StaticAccount.GracePeriodEnd.IsZero() {
+			item.Priority = role.StaticAccount.GracePeriodEnd.Unix()
+		}
+
 		// Check if role name is in map
 		walEntry := walMap[roleName]
 		if walEntry != nil {
@@ -216,6 +221,51 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 		return false
 	}
 
+	// Handle dual-account grace period expiry
+	if role.StaticAccount.DualAccountMode && role.StaticAccount.RotationState == "grace_period" {
+		if time.Now().After(role.StaticAccount.GracePeriodEnd) {
+			b.Logger().Info("grace period expired, transitioning to active state", "role", item.Key, "active_account", role.StaticAccount.ActiveAccount)
+
+			role.StaticAccount.RotationState = "active"
+			role.StaticAccount.GracePeriodEnd = time.Time{}
+
+			entry, err := logical.StorageEntryJSON(staticRolePath+item.Key, role)
+			if err != nil {
+				b.Logger().Error("unable to persist grace period transition", "role", item.Key, "error", err)
+				item.Priority = time.Now().Add(10 * time.Second).Unix()
+				if err := b.pushItem(item); err != nil {
+					b.Logger().Error("unable to push item on to queue", "error", err)
+				}
+				return true
+			}
+			if err := s.Put(ctx, entry); err != nil {
+				b.Logger().Error("unable to persist grace period transition", "role", item.Key, "error", err)
+				item.Priority = time.Now().Add(10 * time.Second).Unix()
+				if err := b.pushItem(item); err != nil {
+					b.Logger().Error("unable to push item on to queue", "error", err)
+				}
+				return true
+			}
+
+			// Schedule next rotation
+			item.Priority = role.StaticAccount.NextVaultRotation.Unix()
+			item.Value = ""
+			if err := b.pushItem(item); err != nil {
+				b.Logger().Error("unable to push item on to queue", "error", err)
+			}
+			b.Logger().Info("successfully transitioned from grace period to active", "role", item.Key)
+			b.ldapEvent(ctx, "dual-account-grace-period-end", "", item.Key, true)
+			return true
+		}
+
+		// Grace period not yet expired, re-queue at grace period end
+		item.Priority = role.StaticAccount.GracePeriodEnd.Unix()
+		if err := b.pushItem(item); err != nil {
+			b.Logger().Error("unable to push item on to queue", "error", err)
+		}
+		return false
+	}
+
 	input := &setStaticAccountInput{
 		RoleName: item.Key,
 		Role:     role,
@@ -254,9 +304,16 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 		lvr = time.Now()
 	}
 
-	// Update priority and push updated Item to the queue
-	nextRotation := lvr.Add(role.StaticAccount.RotationPeriod)
-	item.Priority = nextRotation.Unix()
+	// For dual-account mode, after a successful rotation we enter grace period.
+	// Schedule the queue item for the grace period end instead of the next
+	// rotation time.
+	if role.StaticAccount.DualAccountMode {
+		item.Priority = role.StaticAccount.GracePeriodEnd.Unix()
+	} else {
+		// Update priority and push updated Item to the queue
+		nextRotation := lvr.Add(role.StaticAccount.RotationPeriod)
+		item.Priority = nextRotation.Unix()
+	}
 	if err := b.pushItem(item); err != nil {
 		b.Logger().Warn("unable to push item on to queue", "error", err)
 	}
@@ -321,6 +378,9 @@ type setStaticAccountOutput struct {
 // - sets new password for the static account
 // - uses WAL for ensuring passwords are not lost if storage to Vault fails
 //
+// For dual-account mode, this method rotates the standby account's password
+// and transitions the state machine accordingly.
+//
 // This method does not perform any operations on the priority queue. Those
 // tasks must be handled outside of this method.
 func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storage, input *setStaticAccountInput) (*setStaticAccountOutput, error) {
@@ -346,6 +406,11 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	}
 	if config == nil {
 		return output, errors.New("the config is currently unset")
+	}
+
+	// For dual-account mode, delegate to the dual-account rotation logic
+	if input.Role.StaticAccount.DualAccountMode {
+		return b.setDualAccountPassword(ctx, s, input, output, config)
 	}
 
 	var newPassword string
@@ -452,6 +517,179 @@ func (b *backend) setStaticAccountPassword(ctx context.Context, s logical.Storag
 	b.Logger().Debug("deleted WAL", "WAL ID", output.WALID)
 
 	// The WAL has been deleted, return new setStaticAccountOutput without it
+	return &setStaticAccountOutput{RotationTime: lvr}, nil
+}
+
+// setDualAccountPassword handles password rotation for dual-account mode roles.
+// The rotation state machine works as follows:
+//
+// State: "active" - One account is active, the other is standby.
+//   - On rotation trigger: rotate the standby account's password, then
+//     transition to "grace_period" state with the NEW standby becoming the
+//     active account.
+//
+// State: "grace_period" - Both accounts' credentials are returned.
+//   - On grace period expiry: transition back to "active" state.
+func (b *backend) setDualAccountPassword(ctx context.Context, s logical.Storage, input *setStaticAccountInput, output *setStaticAccountOutput, config *config) (*setStaticAccountOutput, error) {
+	sa := input.Role.StaticAccount
+
+	// On initial creation, both accounts need passwords. Check if either
+	// account has no password set.
+	isInitialSetup := sa.Password == "" || sa.PasswordB == ""
+
+	if isInitialSetup {
+		// Generate and set passwords for both accounts
+		passwordA, err := b.GeneratePassword(ctx, config)
+		if err != nil {
+			return output, err
+		}
+		passwordB, err := b.GeneratePassword(ctx, config)
+		if err != nil {
+			return output, err
+		}
+
+		// Create WAL for initial setup
+		if output.WALID == "" {
+			output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, &setCredentialsWAL{
+				RoleName:          input.RoleName,
+				Username:          sa.Username,
+				DN:                sa.DN,
+				NewPassword:       passwordA,
+				LastVaultRotation: sa.LastVaultRotation,
+				PasswordPolicy:    config.PasswordPolicy,
+			})
+			if err != nil {
+				return output, fmt.Errorf("error writing WAL entry for dual-account initial setup: %w", err)
+			}
+		}
+
+		// Rotate account A
+		if sa.DN != "" {
+			err = b.client.UpdateDNPassword(config.LDAP, sa.DN, passwordA)
+		} else {
+			err = b.client.UpdateUserPassword(config.LDAP, sa.Username, passwordA)
+		}
+		if err != nil {
+			return output, fmt.Errorf("failed to set initial password for account A: %w", err)
+		}
+
+		// Rotate account B
+		if sa.DNB != "" {
+			err = b.client.UpdateDNPassword(config.LDAP, sa.DNB, passwordB)
+		} else {
+			err = b.client.UpdateUserPassword(config.LDAP, sa.UsernameB, passwordB)
+		}
+		if err != nil {
+			return output, fmt.Errorf("failed to set initial password for account B: %w", err)
+		}
+
+		lvr := time.Now()
+		sa.Password = passwordA
+		sa.PasswordB = passwordB
+		sa.LastVaultRotation = lvr
+		sa.LastRotationB = lvr
+		sa.SetNextVaultRotation(lvr)
+		sa.ActiveAccount = "a"
+		sa.RotationState = "active"
+		output.RotationTime = lvr
+
+		// Persist the updated role
+		entry, err := logical.StorageEntryJSON(staticRolePath+input.RoleName, input.Role)
+		if err != nil {
+			return output, err
+		}
+		if err := s.Put(ctx, entry); err != nil {
+			return output, err
+		}
+
+		// Cleanup WAL
+		if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+			b.Logger().Warn("error deleting WAL for dual-account initial setup", "WAL ID", output.WALID, "error", err)
+			return output, err
+		}
+
+		return &setStaticAccountOutput{RotationTime: lvr}, nil
+	}
+
+	// Normal rotation: rotate the standby account's password
+	var standbyDN, standbyUsername string
+	if sa.ActiveAccount == "a" {
+		standbyDN = sa.DNB
+		standbyUsername = sa.UsernameB
+	} else {
+		standbyDN = sa.DN
+		standbyUsername = sa.Username
+	}
+
+	// Generate new password for the standby account
+	newPassword, err := b.GeneratePassword(ctx, config)
+	if err != nil {
+		return output, err
+	}
+
+	// Create WAL entry for the dual-account rotation
+	if output.WALID == "" {
+		output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, &setCredentialsWAL{
+			RoleName:          input.RoleName,
+			Username:          standbyUsername,
+			DN:                standbyDN,
+			NewPassword:       newPassword,
+			LastVaultRotation: sa.LastVaultRotation,
+			PasswordPolicy:    config.PasswordPolicy,
+		})
+		if err != nil {
+			return output, fmt.Errorf("error writing WAL entry for dual-account rotation: %w", err)
+		}
+		b.Logger().Debug("wrote WAL for dual-account rotation", "role", input.RoleName, "WAL ID", output.WALID, "standby_account", standbyUsername)
+	}
+
+	// Rotate the standby account's password in LDAP
+	if standbyDN != "" {
+		err = b.client.UpdateDNPassword(config.LDAP, standbyDN, newPassword)
+	} else {
+		err = b.client.UpdateUserPassword(config.LDAP, standbyUsername, newPassword)
+	}
+	if err != nil {
+		return output, fmt.Errorf("failed to rotate standby account password: %w", err)
+	}
+
+	// Update the role state
+	lvr := time.Now()
+	if sa.ActiveAccount == "a" {
+		// Rotated account B (standby), now B becomes active
+		sa.LastPasswordB = sa.PasswordB
+		sa.PasswordB = newPassword
+		sa.LastRotationB = lvr
+		sa.ActiveAccount = "b"
+	} else {
+		// Rotated account A (standby), now A becomes active
+		sa.LastPassword = sa.Password
+		sa.Password = newPassword
+		sa.ActiveAccount = "a"
+	}
+
+	sa.LastVaultRotation = lvr
+	sa.SetNextVaultRotation(lvr)
+	sa.RotationState = "grace_period"
+	sa.GracePeriodEnd = lvr.Add(sa.GracePeriod)
+	output.RotationTime = lvr
+
+	// Persist the updated role
+	entry, err := logical.StorageEntryJSON(staticRolePath+input.RoleName, input.Role)
+	if err != nil {
+		return output, err
+	}
+	if err := s.Put(ctx, entry); err != nil {
+		return output, err
+	}
+
+	// Cleanup WAL
+	if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+		b.Logger().Warn("error deleting WAL for dual-account rotation", "WAL ID", output.WALID, "error", err)
+		return output, err
+	}
+	b.Logger().Debug("deleted WAL for dual-account rotation", "WAL ID", output.WALID)
+
 	return &setStaticAccountOutput{RotationTime: lvr}, nil
 }
 

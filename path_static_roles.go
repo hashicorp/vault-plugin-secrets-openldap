@@ -143,6 +143,23 @@ func staticFields() map[string]*framework.FieldSchema {
 			Type:        framework.TypeBool,
 			Description: "Skip the initial pasword rotation on import (has no effect on updates)",
 		},
+		"dual_account_mode": {
+			Type:        framework.TypeBool,
+			Description: "Enable dual-account (blue/green) rotation. When enabled, the engine manages two LDAP accounts and alternates between them on each rotation with a configurable grace period.",
+			Default:     false,
+		},
+		"username_b": {
+			Type:        framework.TypeString,
+			Description: "The username/logon name for the second LDAP entry in dual-account mode.",
+		},
+		"dn_b": {
+			Type:        framework.TypeString,
+			Description: "The distinguished name of the second LDAP entry in dual-account mode. If set, it takes precedence over username_b for LDAP search during password rotation.",
+		},
+		"grace_period": {
+			Type:        framework.TypeDurationSecond,
+			Description: "Duration in seconds after a rotation during which both the old active and new active accounts' credentials are returned. Required when dual_account_mode is true.",
+		},
 	}
 	return fields
 }
@@ -187,6 +204,9 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 	b.managedUserLock.Lock()
 	defer b.managedUserLock.Unlock()
 	delete(b.managedUsers, role.StaticAccount.Username)
+	if role.StaticAccount.DualAccountMode && role.StaticAccount.UsernameB != "" {
+		delete(b.managedUsers, role.StaticAccount.UsernameB)
+	}
 
 	walIDs, err := framework.ListWAL(ctx, req.Storage)
 	if err != nil {
@@ -232,6 +252,21 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 	data["rotation_period"] = role.StaticAccount.RotationPeriod.Seconds()
 	if !role.StaticAccount.LastVaultRotation.IsZero() {
 		data["last_vault_rotation"] = role.StaticAccount.LastVaultRotation
+	}
+
+	if role.StaticAccount.DualAccountMode {
+		data["dual_account_mode"] = true
+		data["username_b"] = role.StaticAccount.UsernameB
+		data["dn_b"] = role.StaticAccount.DNB
+		data["grace_period"] = role.StaticAccount.GracePeriod.Seconds()
+		data["active_account"] = role.StaticAccount.ActiveAccount
+		data["rotation_state"] = role.StaticAccount.RotationState
+		if !role.StaticAccount.GracePeriodEnd.IsZero() {
+			data["grace_period_end"] = role.StaticAccount.GracePeriodEnd
+		}
+		if !role.StaticAccount.LastRotationB.IsZero() {
+			data["last_rotation_b"] = role.StaticAccount.LastRotationB
+		}
 	}
 
 	return &logical.Response{Data: data}, nil
@@ -293,6 +328,63 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		role.StaticAccount.DN = dn
 	}
 
+	// Handle dual-account mode fields
+	if dualModeRaw, ok := data.GetOk("dual_account_mode"); ok {
+		dualMode := dualModeRaw.(bool)
+		if !isCreate && dualMode != role.StaticAccount.DualAccountMode {
+			return logical.ErrorResponse("cannot change dual_account_mode after creation"), nil
+		}
+		role.StaticAccount.DualAccountMode = dualMode
+	}
+
+	if role.StaticAccount.DualAccountMode {
+		// username_b handling
+		if usernameBRaw, ok := data.GetOk("username_b"); ok {
+			usernameB := usernameBRaw.(string)
+			if usernameB == "" {
+				return logical.ErrorResponse("username_b must not be empty when dual_account_mode is enabled"), nil
+			}
+			if usernameB == role.StaticAccount.Username {
+				return logical.ErrorResponse("username_b must be different from username"), nil
+			}
+			if _, exists := b.managedUsers[usernameB]; exists && isCreate {
+				return logical.ErrorResponse("%q is already managed by the secrets engine", usernameB), nil
+			}
+			if !isCreate && usernameB != role.StaticAccount.UsernameB {
+				return logical.ErrorResponse("cannot update static account username_b"), nil
+			}
+			role.StaticAccount.UsernameB = usernameB
+		} else if isCreate {
+			return logical.ErrorResponse("username_b is required when dual_account_mode is enabled"), nil
+		}
+
+		// dn_b handling
+		if dnBRaw, ok := data.GetOk("dn_b"); ok {
+			dnB := dnBRaw.(string)
+			if !isCreate && dnB != "" && dnB != role.StaticAccount.DNB {
+				return logical.ErrorResponse("cannot update static account distinguished name (dn_b)"), nil
+			}
+			role.StaticAccount.DNB = dnB
+		}
+
+		// grace_period handling
+		if gracePeriodRaw, ok := data.GetOk("grace_period"); ok {
+			gracePeriodSeconds := gracePeriodRaw.(int)
+			if gracePeriodSeconds < queueTickSeconds {
+				return logical.ErrorResponse("grace_period must be %d seconds or more", queueTickSeconds), nil
+			}
+			role.StaticAccount.GracePeriod = time.Duration(gracePeriodSeconds) * time.Second
+		} else if isCreate {
+			return logical.ErrorResponse("grace_period is required when dual_account_mode is enabled"), nil
+		}
+
+		// Initialize dual-account state on create
+		if isCreate {
+			role.StaticAccount.ActiveAccount = "a"
+			role.StaticAccount.RotationState = "active"
+		}
+	}
+
 	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
 	if !ok && isCreate {
 		return logical.ErrorResponse("rotation_period is required to create static accounts"), nil
@@ -306,6 +398,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil
 		}
 		role.StaticAccount.RotationPeriod = time.Duration(rotationPeriodSeconds) * time.Second
+	}
+
+	// Validate grace_period is less than rotation_period for dual-account mode
+	if role.StaticAccount.DualAccountMode && role.StaticAccount.GracePeriod >= role.StaticAccount.RotationPeriod {
+		return logical.ErrorResponse("grace_period must be less than rotation_period"), nil
 	}
 
 	skipRotation := false
@@ -428,6 +525,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 
 	b.managedUsers[role.StaticAccount.Username] = struct{}{}
 
+	// Track the second account username in dual-account mode
+	if role.StaticAccount.DualAccountMode && role.StaticAccount.UsernameB != "" {
+		b.managedUsers[role.StaticAccount.UsernameB] = struct{}{}
+	}
+
 	// Send event notification for static role create/update
 	b.ldapEvent(ctx, fmt.Sprintf("static-role-%s", req.Operation), req.Path, name, true)
 
@@ -466,6 +568,50 @@ type staticAccount struct {
 	// "time to live". This value is compared to the LastVaultRotation to
 	// determine if a password needs to be rotated
 	RotationPeriod time.Duration `json:"rotation_period"`
+
+	// DualAccountMode enables blue/green rotation with two LDAP accounts. When
+	// enabled, the engine manages two accounts and alternates between them on
+	// each rotation, with a configurable grace period during which both accounts'
+	// credentials are available.
+	DualAccountMode bool `json:"dual_account_mode"`
+
+	// UsernameB is the username/logon name for the second LDAP account in
+	// dual-account mode.
+	UsernameB string `json:"username_b,omitempty"`
+
+	// DNB is the distinguished name of the second LDAP entry in dual-account
+	// mode. Like DN, it is optional and takes precedence over UsernameB for
+	// LDAP search during password rotation.
+	DNB string `json:"dn_b,omitempty"`
+
+	// PasswordB is the current password for the second account in dual-account
+	// mode.
+	PasswordB string `json:"password_b,omitempty"`
+
+	// LastPasswordB is the previous password for the second account after
+	// rotation.
+	LastPasswordB string `json:"last_password_b,omitempty"`
+
+	// LastRotationB represents the last time Vault rotated the second account's
+	// password.
+	LastRotationB time.Time `json:"last_rotation_b,omitempty"`
+
+	// ActiveAccount indicates which account is currently active: "a" or "b".
+	// Defaults to "a" on initial creation.
+	ActiveAccount string `json:"active_account,omitempty"`
+
+	// GracePeriod is the duration after a rotation during which both the old
+	// active and new active accounts' credentials are returned. This allows
+	// applications to transition to the new account. Required when
+	// dual_account_mode is true.
+	GracePeriod time.Duration `json:"grace_period,omitempty"`
+
+	// RotationState tracks the current state of the dual-account rotation state
+	// machine. Values: "active", "grace_period".
+	RotationState string `json:"rotation_state,omitempty"`
+
+	// GracePeriodEnd is the time at which the current grace period expires.
+	GracePeriodEnd time.Time `json:"grace_period_end,omitempty"`
 }
 
 // NextRotationTime calculates the next rotation by adding the Rotation Period

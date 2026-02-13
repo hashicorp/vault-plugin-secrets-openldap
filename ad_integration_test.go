@@ -179,9 +179,9 @@ func TestAD_DualAccountRotation(t *testing.T) {
 		Storage:   storage,
 		Data: map[string]interface{}{
 			"username":          "svc-rotate-a",
-			"dn":               dnA,
+			"dn":                dnA,
 			"username_b":        "svc-rotate-b",
-			"dn_b":             dnB,
+			"dn_b":              dnB,
 			"rotation_period":   "3600s",
 			"dual_account_mode": true,
 			"grace_period":      "1800s",
@@ -298,9 +298,9 @@ func TestAD_DualAccountRotation_SecondRotation(t *testing.T) {
 		Storage:   storage,
 		Data: map[string]interface{}{
 			"username":          "svc-rotate-a",
-			"dn":               dnA,
+			"dn":                dnA,
 			"username_b":        "svc-rotate-b",
-			"dn_b":             dnB,
+			"dn_b":              dnB,
 			"rotation_period":   "3600s",
 			"dual_account_mode": true,
 			"grace_period":      "10s",

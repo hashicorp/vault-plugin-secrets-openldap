@@ -27,7 +27,7 @@ func TestDualAccountRole_CreateValidation(t *testing.T) {
 			name: "missing username_b results in error",
 			data: map[string]interface{}{
 				"username":          "svc-app-blue",
-				"dn":               "uid=svc-app-blue,ou=users,dc=hashicorp,dc=com",
+				"dn":                "uid=svc-app-blue,ou=users,dc=hashicorp,dc=com",
 				"rotation_period":   60,
 				"dual_account_mode": true,
 				"grace_period":      30,
@@ -40,7 +40,7 @@ func TestDualAccountRole_CreateValidation(t *testing.T) {
 			data: map[string]interface{}{
 				"username":          "svc-app-blue",
 				"username_b":        "svc-app-green",
-				"dn":               "uid=svc-app-blue,ou=users,dc=hashicorp,dc=com",
+				"dn":                "uid=svc-app-blue,ou=users,dc=hashicorp,dc=com",
 				"rotation_period":   60,
 				"dual_account_mode": true,
 			},
@@ -137,8 +137,8 @@ func TestDualAccountRole_HappyPath(t *testing.T) {
 	data := map[string]interface{}{
 		"username":          "svc-banking-blue",
 		"username_b":        "svc-banking-green",
-		"dn":               "uid=svc-banking-blue,ou=users,dc=bank,dc=com",
-		"dn_b":             "uid=svc-banking-green,ou=users,dc=bank,dc=com",
+		"dn":                "uid=svc-banking-blue,ou=users,dc=bank,dc=com",
+		"dn_b":              "uid=svc-banking-green,ou=users,dc=bank,dc=com",
 		"rotation_period":   60,
 		"dual_account_mode": true,
 		"grace_period":      30,
@@ -255,8 +255,8 @@ func TestDualAccountRole_ImmutableFields(t *testing.T) {
 	data := map[string]interface{}{
 		"username":          "svc-immutable-blue",
 		"username_b":        "svc-immutable-green",
-		"dn":               "uid=svc-immutable-blue,ou=users,dc=bank,dc=com",
-		"dn_b":             "uid=svc-immutable-green,ou=users,dc=bank,dc=com",
+		"dn":                "uid=svc-immutable-blue,ou=users,dc=bank,dc=com",
+		"dn_b":              "uid=svc-immutable-green,ou=users,dc=bank,dc=com",
 		"rotation_period":   60,
 		"dual_account_mode": true,
 		"grace_period":      10,
@@ -287,7 +287,7 @@ func TestDualAccountRole_ImmutableFields(t *testing.T) {
 	// Try to change dn_b on update
 	resp, err = updateStaticRoleWithData(t, b, storage, "immutable-role", map[string]interface{}{
 		"username":          "svc-immutable-blue",
-		"dn_b":             "uid=svc-other-green,ou=users,dc=bank,dc=com",
+		"dn_b":              "uid=svc-other-green,ou=users,dc=bank,dc=com",
 		"dual_account_mode": true,
 	})
 	isErr = err != nil || (resp != nil && resp.IsError())

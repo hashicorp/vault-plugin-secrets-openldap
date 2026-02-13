@@ -5,6 +5,7 @@ package openldap
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -99,7 +100,7 @@ func setupOpenLDAPForLibraryTest(t *testing.T) string {
 			return err
 		}
 		if len(results.Entries) != 3 {
-			return err
+			return fmt.Errorf("expected 3 entries, got %d", len(results.Entries))
 		}
 		return nil
 	})

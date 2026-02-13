@@ -153,6 +153,11 @@ type setCredentialsWAL struct {
 	PasswordPolicy    string    `json:"password_policy" mapstructure:"password_policy"`
 	LastVaultRotation time.Time `json:"last_vault_rotation" mapstructure:"last_vault_rotation"`
 
+	// Dual-account fields for initial setup WAL recovery
+	NewPasswordB string `json:"new_password_b,omitempty" mapstructure:"new_password_b"`
+	UsernameB    string `json:"username_b,omitempty" mapstructure:"username_b"`
+	DNB          string `json:"dn_b,omitempty" mapstructure:"dn_b"`
+
 	// Private fields which will not be included in json.Marshal/Unmarshal.
 	walID        string
 	walCreatedAt int64 // Unix time at which the WAL was created.
@@ -223,6 +228,10 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 
 	// Handle dual-account grace period expiry
 	if role.StaticAccount.DualAccountMode && role.StaticAccount.RotationState == "grace_period" {
+		if role.StaticAccount.GracePeriodEnd.IsZero() {
+			b.Logger().Error("grace period end time is zero, recomputing from last rotation", "role", item.Key)
+			role.StaticAccount.GracePeriodEnd = role.StaticAccount.LastVaultRotation.Add(role.StaticAccount.GracePeriod)
+		}
 		if time.Now().After(role.StaticAccount.GracePeriodEnd) {
 			b.Logger().Info("grace period expired, transitioning to active state", "role", item.Key, "active_account", role.StaticAccount.ActiveAccount)
 
@@ -548,13 +557,16 @@ func (b *backend) setDualAccountPassword(ctx context.Context, s logical.Storage,
 			return output, err
 		}
 
-		// Create WAL for initial setup
+		// Create WAL for initial setup (includes both accounts for crash recovery)
 		if output.WALID == "" {
 			output.WALID, err = framework.PutWAL(ctx, s, staticWALKey, &setCredentialsWAL{
 				RoleName:          input.RoleName,
 				Username:          sa.Username,
 				DN:                sa.DN,
 				NewPassword:       passwordA,
+				UsernameB:         sa.UsernameB,
+				DNB:               sa.DNB,
+				NewPasswordB:      passwordB,
 				LastVaultRotation: sa.LastVaultRotation,
 				PasswordPolicy:    config.PasswordPolicy,
 			})
@@ -621,10 +633,35 @@ func (b *backend) setDualAccountPassword(ctx context.Context, s logical.Storage,
 		standbyUsername = sa.Username
 	}
 
-	// Generate new password for the standby account
-	newPassword, err := b.GeneratePassword(ctx, config)
-	if err != nil {
-		return output, err
+	// Reuse password from existing WAL if available (crash recovery)
+	var newPassword string
+	var err error
+	if output.WALID != "" {
+		wal, walErr := b.findStaticWAL(ctx, s, output.WALID)
+		if walErr != nil {
+			return output, fmt.Errorf("error retrieving WAL entry for dual-account rotation: %w", walErr)
+		}
+
+		switch {
+		case wal == nil:
+			b.Logger().Error("expected role to have WAL, but WAL not found in storage", "role", input.RoleName, "WAL ID", output.WALID)
+			output.WALID = ""
+		case wal.NewPassword != "" && wal.PasswordPolicy != config.PasswordPolicy:
+			b.Logger().Debug("password policy changed, generating new password for dual-account rotation", "role", input.RoleName, "WAL ID", output.WALID)
+			if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+				b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
+			}
+			output.WALID = ""
+		default:
+			newPassword = wal.NewPassword
+		}
+	}
+
+	if newPassword == "" {
+		newPassword, err = b.GeneratePassword(ctx, config)
+		if err != nil {
+			return output, err
+		}
 	}
 
 	// Create WAL entry for the dual-account rotation
@@ -665,6 +702,7 @@ func (b *backend) setDualAccountPassword(ctx context.Context, s logical.Storage,
 		// Rotated account A (standby), now A becomes active
 		sa.LastPassword = sa.Password
 		sa.Password = newPassword
+		sa.LastRotationB = lvr
 		sa.ActiveAccount = "a"
 	}
 

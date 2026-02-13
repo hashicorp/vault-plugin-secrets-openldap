@@ -171,10 +171,16 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		if resp != nil && resp.WALID != "" {
 			item.Value = resp.WALID
 		}
-	} else {
-		item.Priority = resp.RotationTime.Add(role.StaticAccount.RotationPeriod).Unix()
+	} else if resp != nil {
+		if role.StaticAccount.DualAccountMode {
+			item.Priority = role.StaticAccount.GracePeriodEnd.Unix()
+		} else {
+			item.Priority = resp.RotationTime.Add(role.StaticAccount.RotationPeriod).Unix()
+		}
 		// Clear any stored WAL ID as we must have successfully deleted our WAL to get here.
 		item.Value = ""
+	} else {
+		return nil, fmt.Errorf("rotation succeeded but returned nil response for role %q", name)
 	}
 
 	// Add their rotation to the queue. We use pushErr here to distinguish between

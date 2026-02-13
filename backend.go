@@ -243,6 +243,11 @@ func (b *backend) loadManagedUsers(ctx context.Context, s logical.Storage) (map[
 
 		// Add the static role user to the managed user set
 		b.managedUsers[role.StaticAccount.Username] = struct{}{}
+
+		// Track the second account username for dual-account roles
+		if role.StaticAccount.DualAccountMode && role.StaticAccount.UsernameB != "" {
+			b.managedUsers[role.StaticAccount.UsernameB] = struct{}{}
+		}
 	}
 
 	// Load users managed under library sets

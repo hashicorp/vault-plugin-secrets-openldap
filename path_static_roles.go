@@ -141,7 +141,7 @@ func staticFields() map[string]*framework.FieldSchema {
 		},
 		"skip_import_rotation": {
 			Type:        framework.TypeBool,
-			Description: "Skip the initial pasword rotation on import (has no effect on updates)",
+			Description: "Skip the initial password rotation on import (has no effect on updates)",
 		},
 		"dual_account_mode": {
 			Type:        framework.TypeBool,

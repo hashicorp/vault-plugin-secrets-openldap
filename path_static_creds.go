@@ -66,7 +66,7 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 		respData["rotation_state"] = role.StaticAccount.RotationState
 
 		// Return the active account's credentials as the primary credentials
-		if role.StaticAccount.ActiveAccount == "b" {
+		if role.StaticAccount.ActiveAccount == activeAccountB {
 			respData["username"] = role.StaticAccount.UsernameB
 			respData["dn"] = role.StaticAccount.DNB
 			respData["password"] = role.StaticAccount.PasswordB
@@ -74,8 +74,8 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 		}
 
 		// During grace period, also return the standby account's credentials
-		if role.StaticAccount.RotationState == "grace_period" {
-			if role.StaticAccount.ActiveAccount == "b" {
+		if role.StaticAccount.RotationState == rotationStateGracePeriod {
+			if role.StaticAccount.ActiveAccount == activeAccountB {
 				// B is active, return A as standby
 				respData["standby_username"] = role.StaticAccount.Username
 				respData["standby_dn"] = role.StaticAccount.DN

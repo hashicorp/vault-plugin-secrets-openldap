@@ -380,8 +380,8 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 
 		// Initialize dual-account state on create
 		if isCreate {
-			role.StaticAccount.ActiveAccount = "a"
-			role.StaticAccount.RotationState = "active"
+			role.StaticAccount.ActiveAccount = activeAccountA
+			role.StaticAccount.RotationState = rotationStateActive
 		}
 	}
 
@@ -405,12 +405,25 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		return logical.ErrorResponse("grace_period must be less than rotation_period"), nil
 	}
 
+	// Warn if grace_period is more than 80% of rotation_period (likely misconfiguration)
+	if role.StaticAccount.DualAccountMode && role.StaticAccount.GracePeriod > 0 {
+		threshold := time.Duration(float64(role.StaticAccount.RotationPeriod) * 0.8)
+		if role.StaticAccount.GracePeriod > threshold {
+			b.Logger().Warn("grace_period is more than 80% of rotation_period, this leaves very little time in active state",
+				"grace_period", role.StaticAccount.GracePeriod,
+				"rotation_period", role.StaticAccount.RotationPeriod)
+		}
+	}
+
 	skipRotation := false
 	skipRotationRaw, ok := data.GetOk("skip_import_rotation")
 	if ok {
 		// if skip rotation was set, use it (or validation error on an update)
 		if !isCreate {
 			return logical.ErrorResponse("skip_import_rotation has no effect on updates"), nil
+		}
+		if role.StaticAccount.DualAccountMode {
+			return logical.ErrorResponse("skip_import_rotation is not supported with dual_account_mode"), nil
 		}
 		skipRotation = skipRotationRaw.(bool)
 	} else if isCreate {
@@ -424,6 +437,12 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 
 		skipRotation = c.SkipStaticRoleImportRotation
+		// Ignore config-level skip for dual-account mode since both accounts
+		// need initial passwords set to function correctly
+		if skipRotation && role.StaticAccount.DualAccountMode {
+			b.Logger().Debug("ignoring config-level skip_static_role_import_rotation for dual-account mode role", "role", name)
+			skipRotation = false
+		}
 	}
 
 	lastVaultRotation := role.StaticAccount.LastVaultRotation
@@ -691,6 +710,27 @@ precedence over the "username" when LDAP searches are performed.
 
 The "rotation_period' parameter is required and configures how often, in seconds, 
 the credentials should be automatically rotated by Vault.  The minimum is 5 seconds (5s).
+
+Dual-Account Mode:
+
+When "dual_account_mode" is enabled, the engine manages two LDAP accounts and
+alternates between them on each rotation. This provides zero-downtime credential
+rotation by ensuring there is always a valid account available during the
+rotation process.
+
+Required additional parameters for dual-account mode:
+  - "username_b": The username for the second LDAP account.
+  - "grace_period": Duration in seconds after rotation during which both the
+    old and new active accounts' credentials are available. Must be less than
+    "rotation_period".
+
+Optional parameter:
+  - "dn_b": The distinguished name of the second LDAP entry. Like "dn", it
+    takes precedence over "username_b" for LDAP search during password rotation.
+
+Note: "dual_account_mode", "username_b", and "dn_b" are immutable after role
+creation. The "skip_import_rotation" option is not supported with dual-account
+mode.
 `
 
 const staticRolesListHelpDescription = `

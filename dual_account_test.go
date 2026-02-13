@@ -161,8 +161,8 @@ func TestDualAccountRole_HappyPath(t *testing.T) {
 	require.Equal(t, "uid=svc-banking-green,ou=users,dc=bank,dc=com", readResp.Data["dn_b"])
 	require.Equal(t, float64(30), readResp.Data["grace_period"])
 	// After initial setup, both passwords are set, active_account is "a", state is "active"
-	require.Equal(t, "a", readResp.Data["active_account"])
-	require.Equal(t, "active", readResp.Data["rotation_state"])
+	require.Equal(t, activeAccountA, readResp.Data["active_account"])
+	require.Equal(t, rotationStateActive, readResp.Data["rotation_state"])
 }
 
 func TestDualAccountRole_UsernameOnly(t *testing.T) {
@@ -353,14 +353,14 @@ func TestDualAccountRotation_StateTransition(t *testing.T) {
 	role, err := b.staticRole(context.Background(), storage, roleName)
 	require.NoError(t, err)
 	require.NotNil(t, role)
-	require.Equal(t, "active", role.StaticAccount.RotationState)
-	require.Equal(t, "a", role.StaticAccount.ActiveAccount)
+	require.Equal(t, rotationStateActive, role.StaticAccount.RotationState)
+	require.Equal(t, activeAccountA, role.StaticAccount.ActiveAccount)
 	require.NotEmpty(t, role.StaticAccount.Password, "expected password to be set after initial setup")
 	require.NotEmpty(t, role.StaticAccount.PasswordB, "expected password_b to be set after initial setup")
 
 	// Read creds in active state — should return only the active account
 	credResp := readStaticCred(t, b, storage, roleName)
-	require.Equal(t, "active", credResp.Data["rotation_state"])
+	require.Equal(t, rotationStateActive, credResp.Data["rotation_state"])
 	require.Nil(t, credResp.Data["standby_username"], "should not return standby credentials in active state")
 	require.Nil(t, credResp.Data["standby_password"], "should not return standby credentials in active state")
 
@@ -375,13 +375,13 @@ func TestDualAccountRotation_StateTransition(t *testing.T) {
 	// After manual rotation, the role should be in grace_period with active_account "b"
 	role, err = b.staticRole(context.Background(), storage, roleName)
 	require.NoError(t, err)
-	require.Equal(t, "grace_period", role.StaticAccount.RotationState)
-	require.Equal(t, "b", role.StaticAccount.ActiveAccount)
+	require.Equal(t, rotationStateGracePeriod, role.StaticAccount.RotationState)
+	require.Equal(t, activeAccountB, role.StaticAccount.ActiveAccount)
 	require.False(t, role.StaticAccount.GracePeriodEnd.IsZero())
 
 	// Read creds during grace period — should return both accounts
 	credResp = readStaticCred(t, b, storage, roleName)
-	require.Equal(t, "grace_period", credResp.Data["rotation_state"])
+	require.Equal(t, rotationStateGracePeriod, credResp.Data["rotation_state"])
 	require.NotEmpty(t, credResp.Data["standby_username"])
 	require.NotEmpty(t, credResp.Data["standby_password"])
 	require.NotNil(t, credResp.Data["grace_period_end"])
@@ -397,8 +397,8 @@ func TestDualAccountRotation_StateTransition(t *testing.T) {
 	// After second rotation, active_account should flip back to "a"
 	role, err = b.staticRole(context.Background(), storage, roleName)
 	require.NoError(t, err)
-	require.Equal(t, "grace_period", role.StaticAccount.RotationState)
-	require.Equal(t, "a", role.StaticAccount.ActiveAccount)
+	require.Equal(t, rotationStateGracePeriod, role.StaticAccount.RotationState)
+	require.Equal(t, activeAccountA, role.StaticAccount.ActiveAccount)
 }
 
 func TestDualAccountGracePeriodExpiry(t *testing.T) {
@@ -424,7 +424,7 @@ func TestDualAccountGracePeriodExpiry(t *testing.T) {
 	// Role should be in "active" state after initial setup (both passwords set)
 	role, err := b.staticRole(context.Background(), storage, roleName)
 	require.NoError(t, err)
-	require.Equal(t, "active", role.StaticAccount.RotationState)
+	require.Equal(t, rotationStateActive, role.StaticAccount.RotationState)
 
 	// Trigger a manual rotation to enter grace_period
 	_, err = b.HandleRequest(context.Background(), &logical.Request{
@@ -437,7 +437,7 @@ func TestDualAccountGracePeriodExpiry(t *testing.T) {
 	// Now should be in grace_period
 	role, err = b.staticRole(context.Background(), storage, roleName)
 	require.NoError(t, err)
-	require.Equal(t, "grace_period", role.StaticAccount.RotationState)
+	require.Equal(t, rotationStateGracePeriod, role.StaticAccount.RotationState)
 
 	// Simulate grace period expiry by setting GracePeriodEnd to the past
 	role.StaticAccount.GracePeriodEnd = time.Now().Add(-1 * time.Second)
@@ -459,7 +459,7 @@ func TestDualAccountGracePeriodExpiry(t *testing.T) {
 	// Verify the role transitioned to "active" state
 	role, err = b.staticRole(context.Background(), storage, roleName)
 	require.NoError(t, err)
-	require.Equal(t, "active", role.StaticAccount.RotationState)
+	require.Equal(t, rotationStateActive, role.StaticAccount.RotationState)
 	require.True(t, role.StaticAccount.GracePeriodEnd.IsZero())
 }
 
@@ -480,16 +480,9 @@ func TestDualAccountRole_SkipImportRotation(t *testing.T) {
 
 	resp, err := createStaticRoleWithData(t, b, storage, roleName, data)
 	require.NoError(t, err)
-	if resp != nil {
-		require.False(t, resp.IsError(), "unexpected error: %v", resp.Error())
-	}
-
-	// When skip_import_rotation is set, the role should be in "active" state
-	// because no rotation happened at creation time
-	role, err := b.staticRole(context.Background(), storage, roleName)
-	require.NoError(t, err)
-	require.Equal(t, "active", role.StaticAccount.RotationState)
-	require.Equal(t, "a", role.StaticAccount.ActiveAccount)
+	require.NotNil(t, resp)
+	require.True(t, resp.IsError(), "expected error when combining skip_import_rotation with dual_account_mode")
+	require.Contains(t, resp.Data["error"], "skip_import_rotation is not supported with dual_account_mode")
 }
 
 func TestDualAccountRole_UsernameB_AlreadyManaged(t *testing.T) {

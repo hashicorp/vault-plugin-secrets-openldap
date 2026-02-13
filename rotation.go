@@ -25,6 +25,14 @@ const (
 
 	// WAL storage key used for static account rotations
 	staticWALKey = "staticRotationKey"
+
+	// Dual-account rotation state constants
+	rotationStateActive      = "active"
+	rotationStateGracePeriod = "grace_period"
+
+	// Dual-account active account constants
+	activeAccountA = "a"
+	activeAccountB = "b"
 )
 
 // populateQueue loads the priority queue with existing static accounts. This
@@ -85,7 +93,7 @@ func (b *backend) populateQueue(ctx context.Context, s logical.Storage, roles ma
 		}
 
 		// For dual-account roles in grace_period state, schedule at grace period end
-		if role.StaticAccount.DualAccountMode && role.StaticAccount.RotationState == "grace_period" && !role.StaticAccount.GracePeriodEnd.IsZero() {
+		if role.StaticAccount.DualAccountMode && role.StaticAccount.RotationState == rotationStateGracePeriod && !role.StaticAccount.GracePeriodEnd.IsZero() {
 			item.Priority = role.StaticAccount.GracePeriodEnd.Unix()
 		}
 
@@ -227,7 +235,7 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 	}
 
 	// Handle dual-account grace period expiry
-	if role.StaticAccount.DualAccountMode && role.StaticAccount.RotationState == "grace_period" {
+	if role.StaticAccount.DualAccountMode && role.StaticAccount.RotationState == rotationStateGracePeriod {
 		if role.StaticAccount.GracePeriodEnd.IsZero() {
 			b.Logger().Error("grace period end time is zero, recomputing from last rotation", "role", item.Key)
 			role.StaticAccount.GracePeriodEnd = role.StaticAccount.LastVaultRotation.Add(role.StaticAccount.GracePeriod)
@@ -235,7 +243,7 @@ func (b *backend) rotateCredential(ctx context.Context, s logical.Storage) bool 
 		if time.Now().After(role.StaticAccount.GracePeriodEnd) {
 			b.Logger().Info("grace period expired, transitioning to active state", "role", item.Key, "active_account", role.StaticAccount.ActiveAccount)
 
-			role.StaticAccount.RotationState = "active"
+			role.StaticAccount.RotationState = rotationStateActive
 			role.StaticAccount.GracePeriodEnd = time.Time{}
 
 			entry, err := logical.StorageEntryJSON(staticRolePath+item.Key, role)
@@ -547,14 +555,43 @@ func (b *backend) setDualAccountPassword(ctx context.Context, s logical.Storage,
 	isInitialSetup := sa.Password == "" || sa.PasswordB == ""
 
 	if isInitialSetup {
-		// Generate and set passwords for both accounts
-		passwordA, err := b.GeneratePassword(ctx, config)
-		if err != nil {
-			return output, err
+		// Reuse passwords from existing WAL if available (crash recovery)
+		var passwordA, passwordB string
+		var err error
+		if output.WALID != "" {
+			wal, walErr := b.findStaticWAL(ctx, s, output.WALID)
+			if walErr != nil {
+				return output, fmt.Errorf("error retrieving WAL entry for dual-account initial setup: %w", walErr)
+			}
+
+			switch {
+			case wal == nil:
+				b.Logger().Error("expected role to have WAL, but WAL not found in storage", "role", input.RoleName, "WAL ID", output.WALID)
+				output.WALID = ""
+			case wal.NewPassword != "" && wal.PasswordPolicy != config.PasswordPolicy:
+				b.Logger().Debug("password policy changed, generating new passwords for dual-account initial setup", "role", input.RoleName, "WAL ID", output.WALID)
+				if err := framework.DeleteWAL(ctx, s, output.WALID); err != nil {
+					b.Logger().Warn("failed to delete WAL", "error", err, "WAL ID", output.WALID)
+				}
+				output.WALID = ""
+			default:
+				passwordA = wal.NewPassword
+				passwordB = wal.NewPasswordB
+			}
 		}
-		passwordB, err := b.GeneratePassword(ctx, config)
-		if err != nil {
-			return output, err
+
+		// Generate passwords if not reused from WAL
+		if passwordA == "" {
+			passwordA, err = b.GeneratePassword(ctx, config)
+			if err != nil {
+				return output, err
+			}
+		}
+		if passwordB == "" {
+			passwordB, err = b.GeneratePassword(ctx, config)
+			if err != nil {
+				return output, err
+			}
 		}
 
 		// Create WAL for initial setup (includes both accounts for crash recovery)
@@ -601,8 +638,8 @@ func (b *backend) setDualAccountPassword(ctx context.Context, s logical.Storage,
 		sa.LastVaultRotation = lvr
 		sa.LastRotationB = lvr
 		sa.SetNextVaultRotation(lvr)
-		sa.ActiveAccount = "a"
-		sa.RotationState = "active"
+		sa.ActiveAccount = activeAccountA
+		sa.RotationState = rotationStateActive
 		output.RotationTime = lvr
 
 		// Persist the updated role
@@ -625,7 +662,7 @@ func (b *backend) setDualAccountPassword(ctx context.Context, s logical.Storage,
 
 	// Normal rotation: rotate the standby account's password
 	var standbyDN, standbyUsername string
-	if sa.ActiveAccount == "a" {
+	if sa.ActiveAccount == activeAccountA {
 		standbyDN = sa.DNB
 		standbyUsername = sa.UsernameB
 	} else {
@@ -692,23 +729,22 @@ func (b *backend) setDualAccountPassword(ctx context.Context, s logical.Storage,
 
 	// Update the role state
 	lvr := time.Now()
-	if sa.ActiveAccount == "a" {
+	if sa.ActiveAccount == activeAccountA {
 		// Rotated account B (standby), now B becomes active
 		sa.LastPasswordB = sa.PasswordB
 		sa.PasswordB = newPassword
 		sa.LastRotationB = lvr
-		sa.ActiveAccount = "b"
+		sa.ActiveAccount = activeAccountB
 	} else {
 		// Rotated account A (standby), now A becomes active
 		sa.LastPassword = sa.Password
 		sa.Password = newPassword
-		sa.LastRotationB = lvr
-		sa.ActiveAccount = "a"
+		sa.ActiveAccount = activeAccountA
 	}
 
 	sa.LastVaultRotation = lvr
 	sa.SetNextVaultRotation(lvr)
-	sa.RotationState = "grace_period"
+	sa.RotationState = rotationStateGracePeriod
 	sa.GracePeriodEnd = lvr.Add(sa.GracePeriod)
 	output.RotationTime = lvr
 

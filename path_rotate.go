@@ -127,13 +127,13 @@ func (b *backend) rotateStaticCredential(ctx context.Context, req *logical.Reque
 	}
 
 	handler := atomicrotationhelpers.AtomicStaticCredentialRotationHandler{
-		PluginBackend:        b.Backend,
 		CredentialGenerator:  b.GenerateCredential,
 		ExternalSystemClient: b.UpdateExternalCredential,
 		ConfigStore:          b.SetCredential,
 
-		Config: cfg,
-		Role:   role,
+		Logger:        b.Backend.Logger(),
+		RootConfig:    cfg,
+		StaticAccount: role,
 	}
 
 	if req.RotationInfo != nil {
@@ -240,13 +240,13 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 	}
 
 	handler := atomicrotationhelpers.AtomicStaticCredentialRotationHandler{
-		PluginBackend:        b.Backend,
 		CredentialGenerator:  b.GenerateCredential,
 		ExternalSystemClient: b.UpdateExternalCredential,
 		ConfigStore:          b.SetCredential,
 
-		Config: cfg,
-		Role:   role,
+		Logger:        b.Backend.Logger(),
+		RootConfig:    cfg,
+		StaticAccount: role,
 	}
 
 	if req.RotationInfo != nil {

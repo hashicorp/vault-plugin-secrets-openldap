@@ -9,11 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/vault/sdk/framework"
-	"github.com/hashicorp/vault/sdk/helper/locksutil"
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
 	"github.com/hashicorp/vault/sdk/logical"
-	"github.com/hashicorp/vault/sdk/queue"
+	"github.com/hashicorp/vault/sdk/rotation"
 )
 
 const (
@@ -135,15 +134,21 @@ func fieldsForType(roleType string) map[string]*framework.FieldSchema {
 // only to static roles
 func staticFields() map[string]*framework.FieldSchema {
 	fields := map[string]*framework.FieldSchema{
-		"rotation_period": {
-			Type:        framework.TypeDurationSecond,
-			Description: "Period for automatic credential rotation of the given entry.",
+		"password": {
+			Type:        framework.TypeString,
+			Description: "Password for the static role. This is required for Vault to manage an existing account and enable rotation.",
+			DisplayAttrs: &framework.DisplayAttributes{
+				Sensitive: true,
+			},
 		},
 		"skip_import_rotation": {
 			Type:        framework.TypeBool,
 			Description: "Skip the initial pasword rotation on import (has no effect on updates)",
 		},
 	}
+
+	automatedrotationutil.AddAutomatedRotationFields(fields)
+
 	return fields
 }
 
@@ -158,25 +163,12 @@ func (b *backend) pathStaticRoleExistenceCheck(ctx context.Context, req *logical
 func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	name := data.Get("name").(string)
 
-	// Grab the exclusive lock
-	lock := locksutil.LockForKey(b.roleLocks, name)
-	lock.Lock()
-	defer lock.Unlock()
-
-	// TODO: Add retry logic
-
 	role, err := b.staticRole(ctx, req.Storage, name)
 	if err != nil {
 		return nil, err
 	}
 	if role == nil {
 		return nil, nil
-	}
-
-	// Remove the item from the queue
-	_, err = b.popFromRotationQueueByKey(name)
-	if err != nil {
-		return nil, err
 	}
 
 	err = req.Storage.Delete(ctx, staticRolePath+name)
@@ -187,36 +179,28 @@ func (b *backend) pathStaticRoleDelete(ctx context.Context, req *logical.Request
 	b.managedUserLock.Lock()
 	defer b.managedUserLock.Unlock()
 	delete(b.managedUsers, role.StaticAccount.Username)
+	delete(b.managedUsers, role.StaticAccount.DN)
 
-	walIDs, err := framework.ListWAL(ctx, req.Storage)
-	if err != nil {
-		return nil, err
-	}
-	var merr *multierror.Error
-	for _, walID := range walIDs {
-		wal, err := b.findStaticWAL(ctx, req.Storage, walID)
-		if err != nil {
-			merr = multierror.Append(merr, err)
-			continue
+	if role.HasNonzeroRotationValues() {
+		deregisterReq := &rotation.RotationJobDeregisterRequest{
+			MountPoint: req.MountPoint,
+			ReqPath:    req.Path,
 		}
-		if wal != nil && name == wal.RoleName {
-			b.Logger().Debug("deleting WAL for deleted role", "WAL ID", walID, "role", name)
-			err = framework.DeleteWAL(ctx, req.Storage, walID)
-			if err != nil {
-				b.Logger().Debug("failed to delete WAL for deleted role", "WAL ID", walID, "error", err)
-				merr = multierror.Append(merr, err)
-			}
+		err := b.System().DeregisterRotationJob(ctx, deregisterReq)
+		if err != nil {
+			b.Logger().Error("static role was deleted but error was encountered when deregistering rotation job: %s", err)
 		}
 	}
 
 	// Send event notification for static role delete
 	b.ldapEvent(ctx, "static-role-delete", req.Path, name, true)
 
-	return nil, merr.ErrorOrNil()
+	return nil, err
 }
 
 func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	role, err := b.staticRole(ctx, req.Storage, d.Get("name").(string))
+	name := d.Get("name").(string)
+	role, err := b.staticRole(ctx, req.Storage, name)
 	if err != nil {
 		return nil, err
 	}
@@ -229,22 +213,27 @@ func (b *backend) pathStaticRoleRead(ctx context.Context, req *logical.Request, 
 		"username": role.StaticAccount.Username,
 	}
 
-	data["rotation_period"] = role.StaticAccount.RotationPeriod.Seconds()
-	if !role.StaticAccount.LastVaultRotation.IsZero() {
-		data["last_vault_rotation"] = role.StaticAccount.LastVaultRotation
+	role.PopulateAutomatedRotationData(data)
+
+	role.PopulateRotationInfo(data)
+	if data["last_vault_rotation"] == nil {
+		data["last_vault_rotation"] = time.Time{}
 	}
 
 	return &logical.Response{Data: data}, nil
 }
 
 func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	name := data.Get("name").(string)
+	cfg, err := readConfig(ctx, req.Storage)
+	if cfg == nil {
+		// MountPoint already has a / appended.
+		return logical.ErrorResponse("missing plugin configuration for path %s%s", req.MountPoint, req.Path), nil
+	}
+	if err != nil {
+		return nil, err
+	}
 
-	// Grab the exclusive lock as well potentially pop and re-push the queue item
-	// for this role
-	lock := locksutil.LockForKey(b.roleLocks, name)
-	lock.Lock()
-	defer lock.Unlock()
+	name := data.Get("name").(string)
 
 	role, err := b.staticRole(ctx, req.Storage, data.Get("name").(string))
 	if err != nil {
@@ -262,180 +251,153 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	b.managedUserLock.Lock()
 	defer b.managedUserLock.Unlock()
 
+	// Username is required for static roles in all cases.
 	usernameRaw, ok := data.GetOk("username")
 	if !ok && isCreate {
-		return logical.ErrorResponse("username is a required field to manage a static account"), nil
+		return logical.ErrorResponse("username is a required field to manage a static role"), nil
 	}
 	if ok {
 		username := usernameRaw.(string)
 		if username == "" {
-			return logical.ErrorResponse("username must not be empty"), nil
+			return logical.ErrorResponse("username must not be empty for static roles"), nil
 		}
 		if _, exists := b.managedUsers[username]; exists && isCreate {
-			return logical.ErrorResponse("%q is already managed by the secrets engine", username), nil
+			return logical.ErrorResponse("username %q is already managed by the secrets engine", username), nil
 		}
 		if !isCreate && username != role.StaticAccount.Username {
-			return logical.ErrorResponse("cannot update static account username"), nil
+			return logical.ErrorResponse("cannot update static role username"), nil
 		}
 
 		role.StaticAccount.Username = username
 	}
 
-	// DN is optional. Unless it is unset via providing the empty string, it
-	// cannot be modified after creation. If given, it will take precedence
-	// over username for LDAP search during password rotation.
-	if dnRaw, ok := data.GetOk("dn"); ok {
+	// For non-self-managed roles: DN is optional unless it is unset via providing the empty string. It
+	// cannot be modified after creation. If given, it will take precedence over the username for LDAP
+	// searching during a password rotation.
+	// For self-managed roles: DN is a required field as search cananot be done with the root account
+	// because it may not be configured with a root bindpass. It cannot be modified after creation.
+	dnRaw, ok := data.GetOk("dn")
+	if !ok && isCreate && role.StaticAccount.SelfManaged {
+		return logical.ErrorResponse("dn is a required field for a self-managed static role"), nil
+	}
+	if ok {
 		dn := dnRaw.(string)
-		if !isCreate && dn != "" && dn != role.StaticAccount.DN {
-			return logical.ErrorResponse("cannot update static account distinguished name (dn)"), nil
+		if dn == "" && role.StaticAccount.SelfManaged {
+			return logical.ErrorResponse("dn must not be empty for self-managed static roles"), nil
 		}
-
+		if _, exists := b.managedUsers[dn]; exists && isCreate {
+			return logical.ErrorResponse("dn %q is already managed by the secrets engine", dn), nil
+		}
+		if !isCreate && dn != role.StaticAccount.DN {
+			return logical.ErrorResponse("cannot update static role dn"), nil
+		}
 		role.StaticAccount.DN = dn
 	}
 
-	rotationPeriodSecondsRaw, ok := data.GetOk("rotation_period")
-	if !ok && isCreate {
-		return logical.ErrorResponse("rotation_period is required to create static accounts"), nil
+	// For non-self-managed roles: Password is optional. It can be provided as a starting password for users
+	// onboarding accounts into Vault.
+	// For self-managed roles: Password is required on creation so the role may manage itself.
+	// For both: Password can be updated to allow users to fix passwords that may have been changed out of
+	// band from Vault.
+
+	passwordRaw, ok := data.GetOk("password")
+	if !ok && isCreate && role.StaticAccount.SelfManaged {
+		return logical.ErrorResponse("password is a required field for a self-managed static role"), nil
 	}
 	if ok {
-		rotationPeriodSeconds := rotationPeriodSecondsRaw.(int)
-		if rotationPeriodSeconds < queueTickSeconds {
-			// If rotation frequency is specified the value must be at least
-			// that of the constant queueTickSeconds (5 seconds at time of writing),
-			// otherwise we won't be able to rotate in time
-			return logical.ErrorResponse("rotation_period must be %d seconds or more", queueTickSeconds), nil
+		password := passwordRaw.(string)
+		if role.StaticAccount.SelfManaged && password == "" {
+			// Don't allow an empty password for self-managed accounts
+			return logical.ErrorResponse("password must not be empty for self-managed static roles"), nil
+		} else if password != "" {
+			role.StaticAccount.Password = password
 		}
-		role.StaticAccount.RotationPeriod = time.Duration(rotationPeriodSeconds) * time.Second
 	}
 
-	skipRotation := false
+	if err := role.ParseAutomatedRotationFields(data); err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+
+	if !role.HasNonzeroRotationValues() {
+		return logical.ErrorResponse("either rotation_period or rotation_schedule must be set for static roles"), nil
+	}
+
+	skipImportRotation := false
 	skipRotationRaw, ok := data.GetOk("skip_import_rotation")
 	if ok {
-		// if skip rotation was set, use it (or validation error on an update)
+		// if skip_import_rotation was set, use it (or validation error on an update)
 		if !isCreate {
 			return logical.ErrorResponse("skip_import_rotation has no effect on updates"), nil
 		}
-		skipRotation = skipRotationRaw.(bool)
+		skipImportRotation = skipRotationRaw.(bool)
 	} else if isCreate {
-		// otherwise, go get it if this is a create request.
-		c, err := readConfig(ctx, req.Storage)
-		if err != nil {
-			return nil, err
-		}
-		if c == nil {
-			return logical.ErrorResponse("missing LDAP configuration"), nil
-		}
-
-		skipRotation = c.SkipStaticRoleImportRotation
+		skipImportRotation = cfg.SkipStaticRoleImportRotation
 	}
 
-	lastVaultRotation := role.StaticAccount.LastVaultRotation
-
-	// Only call setStaticAccountPassword if we're creating the role for the first time
-	var item *queue.Item
-	switch req.Operation {
-	case logical.CreateOperation:
-		if skipRotation {
-			b.Logger().Debug("skipping static role import rotation", "role", name)
-
-			// Synthetically set lastVaultRotation to now so that it gets
-			// queued correctly.
-			// NOTE: We intentionally do not set role.StaticAccount.LastVaultRotation
-			// because the zero value indicates Vault has not rotated the
-			// password yet.
-			lastVaultRotation = time.Now()
-
-			// NextVaultRotation allows calculating the TTL on GET /static-creds
-			// requests and to calculate the queue priority in populateQueue()
-			// across restarts. We can't rely on LastVaultRotation in these
-			// cases because, when import rotation is skipped, LastVaultRotation
-			// is set to a zero value in storage.
-			role.StaticAccount.SetNextVaultRotation(lastVaultRotation)
-
-			// we were told not to rotate, just add the entry
-			entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
-			if err != nil {
-				return nil, err
-			}
-			if err := req.Storage.Put(ctx, entry); err != nil {
-				return nil, err
-			}
-
-			// set the item
-			item = &queue.Item{
-				Key: name,
-			}
-			break
-		} else {
-			// setStaticAccountPassword calls Storage.Put and saves the role to storage
-			resp, err := b.setStaticAccountPassword(ctx, req.Storage, &setStaticAccountInput{
-				RoleName: name,
-				Role:     role,
-			})
-			if err != nil {
-				if resp != nil && resp.WALID != "" {
-					b.Logger().Debug("deleting WAL for failed role creation", "WAL ID", resp.WALID, "role", name)
-					walDeleteErr := framework.DeleteWAL(ctx, req.Storage, resp.WALID)
-					if walDeleteErr != nil {
-						b.Logger().Debug("failed to delete WAL for failed role creation", "WAL ID", resp.WALID, "error", walDeleteErr)
-						var merr *multierror.Error
-						merr = multierror.Append(merr, err)
-						merr = multierror.Append(merr, fmt.Errorf("failed to clean up WAL from failed role creation: %w", walDeleteErr))
-						err = merr.ErrorOrNil()
-					}
-				}
-				return nil, err
-			}
-			// guard against RotationTime not being set or zero-value
-			lastVaultRotation = resp.RotationTime
-			item = &queue.Item{
-				Key: name,
-			}
+	var rotOp string
+	if role.ShouldDeregisterRotationJob() {
+		rotOp = rotation.PerformedDeregistration
+		deregisterReq := &rotation.RotationJobDeregisterRequest{
+			MountPoint: req.MountPoint,
+			ReqPath:    req.Path,
 		}
-	case logical.UpdateOperation:
-		// if lastVaultRotation is zero, the role had `skip_import_rotation` set
-		if lastVaultRotation.IsZero() {
-			lastVaultRotation = time.Now()
-		}
-
-		// Ensure that NextVaultRotation is recalculated in case the rotation period changed
-		role.StaticAccount.SetNextVaultRotation(lastVaultRotation)
-
-		// store updated Role
-		entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
+		err := b.System().DeregisterRotationJob(ctx, deregisterReq)
 		if err != nil {
-			return nil, err
+			return logical.ErrorResponse("error deregistering rotation job: %s", err), nil
 		}
-		if err := req.Storage.Put(ctx, entry); err != nil {
-			return nil, err
+	} else if role.ShouldRegisterRotationJob() {
+		rotOp = rotation.PerformedRegistration
+		req := &rotation.RotationJobConfigureRequest{
+			MountPoint:       req.MountPoint,
+			ReqPath:          req.Path,
+			RotationSchedule: role.RotationSchedule,
+			RotationWindow:   role.RotationWindow,
+			RotationPeriod:   role.RotationPeriod,
+			RotationPolicy:   role.RotationPolicy,
 		}
 
-		// In case this is an update, remove any previous version of the item from
-		// the queue. The existing item could be tracking a WAL ID for this role,
-		// so it's important to keep the existing item rather than recreate it.
-		// TODO: Add retry logic
-		item, err = b.popFromRotationQueueByKey(name)
+		resp, err := b.System().RegisterRotationJobWithResponse(ctx, req)
 		if err != nil {
-			return nil, err
+			return logical.ErrorResponse("error registering rotation job: %s", err), nil
 		}
+		role.SetRotationInfo(resp)
 	}
-	item.Priority = role.StaticAccount.NextVaultRotation.Unix()
 
-	// Add their rotation to the queue
-	if err := b.pushItem(item); err != nil {
+	entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
+	if err != nil {
 		return nil, err
 	}
 
+	if err := req.Storage.Put(ctx, entry); err != nil {
+		wrappedError := err
+		b.Logger().Error("write to storage failed but the rotation manager still succeeded.",
+			"operation", rotOp, "mount", req.MountPoint, "path", req.Path)
+		wrappedError = fmt.Errorf("write to storage failed but the rotation manager still succeeded; "+
+			"operation=%s, mount=%s, path=%s, storageError=%s", rotOp, req.MountPoint, req.Path, err)
+
+		return nil, wrappedError
+	}
+
 	b.managedUsers[role.StaticAccount.Username] = struct{}{}
+	b.managedUsers[role.StaticAccount.DN] = struct{}{}
 
 	// Send event notification for static role create/update
 	b.ldapEvent(ctx, fmt.Sprintf("static-role-%s", req.Operation), req.Path, name, true)
+
+	if !skipImportRotation && isCreate {
+		err := b.rotateStaticCredential(ctx, req, name)
+		if err != nil {
+			b.Logger().Error("successfully created static role but failed to rotate the credential upon import", role, "name", req.MountPoint, "path", req.Path)
+		}
+	}
 
 	return nil, nil
 }
 
 type roleEntry struct {
 	StaticAccount *staticAccount `json:"static_account" mapstructure:"static_account"`
+	automatedrotationutil.AutomatedRotationParams
+	automatedrotationutil.WALHandlingParams
 }
 
 type staticAccount struct {
@@ -454,47 +416,9 @@ type staticAccount struct {
 	// This is returned on credential requests if it exists.
 	LastPassword string `json:"last_password"`
 
-	// LastVaultRotation represents the last time Vault rotated the password. A
-	// zero value indicates the the password has never been rotated by Vault.
-	LastVaultRotation time.Time `json:"last_vault_rotation"`
-
-	// NextVaultRotation represents the next time Vault is expected to rotate
-	// the password
-	NextVaultRotation time.Time `json:"next_vault_rotation"`
-
-	// RotationPeriod is number in seconds between each rotation, effectively a
-	// "time to live". This value is compared to the LastVaultRotation to
-	// determine if a password needs to be rotated
-	RotationPeriod time.Duration `json:"rotation_period"`
-}
-
-// NextRotationTime calculates the next rotation by adding the Rotation Period
-// to the last known vault rotation
-func (s *staticAccount) NextRotationTime() time.Time {
-	return s.NextVaultRotation
-}
-
-// SetNextVaultRotation sets the next vault rotation to time t plus the role's
-// rotation period.
-func (s *staticAccount) SetNextVaultRotation(t time.Time) {
-	s.NextVaultRotation = t.Add(s.RotationPeriod)
-}
-
-// PasswordTTL calculates the approximate time remaining until the password is
-// no longer valid. This is approximate because the periodic rotation is only
-// checked approximately every 5 seconds, and each rotation can take a small
-// amount of time to process. This can result in a negative TTL time while the
-// rotation function processes the Static Role and performs the rotation. If the
-// TTL is negative, zero is returned. Users should not trust passwords with a
-// Zero TTL, as they are likely in the process of being rotated and will quickly
-// be invalidated.
-func (s *staticAccount) PasswordTTL() time.Duration {
-	next := s.NextRotationTime()
-	ttl := next.Sub(time.Now()).Round(time.Second)
-	if ttl < 0 {
-		ttl = time.Duration(0)
-	}
-	return ttl
+	// Internal flag for whether this static account is self-managed. Will be true for all
+	// accounts if the mount is configured as self-managed. Remove from reads.
+	SelfManaged bool `json:"self_managed,omitempty"`
 }
 
 func (b *backend) pathStaticRoleList(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
@@ -539,12 +463,27 @@ directly for authentication. If DN not provided, "username" will be used for LDA
 subtree search, rooted at the "userdn" configuration value. The name attribute to use 
 when searching for the user can be configured with the "userattr" configuration value.
 
-The "dn" parameter is optional and configures the distinguished name to use 
-when managing the existing entry. If the "dn" parameter is set, it will take 
+The "dn" parameter is optional for non-self-managed roles and configures the distinguished
+name to use when managing the existing entry. If the "dn" parameter is set, it will take 
 precedence over the "username" when LDAP searches are performed.
+This parameter is required if "self_managed" is true for self-managed static roles.
 
-The "rotation_period' parameter is required and configures how often, in seconds, 
-the credentials should be automatically rotated by Vault.  The minimum is 5 seconds (5s).
+The "skip_import_rotation" parameter is optional and only has effect during role creation. 
+If true, Vault will skip the initial password rotation when creating the role, and will manage
+the existing password. If false (the default), Vault will rotate the password when the role is
+created. This parameter has no effect during role updates.
+
+The "self_managed" parameter is optional and indicates whether the role manages its own password
+rotation. If true, Vault will perform rotations by authenticating as this account using its current
+password (no privileged bind DN). This requires the "password" parameter to be set on creation, and
+the "dn" parameter to be set as well. This field is immutable after creation. If false (the default),
+Vault will use the configured bind DN to perform rotations.
+
+The "password" parameter configures the current password for the entry is required only if the plugin
+was configured with the field "self_managed" as true. "Password" is optional when using
+non-self-managed roles and can be used to set an initial password for the role. This allows
+Vault to assume management of an existing account. The password will be rotated on creation unless 
+the "skip_import_rotation" parameter is set to true. The password is not returned in read operations.
 `
 
 const staticRolesListHelpDescription = `

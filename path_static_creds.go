@@ -6,6 +6,7 @@ package openldap
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -50,16 +51,24 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 		return logical.ErrorResponse("unknown role: %s", name), nil
 	}
 
+	output := map[string]interface{}{
+		"dn":            role.StaticAccount.DN,
+		"username":      role.StaticAccount.Username,
+		"password":      role.StaticAccount.Password,
+		"last_password": role.StaticAccount.LastPassword,
+		"ttl":           role.GetTTL(),
+	}
+
+	role.PopulateAutomatedRotationData(output)
+	delete(output, "disable_automated_rotation")
+
+	role.PopulateRotationInfo(output)
+	if output["last_vault_rotation"] == nil {
+		output["last_vault_rotation"] = time.Time{}
+	}
+
 	return &logical.Response{
-		Data: map[string]interface{}{
-			"dn":                  role.StaticAccount.DN,
-			"username":            role.StaticAccount.Username,
-			"password":            role.StaticAccount.Password,
-			"last_password":       role.StaticAccount.LastPassword,
-			"ttl":                 role.StaticAccount.PasswordTTL().Seconds(),
-			"rotation_period":     role.StaticAccount.RotationPeriod.Seconds(),
-			"last_vault_rotation": role.StaticAccount.LastVaultRotation,
-		},
+		Data: output,
 	}, nil
 }
 

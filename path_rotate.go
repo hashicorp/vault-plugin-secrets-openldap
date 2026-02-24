@@ -10,10 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/vault/sdk/atomicrotationhelpers"
+	"github.com/hashicorp/vault/sdk/helper/automatedrotationutil"
+
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/backoff"
 	"github.com/hashicorp/vault/sdk/logical"
-	"github.com/hashicorp/vault/sdk/queue"
 )
 
 var (
@@ -82,6 +84,93 @@ func (b *backend) pathRotateRootCredentialsUpdate(ctx context.Context, req *logi
 	return nil, err
 }
 
+func (b *backend) rotateCredentialCallback(ctx context.Context, req *logical.Request) error {
+	switch {
+	case req.Path == configPath:
+		return b.rotateRootCredential(ctx, req)
+
+	case strings.HasPrefix(req.Path, staticRolePath):
+		name := strings.TrimPrefix(req.Path, staticRolePath)
+		return b.rotateStaticCredential(ctx, req, name)
+
+	default:
+		return fmt.Errorf("unrecognized path for rotation manager callback: %s", req.Path)
+	}
+}
+
+func (b *backend) rotateStaticCredential(ctx context.Context, req *logical.Request, name string) (err error) {
+	defer func() {
+		if err != nil {
+			b.ldapEvent(ctx, "rotate-fail", req.Path, name, false)
+		} else {
+			b.ldapEvent(ctx, "rotate", req.Path, name, true)
+		}
+	}()
+
+	cfg, err := readConfig(ctx, req.Storage)
+	if err != nil {
+		return fmt.Errorf("unable to read root config for credential rotation: %w", err)
+	}
+
+	role, err := b.staticRole(ctx, req.Storage, name)
+	if err != nil {
+		return err
+	}
+	if role == nil {
+		return fmt.Errorf("role doesn't exist: %s", name)
+	}
+
+	role.WALHandlingParams = automatedrotationutil.WALHandlingParams{
+		RoleName: name,
+		RolePath: staticRolePath + name,
+		WALID:    role.WALID,
+	}
+
+	handler := atomicrotationhelpers.AtomicStaticCredentialRotationHandler{
+		PluginBackend:        b.Backend,
+		CredentialGenerator:  b.GenerateCredential,
+		ExternalSystemClient: b.UpdateExternalCredential,
+		ConfigStore:          b.SetCredential,
+
+		Config: cfg,
+		Role:   role,
+	}
+
+	if req.RotationInfo != nil {
+		handler.RotationInfo = req.RotationInfo
+	}
+	resp, rotateErr := handler.SetStaticAccountCredential(ctx, req.Storage, &role.WALHandlingParams, cfg.PasswordPolicy)
+	if rotateErr != nil {
+		b.Logger().Error("unable to rotate credentials in periodic function", "name", name, "error", rotateErr)
+
+		// Preserve the WALID if it was returned
+		if resp != nil && resp.WALID != "" {
+			role.WALID = resp.WALID
+		}
+
+		// store updated Role
+		entry, err := logical.StorageEntryJSON(role.RolePath, role)
+		if err != nil {
+			// send error to RM so that the rotation can be re-tried and re-stored, but log the storage error
+			b.Logger().Error("unable to create storage entry", "name", name, "error", err)
+
+			return err
+		}
+		if err := req.Storage.Put(ctx, entry); err != nil {
+			// send error to RM so that the rotation can be re-tried and re-stored, but log the storage error
+			b.Logger().Error("unable to store updated role with WALID after rotation failure", "name", name, "error", err)
+
+			return err
+		}
+
+		return rotateErr
+	} else {
+		// TODO clear WALID if needed
+	}
+
+	return nil
+}
+
 func (b *backend) rotateRootCredential(ctx context.Context, req *logical.Request) error {
 	if _, hasTimeout := ctx.Deadline(); !hasTimeout {
 		var cancel func()
@@ -145,44 +234,47 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		return logical.ErrorResponse("role doesn't exist: %s", name), nil
 	}
 
-	// In create/update of static accounts, we only care if the operation
-	// err'd , and this call does not return credentials
-	item, err := b.popFromRotationQueueByKey(name)
+	cfg, err := readConfig(ctx, req.Storage)
 	if err != nil {
-		item = &queue.Item{
-			Key: name,
-		}
+		return nil, fmt.Errorf("unable to read root config for credential rotation: %w", err)
 	}
 
-	input := &setStaticAccountInput{
-		RoleName: name,
-		Role:     role,
+	handler := atomicrotationhelpers.AtomicStaticCredentialRotationHandler{
+		PluginBackend:        b.Backend,
+		CredentialGenerator:  b.GenerateCredential,
+		ExternalSystemClient: b.UpdateExternalCredential,
+		ConfigStore:          b.SetCredential,
+
+		Config: cfg,
+		Role:   role,
 	}
-	if walID, ok := item.Value.(string); ok {
-		input.WALID = walID
+
+	if req.RotationInfo != nil {
+		handler.RotationInfo = req.RotationInfo
 	}
-	resp, err := b.setStaticAccountPassword(ctx, req.Storage, input)
-	if err != nil {
-		// Update the priority to re-try this rotation and re-add the item to
-		// the queue
-		item.Priority = time.Now().Add(10 * time.Second).Unix()
+	resp, rotateErr := handler.SetStaticAccountCredential(ctx, req.Storage, &role.WALHandlingParams, cfg.PasswordPolicy)
+	if rotateErr != nil {
+		b.Logger().Error("unable to rotate credentials in periodic function", "name", name, "error", err)
 
 		// Preserve the WALID if it was returned
 		if resp != nil && resp.WALID != "" {
-			item.Value = resp.WALID
+			role.WALID = resp.WALID
 		}
-	} else {
-		item.Priority = resp.RotationTime.Add(role.StaticAccount.RotationPeriod).Unix()
-		// Clear any stored WAL ID as we must have successfully deleted our WAL to get here.
-		item.Value = ""
-	}
 
-	// Add their rotation to the queue. We use pushErr here to distinguish between
-	// the error returned from setStaticAccount. They are scoped differently but
-	// it's more clear to developers that err above can still be non nil, and not
-	// overwritten or reused here.
-	if pushErr := b.pushItem(item); pushErr != nil {
-		return nil, pushErr
+		// store updated Role
+		entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
+		if err != nil {
+			// send error to RM so that the rotation can be re-tried and re-stored, but log the storage error
+			b.Logger().Error("unable to create storage entry", "name", name, "error", err)
+
+			return nil, err
+		}
+		if err := req.Storage.Put(ctx, entry); err != nil {
+			// send error to RM so that the rotation can be re-tried and re-stored, but log the storage error
+			b.Logger().Error("unable to store updated role with WALID after rotation failure", "name", name, "error", err)
+
+			return nil, err
+		}
 	}
 
 	if err != nil {
@@ -191,7 +283,7 @@ func (b *backend) pathRotateRoleCredentialsUpdate(ctx context.Context, req *logi
 		return nil, fmt.Errorf("unable to finish rotating credentials; retries will "+
 			"continue in the background but it is also safe to retry manually: %w", err)
 	} else {
-		b.Logger().Info("successfully rotated credential in rotate-role on user request", "name", item.Key)
+		b.Logger().Info("successfully rotated credential in rotate-role on user request", "name", name)
 		b.ldapEvent(ctx, "rotate", req.Path, name, true)
 	}
 

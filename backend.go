@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/locksutil"
 	"github.com/hashicorp/vault/sdk/logical"
-	"github.com/hashicorp/vault/sdk/queue"
 )
 
 const (
@@ -33,11 +32,9 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 
 func Backend(client ldapClient) *backend {
 	b := &backend{
-		client:            client,
-		credRotationQueue: queue.New(),
-		roleLocks:         locksutil.CreateLocks(),
-		checkOutLocks:     locksutil.CreateLocks(),
-		managedUsers:      make(map[string]struct{}),
+		client:        client,
+		checkOutLocks: locksutil.CreateLocks(),
+		managedUsers:  make(map[string]struct{}),
 	}
 
 	b.Backend = &framework.Backend{
@@ -80,66 +77,23 @@ func Backend(client ldapClient) *backend {
 			dynamicSecretCreds(b),
 			checkoutSecretCreds(b),
 		},
-		Clean:       b.clean,
 		BackendType: logical.TypeLogical,
 
-		RotateCredential: b.rotateRootCredential,
+		RotateCredential: b.rotateCredentialCallback,
 	}
 
 	return b
 }
 
 func (b *backend) initialize(ctx context.Context, initRequest *logical.InitializationRequest) error {
-	// Load managed LDAP users into memory from storage
-	staticRoles, err := b.loadManagedUsers(ctx, initRequest.Storage)
-	if err != nil {
-		return err
-	}
-
-	// Create a context with a cancel method for processing any WAL entries and
-	// populating the queue
-	ictx, cancel := context.WithCancel(context.Background())
-	b.cancelQueue = cancel
-
-	// Load static role queue and kickoff new periodic ticker
-	go b.initQueue(ictx, initRequest, staticRoles)
-
 	return nil
-}
-
-func (b *backend) clean(_ context.Context) {
-	b.invalidateQueue()
-}
-
-// invalidateQueue cancels any background queue loading and destroys the queue.
-func (b *backend) invalidateQueue() {
-	b.Lock()
-	defer b.Unlock()
-
-	if b.cancelQueue != nil {
-		b.cancelQueue()
-	}
-	b.credRotationQueue = nil
 }
 
 type backend struct {
 	*framework.Backend
 	sync.RWMutex
-	// CredRotationQueue is an in-memory priority queue used to track Static Roles
-	// that require periodic rotation. Backends will have a PriorityQueue
-	// initialized on setup, but only backends that are mounted by a primary
-	// server or mounted as a local mount will perform the rotations.
-	//
-	// cancelQueue is used to remove the priority queue and terminate the
-	// background ticker.
-	credRotationQueue *queue.PriorityQueue
-	cancelQueue       context.CancelFunc
 
-	// roleLocks is used to lock modifications to roles in the queue, to ensure
-	// concurrent requests are not modifying the same role and possibly causing
-	// issues with the priority queue.
-	roleLocks []*locksutil.LockEntry
-	client    ldapClient
+	client ldapClient
 
 	// managedUsers contains the set of LDAP usernames managed by the secrets engine
 	// static role and check-in/check-out systems. It is used to ensure that users

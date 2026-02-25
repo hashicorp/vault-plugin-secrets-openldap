@@ -335,6 +335,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	}
 
 	var rotOp string
+	var info *rotation.RotationInfo
 	if role.ShouldDeregisterRotationJob() {
 		rotOp = rotation.PerformedDeregistration
 		deregisterReq := &rotation.RotationJobDeregisterRequest{
@@ -361,6 +362,11 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 			return logical.ErrorResponse("error registering rotation job: %s", err), nil
 		}
 		role.SetRotationInfo(resp)
+
+		info = &rotation.RotationInfo{
+			NextVaultRotation: resp.NextVaultRotation,
+			LastVaultRotation: resp.LastVaultRotation,
+		}
 	}
 
 	entry, err := logical.StorageEntryJSON(staticRolePath+name, role)
@@ -385,6 +391,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 	b.ldapEvent(ctx, fmt.Sprintf("static-role-%s", req.Operation), req.Path, name, true)
 
 	if !skipImportRotation && isCreate {
+		req.RotationInfo = info
 		err := b.rotateStaticCredential(ctx, req, name)
 		if err != nil {
 			b.Logger().Error("successfully created static role but failed to rotate the credential upon import", role, "name", req.MountPoint, "path", req.Path)

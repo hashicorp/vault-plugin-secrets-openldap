@@ -363,10 +363,7 @@ func (b *backend) pathStaticRoleCreateUpdate(ctx context.Context, req *logical.R
 		}
 		role.SetRotationInfo(resp)
 
-		info = &rotation.RotationInfo{
-			NextVaultRotation: resp.NextVaultRotation,
-			LastVaultRotation: resp.LastVaultRotation,
-		}
+		info = resp
 	}
 
 	entry, err := logical.StorageEntryJSON(staticRolePath+name, role)

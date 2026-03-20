@@ -148,7 +148,7 @@ func (b *backend) configCreateUpdateOperation(ctx context.Context, req *logical.
 		return nil, err
 	}
 
-	if err := ldapConf.Validate(); err != nil {
+	if err := ldapConf.Validate(client.SupportedSchemas()...); err != nil {
 		return nil, err
 	}
 

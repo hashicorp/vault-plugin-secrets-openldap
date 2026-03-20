@@ -763,6 +763,7 @@ func ldapResponseData(vals ...interface{}) map[string]interface{} {
 		"rotation_period":                  float64(0),
 		"rotation_schedule":                "",
 		"rotation_window":                  float64(0),
+		"rotation_policy":                  "",
 		"disable_automated_rotation":       false,
 		"enable_samaccountname_login":      false,
 		"credential_type":                  "password",

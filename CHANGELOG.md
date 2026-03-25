@@ -1,3 +1,12 @@
+## v0.18.0
+### March 20, 2026
+
+* Automated dependency upgrades (#227)
+* [COMPLIANCE] Update Copyright and License Headers (Batch 1 of 1) (#224)
+* Update changelog for v0.17.0 release (#218)
+* chore: remove changie (#220)
+* only pop from queue once role existence has been validated (#213)
+
 ## v0.17.0
 ### October 7, 2025
 

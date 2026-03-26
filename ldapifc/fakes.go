@@ -25,9 +25,10 @@ func (f *FakeLDAPClient) DialURL(addr string, opts ...ldap.DialOpt) (ldaputil.Co
 }
 
 type FakeLDAPConnection struct {
-	ModifyRequestToExpect *ldap.ModifyRequest
-	SearchRequestToExpect *ldap.SearchRequest
-	SearchResultToReturn  *ldap.SearchResult
+	ModifyRequestToExpect         *ldap.ModifyRequest
+	PasswordModifyRequestToExpect *ldap.PasswordModifyRequest
+	SearchRequestToExpect         *ldap.SearchRequest
+	SearchResultToReturn          *ldap.SearchResult
 }
 
 func (f *FakeLDAPConnection) Bind(username, password string) error {
@@ -80,4 +81,11 @@ func (f *FakeLDAPConnection) Add(request *ldap.AddRequest) error {
 
 func (f *FakeLDAPConnection) Del(request *ldap.DelRequest) error {
 	return nil
+}
+
+func (f *FakeLDAPConnection) PasswordModify(modifyRequest *ldap.PasswordModifyRequest) (*ldap.PasswordModifyResult, error) {
+	if !reflect.DeepEqual(f.PasswordModifyRequestToExpect, modifyRequest) {
+		return nil, fmt.Errorf("Actual modify request: %#v\nExpected: %#v", modifyRequest, f.PasswordModifyRequestToExpect)
+	}
+	return &ldap.PasswordModifyResult{}, nil
 }

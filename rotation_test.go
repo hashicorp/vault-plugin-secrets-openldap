@@ -752,6 +752,128 @@ func TestDeletesOlderWALsOnLoad(t *testing.T) {
 	requireWALs(t, storage, 1)
 }
 
+func TestSelfManagedMaxInvalidAttemptsStopsAutoRotation(t *testing.T) {
+	ctx := context.Background()
+	b, storage := getBackend(false)
+	defer b.Cleanup(ctx)
+
+	// Configure backend
+	configureOpenLDAPMount(t, b, storage)
+
+	roleName := "self-managed"
+	createReq := &logical.Request{
+		Operation: logical.CreateOperation,
+		Path:      staticRolePath + roleName,
+		Storage:   storage,
+		Data: map[string]interface{}{
+			"username":                          roleName,
+			"dn":                                "uid=self-managed,ou=users,dc=hashicorp,dc=com",
+			"rotation_period":                   "1m",
+			"self_managed":                      true,
+			"self_managed_max_invalid_attempts": 1, // allow a single retry (attempt sequence: 0 -> 1 -> stop)
+			"password":                          "CurrentPassw0rd!",
+		},
+	}
+	resp, err := b.HandleRequest(ctx, createReq)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+	// validate password was changed on import
+	role, err := b.staticRole(ctx, storage, roleName)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.NotEqual(t, "CurrentPassw0rd!", role.StaticAccount.Password)
+
+	// Make LDAP client return "invalid credentials"
+	ldapClient := b.client.(*fakeLdapClient)
+	ldapClient.throwsInvalidCredentialsErr = true
+
+	// Ensure role queued
+	item, err := b.popFromRotationQueueByKey(roleName)
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	// Force immediate rotation attempt
+	item.Priority = time.Now().Unix() - 1
+	require.NoError(t, b.pushItem(item))
+
+	// First automatic rotation attempt (attempt 0 -> 1, WAL persisted & requeued)
+	b.rotateCredentials(ctx, storage)
+
+	wals := requireWALs(t, storage, 1)
+	wal1, err := b.findStaticWAL(ctx, storage, wals[0])
+	require.NoError(t, err)
+	require.Equal(t, 1, wal1.Attempt, "first failure should increment attempt to 1")
+
+	// Fetch queued item, lower priority to trigger second attempt immediately
+	item, err = b.popFromRotationQueueByKey(roleName)
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	item.Priority = time.Now().Unix() - 1
+	require.NoError(t, b.pushItem(item))
+
+	// Second automatic rotation attempt should hit max attempts and NOT requeue
+	b.rotateCredentials(ctx, storage)
+
+	// WAL should be deleted after max attempts
+	requireWALs(t, storage, 0)
+
+	// Queue should no longer contain the role
+	_, err = b.popFromRotationQueueByKey(roleName)
+	require.Error(t, err, "expected role to be removed from queue after max attempts")
+
+	// Additional ticks should do nothing because queue is empty
+	b.rotateCredentials(ctx, storage)
+	requireWALs(t, storage, 0)
+	// validate rotation_suspended flag set
+	role, err = b.staticRole(ctx, storage, roleName)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.True(t, role.StaticAccount.RotationSuspended)
+
+	// update role password externally to simulate user fixing invalid password
+	updateReq := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      staticRolePath + roleName,
+		Storage:   storage,
+		Data: map[string]interface{}{
+			"password": "NewValidPassw0rd!",
+		},
+	}
+	resp, err = b.HandleRequest(ctx, updateReq)
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+	// validate rotation_suspended flag set
+	role, err = b.staticRole(ctx, storage, roleName)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.False(t, role.StaticAccount.RotationSuspended)
+	// Make LDAP client work again
+	ldapClient.throwsInvalidCredentialsErr = false
+	// Ensure role readded to queue after update
+	item, err = b.popFromRotationQueueByKey(roleName)
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	// Force immediate rotation attempt
+	item.Priority = time.Now().Unix() - 1
+	require.NoError(t, b.pushItem(item))
+	// First automatic rotation attempt
+	b.rotateCredentials(ctx, storage)
+	// validate no wal after successful rotation
+	requireWALs(t, storage, 0)
+	// validate requeued again
+	item, err = b.popFromRotationQueueByKey(roleName)
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	// validate password was changed
+	role, err = b.staticRole(ctx, storage, roleName)
+	require.NoError(t, err)
+	require.NotNil(t, role)
+	require.NotEqual(t, "NewValidPassw0rd!", role.StaticAccount.Password)
+	// validate rotation_suspended flag cleared
+	require.False(t, role.StaticAccount.RotationSuspended)
+}
+
 func generateWALFromFailedRotation(t *testing.T, b *backend, storage logical.Storage, roleName string) {
 	t.Helper()
 	// Fail to rotate the roles

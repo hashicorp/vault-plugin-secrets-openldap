@@ -267,6 +267,87 @@ func TestUpdatePasswordAD(t *testing.T) {
 	}
 }
 
+func TestUpdateSelfManagedPasswordOpenLDAP(t *testing.T) {
+	testPass := "hell0$catz*"
+	currentPass := "dogs"
+
+	config := emptyConfig()
+	config.Schema = SchemaOpenLDAP
+	config.BindDN = "cn=admin,dc=example,dc=org"
+	config.BindPassword = "admin"
+	dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
+
+	conn := &ldapifc.FakeLDAPConnection{
+		SearchRequestToExpect: testSearchRequest(),
+		SearchResultToReturn:  testSearchResult(),
+	}
+
+	conn.PasswordModifyRequestToExpect = &ldap.PasswordModifyRequest{
+		UserIdentity: dn,
+		OldPassword:  currentPass,
+		NewPassword:  testPass,
+	}
+	ldapClient := &ldaputil.Client{
+		Logger: hclog.NewNullLogger(),
+		LDAP:   &ldapifc.FakeLDAPClient{conn},
+	}
+
+	client := &Client{ldapClient}
+
+	filters := map[*Field][]string{
+		FieldRegistry.ObjectClass: {"*"},
+	}
+	if err := client.UpdateSelfManagedPassword(config, dn, ldap.ScopeBaseObject, currentPass, testPass, filters); err != nil {
+		t.Fatal(err)
+	}
+	// validate client didnt change
+	assert.Equal(t, "cn=admin,dc=example,dc=org", config.BindDN)
+	assert.Equal(t, "admin", config.BindPassword)
+}
+
+func TestUpdateSelfManagedPasswordAD(t *testing.T) {
+	testPass := "hell0$catz*"
+	currentPass := "dogs"
+	encodedCurrentPass, err := formatPassword(currentPass)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dn := "CN=Jim H.. Jones,OU=Vault,OU=Engineering,DC=example,DC=com"
+	encodedTestPass, err := formatPassword(testPass)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := emptyConfig()
+	config.Schema = SchemaAD
+
+	conn := &ldapifc.FakeLDAPConnection{
+		SearchRequestToExpect: testSearchRequest(),
+		SearchResultToReturn:  testSearchResult(),
+	}
+
+	conn.ModifyRequestToExpect = &ldap.ModifyRequest{
+		DN: dn,
+	}
+	conn.ModifyRequestToExpect.Delete("unicodePwd", []string{encodedCurrentPass})
+	conn.ModifyRequestToExpect.Add("unicodePwd", []string{encodedTestPass})
+
+	ldapClient := &ldaputil.Client{
+		Logger: hclog.NewNullLogger(),
+		LDAP:   &ldapifc.FakeLDAPClient{conn},
+	}
+
+	client := &Client{ldapClient}
+
+	filters := map[*Field][]string{
+		FieldRegistry.ObjectClass: {"*"},
+	}
+
+	if err := client.UpdateSelfManagedPassword(config, dn, ldap.ScopeBaseObject, currentPass, testPass, filters); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestUpdateRootPassword mimics the UpdateRootPassword in the SecretsClient.
 // However, this test must be located within this package because when the
 // "client" is instantiated below, the "ldapClient" is being added to an

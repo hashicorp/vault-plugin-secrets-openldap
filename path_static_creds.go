@@ -50,16 +50,50 @@ func (b *backend) pathStaticCredsRead(ctx context.Context, req *logical.Request,
 		return logical.ErrorResponse("unknown role: %s", name), nil
 	}
 
+	respData := map[string]interface{}{
+		"dn":                  role.StaticAccount.DN,
+		"username":            role.StaticAccount.Username,
+		"password":            role.StaticAccount.Password,
+		"last_password":       role.StaticAccount.LastPassword,
+		"ttl":                 role.StaticAccount.PasswordTTL().Seconds(),
+		"rotation_period":     role.StaticAccount.RotationPeriod.Seconds(),
+		"last_vault_rotation": role.StaticAccount.LastVaultRotation,
+	}
+
+	if role.StaticAccount.DualAccountMode {
+		respData["dual_account_mode"] = true
+		respData["active_account"] = role.StaticAccount.ActiveAccount
+		respData["rotation_state"] = role.StaticAccount.RotationState
+
+		// Return the active account's credentials as the primary credentials
+		if role.StaticAccount.ActiveAccount == activeAccountB {
+			respData["username"] = role.StaticAccount.UsernameB
+			respData["dn"] = role.StaticAccount.DNB
+			respData["password"] = role.StaticAccount.PasswordB
+			respData["last_password"] = role.StaticAccount.LastPasswordB
+		}
+
+		// During grace period, also return the standby account's credentials
+		if role.StaticAccount.RotationState == rotationStateGracePeriod {
+			if role.StaticAccount.ActiveAccount == activeAccountB {
+				// B is active, return A as standby
+				respData["standby_username"] = role.StaticAccount.Username
+				respData["standby_dn"] = role.StaticAccount.DN
+				respData["standby_password"] = role.StaticAccount.Password
+				respData["standby_last_password"] = role.StaticAccount.LastPassword
+			} else {
+				// A is active, return B as standby
+				respData["standby_username"] = role.StaticAccount.UsernameB
+				respData["standby_dn"] = role.StaticAccount.DNB
+				respData["standby_password"] = role.StaticAccount.PasswordB
+				respData["standby_last_password"] = role.StaticAccount.LastPasswordB
+			}
+			respData["grace_period_end"] = role.StaticAccount.GracePeriodEnd
+		}
+	}
+
 	return &logical.Response{
-		Data: map[string]interface{}{
-			"dn":                  role.StaticAccount.DN,
-			"username":            role.StaticAccount.Username,
-			"password":            role.StaticAccount.Password,
-			"last_password":       role.StaticAccount.LastPassword,
-			"ttl":                 role.StaticAccount.PasswordTTL().Seconds(),
-			"rotation_period":     role.StaticAccount.RotationPeriod.Seconds(),
-			"last_vault_rotation": role.StaticAccount.LastVaultRotation,
-		},
+		Data: respData,
 	}, nil
 }
 

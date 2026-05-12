@@ -79,10 +79,22 @@ tmp/
 scripts/custom.sh
 
 **/.terraform/*
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
+*.terraform.lock.hcl
 
 # ldap racf terraform
 seed.ldif
 cleanup.ldif
+
+# Vault Enterprise License (Enos)
+.vault-license
+
+# Enos
+.enos/
+enos.lock.hcl
+enos-local.vars.hcl
+enos/enos.vars.hcl
+
+# Enos tests
+tests/go.sum

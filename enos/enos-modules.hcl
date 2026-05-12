@@ -1,0 +1,11 @@
+module "docker_network" {
+  source = "./modules/docker_network"
+}
+
+module "ldap_container" {
+  source = "./modules/ldap_container"
+}
+
+module "vault_cluster" {
+  source = "./modules/vault_cluster"
+}

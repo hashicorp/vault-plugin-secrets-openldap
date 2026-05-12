@@ -9,3 +9,7 @@ module "ldap_container" {
 module "vault_cluster" {
   source = "./modules/vault_cluster"
 }
+
+module "run_test" {
+  source = "./modules/run_test"
+}

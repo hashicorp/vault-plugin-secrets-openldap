@@ -58,6 +58,20 @@ scenario "ldap_poc" {
     }
   }
 
+  step "run_blackbox_system_tests" {
+    description = "Run plugin-owned blackbox SystemTests"
+    module      = module.run_test
+    depends_on  = [step.setup_ldap, step.create_vault_cluster]
+
+    variables {
+      vault_address = step.create_vault_cluster.vault_address
+      vault_token   = step.create_vault_cluster.vault_token
+      repo_root     = abspath(path.root + "/..")
+      test_package  = "./blackbox"
+      test_timeout  = "5m"
+    }
+  }
+
   output "vault_address" {
     description = "Vault cluster address"
     value       = step.create_vault_cluster.vault_address

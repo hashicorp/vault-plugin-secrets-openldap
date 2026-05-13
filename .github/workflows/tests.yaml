@@ -1,6 +1,9 @@
 name: Run Tests
 on:
   push:
+permissions:
+  contents: read
+
 jobs:
   run-tests:
     # using `main` as the ref will keep your workflow up-to-date

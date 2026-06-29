@@ -21,15 +21,34 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/testcluster/blackbox"
 )
 
-// LDAPDomainConfig holds configuration for an isolated LDAP domain
+// Configuration constants for LDAP test infrastructure
+const (
+	// DefaultBaseDN is the base distinguished name for the LDAP test domain
+	DefaultBaseDN = "dc=enos,dc=com"
+
+	// DefaultRetryTimeout is the default timeout for Eventually operations
+	DefaultRetryTimeout = 5 * time.Second
+
+	// DefaultRetryInterval is the interval between retry attempts
+	DefaultRetryInterval = 200 * time.Millisecond
+
+	// LDAPVerifyTimeout is the timeout for LDAP library operations that verify service accounts
+	LDAPVerifyTimeout = 60 * time.Second
+
+	// LDAPServerReadyTimeout is the timeout for waiting for LDAP server to be ready
+	LDAPServerReadyTimeout = 30 * time.Second
+)
+
+// LDAPDomainConfig holds configuration for an isolated LDAP domain.
+// Each test session gets a unique domain to prevent test interference.
 type LDAPDomainConfig struct {
 	URL      string // LDAP server URL (private IP for Vault operations)
 	SetupURL string // LDAP server URL (public IP for setup operations from GitHub runner)
 	BindDN   string // Admin bind DN
 	BindPass string // Admin bind password
-	BaseDN   string // Base DN for this domain (e.g., dc=bbsdk-xxx,dc=test,dc=enos,dc=com)
-	UserDN   string // User DN (e.g., ou=users,dc=bbsdk-xxx,dc=test,dc=enos,dc=com)
-	GroupDN  string // Group DN (e.g., ou=groups,dc=bbsdk-xxx,dc=test,dc=enos,dc=com)
+	BaseDN   string // Base DN for this domain (e.g., dc=enos,dc=com)
+	UserDN   string // User DN (e.g., ou=bbsdk-xxx-users,dc=enos,dc=com)
+	GroupDN  string // Group DN (e.g., ou=bbsdk-xxx-groups,dc=enos,dc=com)
 }
 
 // setupLDAPSecretsEngine configures the LDAP secrets engine with environment variables
@@ -56,7 +75,9 @@ func setupLDAPSecretsEngine(t *testing.T, v *blackbox.Session, mount string) {
 	})
 }
 
-// SetupLDAPSecretsEngineWithConfig configures the LDAP secrets engine with an isolated domain config
+// SetupLDAPSecretsEngineWithConfig configures the LDAP secrets engine with an isolated domain config.
+// It enables the LDAP secrets engine at the specified mount point and configures it with the provided
+// domain configuration. This function is used to set up isolated LDAP domains for test sessions.
 func SetupLDAPSecretsEngineWithConfig(t *testing.T, v *blackbox.Session, mount string, config *LDAPDomainConfig) {
 	t.Helper()
 
@@ -80,12 +101,18 @@ func SetupLDAPSecretsEngineWithConfig(t *testing.T, v *blackbox.Session, mount s
 	t.Logf("  GroupDN: %s", config.GroupDN)
 	t.Logf("DEBUG: To test LDAP connection manually, run:")
 	t.Logf("  ldapsearch -x -H %s -b \"%s\" -D %s -w %s",
-		config.URL, config.BaseDN, config.BindDN, config.BindPass)
+		config.URL, config.BaseDN, config.BindDN, maskPassword(config.BindPass))
 }
 
-// WriteLibrarySetWithRetry writes an LDAP library set configuration with retry logic
-// LDAP library operations can take time as Vault verifies service accounts exist in LDAP
-// Uses a 60-second timeout to accommodate LDAP verification delays
+// WriteLibrarySetWithRetry writes an LDAP library set configuration with retry logic.
+// LDAP library operations can take time as Vault verifies service accounts exist in LDAP.
+// Uses LDAPVerifyTimeout (60s) to accommodate LDAP verification delays.
+//
+// Parameters:
+//   - t: Test instance
+//   - v: Blackbox session
+//   - path: Library set path (e.g., "ldap/library/my-set")
+//   - data: Library set configuration including service_account_names
 func WriteLibrarySetWithRetry(t *testing.T, v *blackbox.Session, path string, data map[string]any) {
 	t.Helper()
 
@@ -105,7 +132,7 @@ func WriteLibrarySetWithRetry(t *testing.T, v *blackbox.Session, path string, da
 			t.Logf("DEBUG: Library set creation attempt failed: %v", err)
 		}
 		return err
-	}, 60*time.Second)
+	}, LDAPVerifyTimeout)
 
 	t.Logf("DEBUG: Successfully created LDAP library set at %s", path)
 }
@@ -156,7 +183,8 @@ func isCI() bool {
 		os.Getenv("ENOS_VAR_ci") != ""
 }
 
-// maskPassword masks a password for logging, showing only first 2 and last 2 characters
+// maskPassword masks a password for logging, showing only first 2 and last 2 characters.
+// Returns "****" for passwords 4 characters or shorter.
 func maskPassword(password string) string {
 	if len(password) <= 4 {
 		return "****"
@@ -164,7 +192,9 @@ func maskPassword(password string) string {
 	return password[:2] + "****" + password[len(password)-2:]
 }
 
-// waitForLDAP waits for the LDAP server to be ready by repeatedly attempting to connect
+// waitForLDAP waits for the LDAP server to be ready by repeatedly attempting to connect.
+// Uses ldapsearch to verify connectivity with exponential backoff.
+// Logs progress every 5 attempts to avoid excessive output.
 func waitForLDAP(t *testing.T, config *LDAPDomainConfig, timeout time.Duration) {
 	t.Helper()
 
@@ -200,7 +230,8 @@ func waitForLDAP(t *testing.T, config *LDAPDomainConfig, timeout time.Duration) 
 }
 
 // PrepareTestLDAPDomain creates an isolated LDAP domain for the test session.
-// Uses the session's namespace to create a unique domain within the existing LDAP server.
+// Uses the session's namespace to create unique organizational units within the existing LDAP server.
+// This provides test isolation without requiring separate LDAP instances.
 //
 // Parameters:
 //   - t: The test instance
@@ -210,7 +241,7 @@ func waitForLDAP(t *testing.T, config *LDAPDomainConfig, timeout time.Duration) 
 //
 // Returns:
 //   - cleanup: Function to delete the domain and all its contents
-//   - config: LDAP config with domain-specific settings
+//   - config: LDAP config with domain-specific settings (URLs, DNs, credentials)
 //   - error: Non-nil if domain creation failed
 func PrepareTestLDAPDomain(
 	t *testing.T,
@@ -238,10 +269,10 @@ func PrepareTestLDAPDomain(
 		return nil, nil, fmt.Errorf("%w - skipping in dev", err)
 	}
 
-	// Create unique organizational units under the existing dc=enos,dc=com domain
+	// Create unique organizational units under the existing base domain
 	// This avoids needing to create intermediate domain components
 	domainName := session.Namespace // e.g., "bbsdk-a1b2c3d4"
-	baseDN := "dc=enos,dc=com"      // Use existing base domain
+	baseDN := DefaultBaseDN         // Use existing base domain
 
 	config = &LDAPDomainConfig{
 		URL:      ldapURLPrivate,
@@ -270,8 +301,9 @@ func PrepareTestLDAPDomain(
 	return cleanup, config, nil
 }
 
-// createDomain creates isolated organizational units for the test session
-// Uses Eventually to retry the operation until LDAP server is ready
+// createDomain creates isolated organizational units for the test session.
+// Uses Eventually to retry the operation until LDAP server is ready.
+// Creates two OUs: one for users and one for groups under the base DN.
 func createDomain(t *testing.T, session *blackbox.Session, config *LDAPDomainConfig) error {
 	t.Helper()
 
@@ -296,16 +328,16 @@ ou: %s
 	// Log the exact command for debugging (using SetupURL for public IP)
 	t.Logf("DEBUG: Creating LDAP domain OUs with command:")
 	t.Logf("  echo '%s' | ldapadd -x -H %s -D %s -w %s",
-		strings.ReplaceAll(ldif, "\n", "\\n"), config.SetupURL, config.BindDN, config.BindPass)
+		strings.ReplaceAll(ldif, "\n", "\\n"), config.SetupURL, config.BindDN, maskPassword(config.BindPass))
 	t.Logf("DEBUG: To verify OUs exist, run:")
-	t.Logf("  ldapsearch -x -H %s -b \"dc=enos,dc=com\" -D %s -w %s \"(objectClass=organizationalUnit)\"",
-		config.SetupURL, config.BindDN, config.BindPass)
+	t.Logf("  ldapsearch -x -H %s -b \"%s\" -D %s -w %s \"(objectClass=organizationalUnit)\"",
+		config.SetupURL, DefaultBaseDN, config.BindDN, maskPassword(config.BindPass))
 
-	// Wait for LDAP server to be ready with extended timeout (30 seconds)
+	// Wait for LDAP server to be ready with extended timeout
 	// LDAP containers can take time to fully initialize, especially in CI environments
 	t.Logf("Waiting for LDAP server to be ready at %s", config.SetupURL)
 
-	waitForLDAP(t, config, 30*time.Second)
+	waitForLDAP(t, config, LDAPServerReadyTimeout)
 
 	// Use Eventually to retry ldapadd until LDAP server is ready
 	session.Eventually(func() error {
@@ -332,7 +364,8 @@ ou: %s
 	return nil
 }
 
-// deleteDomain recursively deletes the isolated organizational units
+// deleteDomain recursively deletes the isolated organizational units.
+// Cleans up both user and group OUs created for the test session.
 func deleteDomain(t *testing.T, config *LDAPDomainConfig) {
 	t.Helper()
 
@@ -359,7 +392,14 @@ func deleteDomain(t *testing.T, config *LDAPDomainConfig) {
 	}
 }
 
-// CreateLDAPUser creates a user in the isolated domain
+// CreateLDAPUser creates a user in the isolated domain.
+// The user is created with inetOrgPerson objectClass and basic attributes.
+//
+// Parameters:
+//   - t: Test instance
+//   - config: LDAP domain configuration
+//   - username: Username (used for uid, cn, and sn)
+//   - password: User password
 func CreateLDAPUser(t *testing.T, config *LDAPDomainConfig, username, password string) error {
 	t.Helper()
 
@@ -379,13 +419,13 @@ userPassword: %s
 	// Log the exact command for debugging (using SetupURL for public IP)
 	t.Logf("DEBUG: Creating LDAP user with command:")
 	t.Logf("  echo '%s' | ldapadd -x -H %s -D %s -w %s",
-		strings.ReplaceAll(ldif, "\n", "\\n"), config.SetupURL, config.BindDN, config.BindPass)
+		strings.ReplaceAll(ldif, "\n", "\\n"), config.SetupURL, config.BindDN, maskPassword(config.BindPass))
 	t.Logf("DEBUG: To verify user exists, run:")
 	t.Logf("  ldapsearch -x -H %s -b \"%s\" -D %s -w %s \"(uid=%s)\"",
-		config.SetupURL, config.UserDN, config.BindDN, config.BindPass, username)
+		config.SetupURL, config.UserDN, config.BindDN, maskPassword(config.BindPass), username)
 	t.Logf("DEBUG: To test bind as user, run:")
-	t.Logf("  ldapsearch -x -H %s -b \"dc=enos,dc=com\" -D \"%s\" -w \"%s\" -s base",
-		config.SetupURL, userDN, password)
+	t.Logf("  ldapsearch -x -H %s -b \"%s\" -D \"%s\" -w \"%s\" -s base",
+		config.SetupURL, DefaultBaseDN, userDN, maskPassword(password))
 
 	cmd := exec.Command(
 		"ldapadd",
@@ -407,7 +447,14 @@ userPassword: %s
 	return nil
 }
 
-// CreateLDAPGroup creates a group in the isolated domain
+// CreateLDAPGroup creates a group in the isolated domain.
+// The group is created with groupOfNames objectClass and initial members.
+//
+// Parameters:
+//   - t: Test instance
+//   - config: LDAP domain configuration
+//   - groupName: Group name (used for cn)
+//   - members: List of usernames to add as initial members
 func CreateLDAPGroup(t *testing.T, config *LDAPDomainConfig, groupName string, members []string) error {
 	t.Helper()
 
@@ -448,7 +495,8 @@ cn: %s
 	return nil
 }
 
-// AddUserToGroup adds a user to a group in the isolated domain
+// AddUserToGroup adds a user to an existing group in the isolated domain.
+// Uses LDAP modify operation to add the user DN as a member.
 func AddUserToGroup(t *testing.T, config *LDAPDomainConfig, username, groupName string) error {
 	t.Helper()
 
@@ -482,7 +530,8 @@ member: %s
 	return nil
 }
 
-// RemoveUserFromGroup removes a user from a group in the isolated domain
+// RemoveUserFromGroup removes a user from an existing group in the isolated domain.
+// Uses LDAP modify operation to delete the user DN from members.
 func RemoveUserFromGroup(t *testing.T, config *LDAPDomainConfig, username, groupName string) error {
 	t.Helper()
 
@@ -516,7 +565,8 @@ member: %s
 	return nil
 }
 
-// CheckLDAPUserExistsInDomain verifies if a user exists in the isolated domain
+// CheckLDAPUserExistsInDomain verifies if a user exists in the isolated domain.
+// Returns true if the user DN is found in the domain's user OU.
 func CheckLDAPUserExistsInDomain(t *testing.T, config *LDAPDomainConfig, username string) bool {
 	t.Helper()
 
@@ -539,7 +589,8 @@ func CheckLDAPUserExistsInDomain(t *testing.T, config *LDAPDomainConfig, usernam
 	return strings.Contains(string(output), "dn:")
 }
 
-// createDynamicRole creates a dynamic role with standard configuration
+// createDynamicRole creates a dynamic role with standard configuration.
+// Merges provided config with sensible defaults for username template and TTLs.
 func createDynamicRole(v *blackbox.Session, mount, roleName string, config map[string]any) {
 	defaultConfig := map[string]any{
 		"username_template": "v-test-{{random 8}}",

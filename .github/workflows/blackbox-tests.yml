@@ -72,9 +72,11 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "## Blackbox Test Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Test compilation: Success" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Smoke test execution: Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note**: This workflow runs only the smoke test. Full test suite with Enos infrastructure will be added in Task 1.3b." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Blackbox Test Summary"
+            echo ""
+            echo "✅ Test compilation: Success"
+            echo "✅ Smoke test execution: Complete"
+            echo ""
+            echo "**Note**: This workflow runs only the smoke test. Full test suite with Enos infrastructure will be added in Task 1.3b."
+          } >> "$GITHUB_STEP_SUMMARY"

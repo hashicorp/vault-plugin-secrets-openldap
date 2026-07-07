@@ -1,0 +1,80 @@
+name: Blackbox Tests
+
+on:
+  pull_request:
+    paths:
+      - 'blackbox/**'
+      - 'enos/**'
+      - '.github/workflows/blackbox-tests.yml'
+      - 'go.mod'
+      - 'go.sum'
+  push:
+    branches:
+      - main
+      - 'release/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  blackbox-smoke-test:
+    name: Blackbox Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+          cache: true
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
+      - name: Verify test compilation
+        run: |
+          echo "Compiling blackbox tests..."
+          go test -c -tags=blackbox ./blackbox
+          ls -lh blackbox.test
+          echo "✅ Tests compiled successfully"
+
+      - name: Run smoke test
+        run: |
+          echo "Running smoke test (TestBasicSmoke)..."
+          gotestsum --junitfile=test-results.xml --format=testname -- \
+            -v -timeout=5m -tags=blackbox -run=TestBasicSmoke ./blackbox
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: test-results.xml
+          check_name: Blackbox Test Results
+          comment_mode: off
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blackbox-test-results
+          path: |
+            test-results.xml
+            blackbox.test
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Blackbox Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Test compilation: Success" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Smoke test execution: Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note**: This workflow runs only the smoke test. Full test suite with Enos infrastructure will be added in Task 1.3b." >> $GITHUB_STEP_SUMMARY

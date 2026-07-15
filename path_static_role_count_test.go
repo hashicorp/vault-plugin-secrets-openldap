@@ -84,7 +84,6 @@ func updateStaticRoleViaAPI(t *testing.T, b logical.Backend, s logical.Storage, 
 		Path:      staticRolePath + name,
 		Storage:   s,
 		Data: map[string]interface{}{
-			"username":        name,
 			"rotation_period": "48h",
 		},
 	}

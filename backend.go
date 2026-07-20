@@ -62,6 +62,9 @@ func Backend(client ldapClient) *backend {
 			b.pathSetCheckIn(),
 			b.pathSetCheckOut(),
 			b.pathSetStatus(),
+			b.pathLibraryCount(),
+			b.pathStaticRoleCount(),
+			b.pathDynamicRoleCount(),
 
 			// These paths are more generic than the above. They must be
 			// appended last.

@@ -41,6 +41,9 @@ website/build
 .vagrant/
 Vagrantfile
 
+# Configs
+*.hcl
+
 .DS_Store
 .idea
 .vscode
@@ -77,6 +80,10 @@ ui/testem.log
 tmp/
 
 scripts/custom.sh
+
+# enos
+/enos/.enos/*
+/enos/enos*.vars.hcl
 
 **/.terraform/*
 .terraform.lock.hcl

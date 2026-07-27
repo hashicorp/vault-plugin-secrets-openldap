@@ -1,0 +1,275 @@
+---
+name: enos-docker-tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  enos-test:
+    name: Enos Docker Test - Vault ${{ matrix.vault_version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        vault_version: ["2.0.0", "1.21.5", "1.20.9", "1.19.9"]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3.1.1
+        with:
+          terraform_version: "~> 1.2"
+
+      - name: Set up Enos
+        uses: hashicorp/action-setup-enos@3817610f3f8dc74a8dbe15bc23c6dc3164f9b224 # v1.53
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Docker
+        run: |
+          docker info
+          docker network ls
+          echo "Docker is ready for Enos scenarios"
+
+      - name: Prepare scenario dependencies
+        id: prepare_scenario
+        run: |
+          mkdir -p ./enos/support
+          
+          # Create safe scenario name for artifacts (truncate to 219 chars for prefix + variable + suffix ≤ 235)
+          scenario_safe_name=$(echo "ldap_poc_vault_version=${{ matrix.vault_version }}" | sed -e 's/ /_/g' | sed -e 's/:/=/g')
+          
+          {
+            echo "debug_data_artifact_name=enos-debug-data_${scenario_safe_name:0:219}"
+            echo "test_results_artifact_name=test-results_${scenario_safe_name:0:222}"
+            echo "junit_results_artifact_name=junit-results_${scenario_safe_name:0:221}"
+            echo "failure_summary_artifact_name=failure-summary-enos_${scenario_safe_name:0:211}.md"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Configure Vault license
+        run: |
+          if [ -n "${{ secrets.VAULT_LICENSE }}" ]; then
+            echo "${{ secrets.VAULT_LICENSE }}" > ./enos/support/vault.hclic
+            echo "✅ Vault Enterprise license configured"
+          else
+            echo "⚠️  No VAULT_LICENSE secret found - enterprise tests may be skipped"
+            touch ./enos/support/vault.hclic
+          fi
+
+      - name: Set Enos environment variables
+        run: |
+          {
+            echo "ENOS_DEBUG_DATA_ROOT_DIR=/tmp/enos-debug-data"
+            echo "ENOS_VAR_docker_network_name=enos-ci-network-${{ matrix.vault_version }}"
+            echo "ENOS_VAR_vault_cluster_name=vault-ci-${{ matrix.vault_version }}"
+            echo "ENOS_VAR_vault_license_path=./support/vault.hclic"
+          } | tee -a "$GITHUB_ENV"
+
+      - name: Run Enos scenario
+        id: run_scenario
+        timeout-minutes: 50
+        run: |
+          cd enos
+          echo "🚀 Running Enos scenario: ldap_poc with Vault ${{ matrix.vault_version }}"
+          
+          # Run the scenario
+          if enos scenario run ldap_poc \
+            --timeout 45m0s \
+            vault_version=${{ matrix.vault_version }}; then
+            echo "launch-outcome=success" >> "$GITHUB_OUTPUT"
+            echo "✅ Scenario launched successfully"
+          else
+            echo "launch-outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "❌ Scenario launch failed"
+            exit 1
+          fi
+
+      - name: Check for test results
+        if: always()
+        id: check_test_results
+        continue-on-error: true
+        run: |
+          if find /tmp -maxdepth 1 -name 'vault_test_results_*.json' -type f -print -quit 2>/dev/null | grep -q .; then
+            echo "has_results=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Test results found"
+          else
+            echo "has_results=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  No test results found"
+          fi
+
+      - name: Prepare test results summary
+        if: always() && steps.check_test_results.outputs.has_results == 'true'
+        continue-on-error: true
+        run: |
+          # Find the most recent JSON test results file
+          json_file=$(find /tmp -maxdepth 1 -name 'vault_test_results_*.json' -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
+          
+          if [ -n "$json_file" ] && [ -f "$json_file" ]; then
+            # Create failure summary file
+            failure_summary_file="${{ steps.prepare_scenario.outputs.failure_summary_artifact_name }}"
+            
+            # Extract failed tests and format as table rows
+            jq -r 'select(.Action == "fail") | select(.Test != null) | "| enos | \(.Package) | \(.Test) | \(.Elapsed // "N/A") | ${{ matrix.vault_version }} | [view logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |"' \
+              "$json_file" > "$failure_summary_file"
+            
+            # Count total tests, passes, and failures
+            total_tests=$(jq -r 'select(.Action == "pass" or .Action == "fail") | select(.Test != null)' "$json_file" | jq -s 'length')
+            passed_tests=$(jq -r 'select(.Action == "pass") | select(.Test != null)' "$json_file" | jq -s 'length')
+            failed_tests=$(jq -r 'select(.Action == "fail") | select(.Test != null)' "$json_file" | jq -s 'length')
+            
+            # Create step summary
+            {
+              echo "## Test Results for Vault ${{ matrix.vault_version }}"
+              echo ""
+              echo "- **Total Tests:** $total_tests"
+              echo "- **Passed:** ✅ $passed_tests"
+              echo "- **Failed:** ❌ $failed_tests"
+              echo ""
+              
+              if [ "$failed_tests" -gt 0 ]; then
+                echo "### Failed Tests"
+                echo ""
+                echo "| Test Type | Package | Test | Elapsed | Vault Version | Logs |"
+                echo "| --------- | ------- | ---- | ------- | ------------- | ---- |"
+                cat "${failure_summary_file}"
+                echo ""
+              fi
+              
+              echo "📊 Full test results available in artifacts: \`${{ steps.prepare_scenario.outputs.test_results_artifact_name }}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: ${{ steps.prepare_scenario.outputs.test_results_artifact_name }}
+          path: /tmp/vault_test_results_*.json
+          retention-days: 7
+          if-no-files-found: ignore
+        continue-on-error: true
+
+      - name: Upload JUnit results
+        if: always()
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: ${{ steps.prepare_scenario.outputs.junit_results_artifact_name }}
+          path: /tmp/vault_test_results_*.xml
+          retention-days: 7
+          if-no-files-found: ignore
+        continue-on-error: true
+
+      - name: Upload failure summary
+        if: always() && steps.check_test_results.outputs.has_results == 'true'
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: ${{ steps.prepare_scenario.outputs.failure_summary_artifact_name }}
+          path: ${{ steps.prepare_scenario.outputs.failure_summary_artifact_name }}
+          if-no-files-found: ignore
+        continue-on-error: true
+
+      - name: Upload debug data
+        if: always()
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: ${{ steps.prepare_scenario.outputs.debug_data_artifact_name }}
+          path: /tmp/enos-debug-data
+          retention-days: 30
+          if-no-files-found: ignore
+        continue-on-error: true
+
+      - name: Destroy Enos scenario
+        id: destroy_scenario
+        if: always()
+        timeout-minutes: 15
+        run: |
+          cd enos
+          echo "🧹 Destroying Enos scenario: ldap_poc with Vault ${{ matrix.vault_version }}"
+          
+          if enos scenario destroy ldap_poc \
+            --timeout 10m0s \
+            vault_version=${{ matrix.vault_version }}; then
+            echo "destroy-outcome=success" >> "$GITHUB_OUTPUT"
+            echo "✅ Scenario destroyed successfully"
+          else
+            echo "destroy-outcome=failure" >> "$GITHUB_OUTPUT"
+            echo "⚠️  Scenario destroy had issues, attempting force cleanup"
+          fi
+
+      - name: Force cleanup Docker resources
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "🧹 Force cleaning Docker resources for Vault ${{ matrix.vault_version }}"
+          
+          # Remove containers
+          docker ps -a --filter "name=vault-ci-${{ matrix.vault_version }}" --format "{{.ID}}" | xargs -r docker rm -f || true
+          docker ps -a --filter "name=openldap-poc-${{ matrix.vault_version }}" --format "{{.ID}}" | xargs -r docker rm -f || true
+          
+          # Remove networks
+          docker network ls --filter "name=enos-ci-network-${{ matrix.vault_version }}" --format "{{.ID}}" | xargs -r docker network rm || true
+          
+          echo "✅ Force cleanup completed"
+
+      - name: Verify cleanup
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "=== Remaining Containers (filtered) ==="
+          docker ps -a --filter "name=vault-ci" --filter "name=openldap" || echo "No matching containers"
+          echo ""
+          echo "=== Remaining Networks (filtered) ==="
+          docker network ls --filter "name=enos-ci" || echo "No matching networks"
+
+      - name: Clean up runtime directories
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "🧹 Cleaning up Enos runtime directories"
+          rm -rf /tmp/enos* || true
+          rm -rf ./enos/support || true
+          rm -rf ./enos/.enos || true
+          echo "✅ Runtime directories cleaned"
+
+      - name: Notify scenario launch failed
+        if: always() && steps.run_scenario.outputs.launch-outcome == 'failure'
+        uses: hashicorp/actions-slack-status@1a3f63b30bd476aee1f3bd6f9d8f2aacc4f14d81 # v2.0.1
+        with:
+          failure-message: |
+            Enos scenario launch failed for Vault ${{ matrix.vault_version }}
+            Scenario: ldap_poc
+            Triggering event: `${{ github.event_name }}`
+            Actor: `${{ github.actor }}`
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          status: failure
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+      - name: Notify scenario destroy failed
+        if: always() && steps.destroy_scenario.outputs.destroy-outcome == 'failure'
+        uses: hashicorp/actions-slack-status@1a3f63b30bd476aee1f3bd6f9d8f2aacc4f14d81 # v2.0.1
+        with:
+          failure-message: |
+            Enos scenario destroy failed for Vault ${{ matrix.vault_version }}
+            Scenario: ldap_poc
+            Triggering event: `${{ github.event_name }}`
+            Actor: `${{ github.actor }}`
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          status: failure
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true

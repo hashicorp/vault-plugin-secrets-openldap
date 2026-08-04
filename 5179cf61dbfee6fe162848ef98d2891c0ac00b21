@@ -1,0 +1,2 @@
+{"id":"e97a91c9-810b-48f8-9ddd-81b80d21c5d8","ts":"2026-08-04T17:11:38.397Z","path":"/Users/ltcarbonell/Workspace/vault-plugins/vault-plugin-secrets-openldap/enos/modules/ldap_container/main.tf","version":"1.0.0","taskID":"55f4603b-9557-4a7b-972d-f341924236e7"}
+{"id":"3a8b7508-fc89-4e07-8e35-ad20b70f58da","ts":"2026-08-04T17:11:54.814Z","path":"/Users/ltcarbonell/Workspace/vault-plugins/vault-plugin-secrets-openldap/enos/modules/vault_cluster/main.tf","version":"1.0.0","taskID":"55f4603b-9557-4a7b-972d-f341924236e7"}

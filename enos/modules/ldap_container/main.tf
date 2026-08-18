@@ -8,7 +8,7 @@ terraform {
 }
 
 variable "network_id" {
-  description = "Docker network ID to attach the container to"
+  description = "ID of the Docker network to attach the container to"
   type        = string
 }
 
@@ -16,12 +16,6 @@ variable "container_name" {
   description = "Name of the LDAP container"
   type        = string
   default     = "openldap"
-}
-
-variable "ldap_domain" {
-  description = "LDAP domain"
-  type        = string
-  default     = "example.org"
 }
 
 variable "ldap_admin_password" {
@@ -78,8 +72,9 @@ resource "docker_container" "openldap" {
     external = var.ldaps_port
   }
 
-  # Keep container running
-  restart = "unless-stopped"
+  # Use restart=no for test containers so `terraform destroy` can cleanly
+  # remove them without the daemon immediately restarting them.
+  restart = "no"
 
   # Note: Removed healthcheck - osixia/openldap image has issues with Docker healthchecks
   # The test script will wait for LDAP port availability instead

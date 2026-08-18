@@ -36,7 +36,6 @@ scenario "ldap_poc" {
     variables {
       network_id          = step.create_network.network_id
       container_name      = "openldap-poc-${matrix.vault_version}"
-      ldap_domain         = "example.org"
       ldap_admin_password = "adminpassword"
       ldap_port           = matrix.vault_version == "2.0.0" ? 1389 : (matrix.vault_version == "1.21.5" ? 1390 : (matrix.vault_version == "1.20.9" ? 1391 : 1392))
       ldaps_port          = matrix.vault_version == "2.0.0" ? 1636 : (matrix.vault_version == "1.21.5" ? 1637 : (matrix.vault_version == "1.20.9" ? 1638 : 1639))
@@ -64,17 +63,18 @@ scenario "ldap_poc" {
     depends_on  = [step.setup_ldap, step.create_vault_cluster]
 
     variables {
-      vault_address    = step.create_vault_cluster.vault_address
-      vault_token      = step.create_vault_cluster.vault_token
-      repo_root        = abspath("${path.root}/..")
-      test_package     = "./blackbox"
-      test_timeout     = "5m"
-      ldap_url_private = step.setup_ldap.ldap_url
-      ldap_url_public  = step.setup_ldap.ldap_url_public
-      ldap_bind_dn     = step.setup_ldap.ldap_bind_dn
-      ldap_bind_pass   = step.setup_ldap.ldap_bind_pass
-      ldap_username    = "enos"
-      ldap_admin_pw    = step.setup_ldap.ldap_bind_pass
+      vault_address      = step.create_vault_cluster.vault_address
+      vault_token        = step.create_vault_cluster.vault_token
+      vault_cluster_name = "${var.vault_cluster_name}-${matrix.vault_version}"
+      repo_root          = abspath("${path.root}/..")
+      test_package       = "./blackbox"
+      test_timeout       = "5m"
+      ldap_url_private   = step.setup_ldap.ldap_url
+      ldap_url_public    = step.setup_ldap.ldap_url_public
+      ldap_bind_dn       = step.setup_ldap.ldap_bind_dn
+      ldap_bind_pass     = step.setup_ldap.ldap_bind_pass
+      ldap_username      = "enos"
+      ldap_admin_pw      = step.setup_ldap.ldap_bind_pass
     }
   }
 

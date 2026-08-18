@@ -10,6 +10,10 @@ readonly VAULT_API_ATTEMPTS=30
 readonly VAULT_API_SLEEP_SECONDS=2
 readonly CONTAINER_CMD="docker"
 
+# VAULT_CLUSTER_NAME is injected by the run_test module (set to the cluster_name
+# variable) so the filter matches exactly this scenario variant's container.
+readonly VAULT_CONTAINER_FILTER="${VAULT_CLUSTER_NAME:-vault-poc}"
+
 require_env() {
   local name="$1"
 
@@ -205,7 +209,7 @@ main() {
 
   log_section "Finding Vault container (including exited)"
   local vault_container
-  vault_container=$(find_container_name "vault-poc")
+  vault_container=$(find_container_name "$VAULT_CONTAINER_FILTER")
   if [ -z "$vault_container" ]; then
     echo "ERROR: No Vault container found at all!"
     exit 1

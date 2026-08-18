@@ -8,7 +8,7 @@ terraform {
 }
 
 variable "network_id" {
-  description = "Docker network ID to attach the container to"
+  description = "ID of the Docker network to attach the container to"
   type        = string
 }
 
@@ -93,8 +93,9 @@ resource "docker_container" "vault" {
     start_period = "30s"
   }
 
-  # Keep container running
-  restart = "always"
+  # Use restart=no for test containers so `terraform destroy` can cleanly
+  # remove them without the daemon immediately restarting them.
+  restart = "no"
 
   # Increase shared memory for stability
   shm_size = 128

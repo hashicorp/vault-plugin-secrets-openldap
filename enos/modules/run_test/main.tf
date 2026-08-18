@@ -17,6 +17,12 @@ variable "vault_token" {
   sensitive   = true
 }
 
+variable "vault_cluster_name" {
+  description = "Cluster name prefix used to locate the Vault container by name"
+  type        = string
+  default     = "vault-poc"
+}
+
 variable "test_package" {
   description = "Go test package path relative to repository root"
   type        = string
@@ -73,17 +79,18 @@ variable "ldap_admin_pw" {
 
 resource "enos_local_exec" "test" {
   environment = {
-    VAULT_ADDR       = var.vault_address
-    VAULT_TOKEN      = var.vault_token
-    LDAP_URL_PRIVATE = var.ldap_url_private
-    LDAP_URL_PUBLIC  = var.ldap_url_public
-    LDAP_BIND_DN     = var.ldap_bind_dn
-    LDAP_BIND_PASS   = var.ldap_bind_pass
-    LDAP_USERNAME    = var.ldap_username
-    LDAP_ADMIN_PW    = var.ldap_admin_pw
-    REPO_ROOT        = var.repo_root
-    TEST_PACKAGE     = var.test_package
-    TEST_TIMEOUT     = var.test_timeout
+    VAULT_ADDR         = var.vault_address
+    VAULT_TOKEN        = var.vault_token
+    VAULT_CLUSTER_NAME = var.vault_cluster_name
+    LDAP_URL_PRIVATE   = var.ldap_url_private
+    LDAP_URL_PUBLIC    = var.ldap_url_public
+    LDAP_BIND_DN       = var.ldap_bind_dn
+    LDAP_BIND_PASS     = var.ldap_bind_pass
+    LDAP_USERNAME      = var.ldap_username
+    LDAP_ADMIN_PW      = var.ldap_admin_pw
+    REPO_ROOT          = var.repo_root
+    TEST_PACKAGE       = var.test_package
+    TEST_TIMEOUT       = var.test_timeout
   }
 
   inline = ["${path.module}/scripts/run-blackbox-tests.sh"]

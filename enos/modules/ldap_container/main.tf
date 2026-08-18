@@ -78,16 +78,11 @@ resource "docker_container" "openldap" {
     external = var.ldaps_port
   }
 
-  # Health check
-  healthcheck {
-    test     = ["CMD-SHELL", "ldapsearch -x -H ldap://localhost -b dc=example,dc=org -D 'cn=admin,dc=example,dc=org' -w adminpassword"]
-    interval = "10s"
-    timeout  = "5s"
-    retries  = 5
-  }
-
   # Keep container running
   restart = "unless-stopped"
+
+  # Note: Removed healthcheck - osixia/openldap image has issues with Docker healthchecks
+  # The test script will wait for LDAP port availability instead
 }
 
 output "container_id" {

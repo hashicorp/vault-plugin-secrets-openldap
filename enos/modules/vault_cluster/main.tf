@@ -78,7 +78,7 @@ resource "docker_container" "vault" {
       "VAULT_ADDR=http://0.0.0.0:8200",
       "SKIP_SETCAP=true"
     ],
-    var.vault_license != null ? ["VAULT_LICENSE=${var.vault_license}"] : []
+    (var.vault_license != null && var.vault_license != "" && trimspace(var.vault_license) != "") ? ["VAULT_LICENSE=${var.vault_license}"] : []
   )
 
   # Run in dev mode for simplicity
@@ -86,14 +86,18 @@ resource "docker_container" "vault" {
 
   # Health check
   healthcheck {
-    test     = ["CMD", "vault", "status"]
-    interval = "10s"
-    timeout  = "5s"
-    retries  = 5
+    test         = ["CMD", "vault", "status"]
+    interval     = "5s"
+    timeout      = "3s"
+    retries      = 10
+    start_period = "30s"
   }
 
   # Keep container running
-  restart = "unless-stopped"
+  restart = "always"
+
+  # Increase shared memory for stability
+  shm_size = 128
 }
 
 output "container_id" {

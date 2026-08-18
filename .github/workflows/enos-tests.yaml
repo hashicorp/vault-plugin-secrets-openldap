@@ -1,0 +1,131 @@
+name: enos-docker-tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - release/**
+      - 'hashigator/**'
+  push:
+    branches:
+      - main
+      - 'hashigator/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      vault-versions: ${{ steps.set-versions.outputs.vault-versions }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set Vault versions
+        id: set-versions
+        run: |
+          echo 'vault-versions=["2.0.0","1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
+
+  enos-test:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vault_version: ${{ fromJson(needs.setup.outputs.vault-versions) }}
+    name: enos-test (${{ matrix.vault_version }})
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Enos
+        uses: hashicorp/action-setup-enos@v1.53
+        with:
+          version: '0.0.37'
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Install and configure Podman
+        run: |
+          # Install Podman and LDAP utilities
+          sudo apt-get update
+          sudo apt-get install -y podman ldap-utils
+          
+          # Configure Podman for rootless operation
+          podman --version
+          podman info
+          
+          # Enable Docker compatibility socket for Terraform provider
+          systemctl --user enable --now podman.socket
+          USER_ID="$(id -u)"
+          export DOCKER_HOST="unix:///run/user/${USER_ID}/podman/podman.sock"
+          echo "DOCKER_HOST=unix:///run/user/${USER_ID}/podman/podman.sock" >> "$GITHUB_ENV"
+          
+          # Create docker alias for compatibility
+          PODMAN_PATH="$(which podman)"
+          sudo ln -sf "${PODMAN_PATH}" /usr/local/bin/docker
+          
+          # Verify setup
+          docker --version
+          docker info
+
+      - name: Prepare scenario dependencies
+        run: |
+          cd enos
+          mkdir -p .terraform/plugin-cache
+          terraform init
+
+      - name: Configure Vault license
+        run: |
+          mkdir -p enos/support
+          VAULT_LICENSE="${{ secrets.VAULT_LICENSE }}"
+          if [ -n "${VAULT_LICENSE}" ]; then
+            echo "${VAULT_LICENSE}" > enos/support/vault.hclic
+            echo "License file created"
+          else
+            echo "ERROR: VAULT_LICENSE secret is required for Vault Enterprise"
+            echo "Please configure the VAULT_LICENSE repository secret"
+            exit 1
+          fi
+
+      - name: Run Enos scenario
+        run: |
+          cd enos
+          LICENSE_PATH="$(pwd)/support/vault.hclic"
+          export ENOS_VAR_vault_license_path="${LICENSE_PATH}"
+          enos scenario run ldap_poc vault_version:${{ matrix.vault_version }}
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          echo "Cleaning up containers and networks..."
+          podman ps -a
+          CONTAINER_IDS="$(podman ps -aq)"
+          if [ -n "${CONTAINER_IDS}" ]; then
+            podman stop "${CONTAINER_IDS}" || true
+            podman rm "${CONTAINER_IDS}" || true
+          fi
+          podman network prune -f || true
+
+      - name: Upload debug data
+        if: failure()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: enos-debug-${{ matrix.vault_version }}
+          path: |
+            enos/.enos/
+            /tmp/vault.hclic
+          retention-days: 7

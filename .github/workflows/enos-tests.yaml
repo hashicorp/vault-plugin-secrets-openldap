@@ -70,11 +70,13 @@ jobs:
           
           # Enable Docker compatibility socket for Terraform provider
           systemctl --user enable --now podman.socket
-          export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
-          echo "DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock" >> $GITHUB_ENV
+          USER_ID="$(id -u)"
+          export DOCKER_HOST="unix:///run/user/${USER_ID}/podman/podman.sock"
+          echo "DOCKER_HOST=unix:///run/user/${USER_ID}/podman/podman.sock" >> "$GITHUB_ENV"
           
           # Create docker alias for compatibility
-          sudo ln -sf $(which podman) /usr/local/bin/docker
+          PODMAN_PATH="$(which podman)"
+          sudo ln -sf "${PODMAN_PATH}" /usr/local/bin/docker
           
           # Verify setup
           docker --version
@@ -89,8 +91,9 @@ jobs:
       - name: Configure Vault license
         run: |
           mkdir -p enos/support
-          if [ -n "${{ secrets.VAULT_LICENSE }}" ]; then
-            echo "${{ secrets.VAULT_LICENSE }}" > enos/support/vault.hclic
+          VAULT_LICENSE="${{ secrets.VAULT_LICENSE }}"
+          if [ -n "${VAULT_LICENSE}" ]; then
+            echo "${VAULT_LICENSE}" > enos/support/vault.hclic
             echo "License file created"
           else
             echo "ERROR: VAULT_LICENSE secret is required for Vault Enterprise"
@@ -101,7 +104,8 @@ jobs:
       - name: Run Enos scenario
         run: |
           cd enos
-          export ENOS_VAR_vault_license_path="$(pwd)/support/vault.hclic"
+          LICENSE_PATH="$(pwd)/support/vault.hclic"
+          export ENOS_VAR_vault_license_path="${LICENSE_PATH}"
           enos scenario run ldap_poc vault_version:${{ matrix.vault_version }}
 
       - name: Cleanup on failure
@@ -109,8 +113,11 @@ jobs:
         run: |
           echo "Cleaning up containers and networks..."
           podman ps -a
-          podman stop "$(podman ps -aq)" || true
-          podman rm "$(podman ps -aq)" || true
+          CONTAINER_IDS="$(podman ps -aq)"
+          if [ -n "${CONTAINER_IDS}" ]; then
+            podman stop "${CONTAINER_IDS}" || true
+            podman rm "${CONTAINER_IDS}" || true
+          fi
           podman network prune -f || true
 
       - name: Upload debug data

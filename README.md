@@ -32,27 +32,3 @@ at `openldap`. To enable this in a running Vault server:
 $ vault secrets enable openldap
 Success! Enabled the openldap secrets engine at: openldap/
 ```
-
-
-## Testing
-
-### Unit & integration tests
-
-```sh
-go test ./...
-```
-
-### Enos end-to-end tests (local Docker)
-
-Enos scenarios spin up a live Vault + OpenLDAP environment in Docker and run
-the blackbox test suite against it. See **[`enos/README.md`](enos/README.md)**
-for prerequisites, setup, and all available commands.
-
-Quick start (requires a Vault Enterprise license):
-
-```sh
-cd enos
-terraform init
-enos scenario run ldap_poc vault_version:1.21.5 \
-  --var vault_license_path=/path/to/vault.hclic
-```

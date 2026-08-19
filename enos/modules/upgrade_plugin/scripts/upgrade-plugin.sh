@@ -24,6 +24,11 @@ log_section "Copying candidate plugin into container"
 echo "  host:      ${PLUGIN_BINARY_PATH}"
 echo "  container: ${CONTAINER_NAME}:${PLUGIN_DEST}"
 
+# Ensure the destination directory exists inside the container.
+# Podman (used on CI runners) requires the destination directory to exist
+# before `cp`; it will error with "could not be found" otherwise.
+$CONTAINER_CMD exec "${CONTAINER_NAME}" mkdir -p "$(dirname "${PLUGIN_DEST}")"
+
 $CONTAINER_CMD cp "${PLUGIN_BINARY_PATH}" "${CONTAINER_NAME}:${PLUGIN_DEST}"
 $CONTAINER_CMD exec "${CONTAINER_NAME}" chmod +x "${PLUGIN_DEST}"
 echo "Copy complete."

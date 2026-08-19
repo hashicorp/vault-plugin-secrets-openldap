@@ -81,8 +81,11 @@ resource "docker_container" "vault" {
     (var.vault_license != null && var.vault_license != "" && trimspace(var.vault_license) != "") ? ["VAULT_LICENSE=${var.vault_license}"] : []
   )
 
-  # Run in dev mode for simplicity
-  command = ["server", "-dev", "-dev-root-token-id=${local.root_token}"]
+  # Run in dev mode for simplicity.
+  # -dev-plugin-dir ensures Vault creates /vault/plugins/ and configures
+  # plugin_directory so that `vault plugin register` trusts binaries placed
+  # there by the upgrade_plugin module.
+  command = ["server", "-dev", "-dev-root-token-id=${local.root_token}", "-dev-plugin-dir=/vault/plugins"]
 
   # Health check
   healthcheck {

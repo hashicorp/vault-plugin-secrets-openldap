@@ -1,10 +1,18 @@
 scenario "plugin_upgrade" {
   description = <<-EOF
-    Verifies that the candidate LDAP secrets engine plugin (built from the current branch)
-    does not introduce regressions when upgrading from a previously released plugin version.
-    Installs a released plugin into a live Vault environment, establishes a validated
-    baseline, upgrades to the candidate plugin, and runs the blackbox test suite to confirm
-    that existing functionality and data are preserved.
+    Verifies that changes on the current branch do not introduce regressions in the
+    LDAP secrets engine plugin. The scenario runs in two phases against the same
+    live Vault cluster:
+
+      Phase 1 — Baseline: run the full blackbox test suite against the builtin
+      released plugin that ships with the Vault image. This confirms the starting
+      state is healthy and seeds real plugin data (mounts, roles, leases).
+
+      Phase 2 — Upgrade: copy the candidate plugin binary (built from this branch)
+      into the running container, register it in the Vault plugin catalog, and
+      reload the secrets engine mount to hot-swap the plugin in-place. Then re-run
+      the full blackbox suite to confirm that all existing data and functionality
+      are preserved under the candidate plugin.
   EOF
 
   matrix {
@@ -69,10 +77,10 @@ scenario "plugin_upgrade" {
   }
 
   # Deploy a Vault cluster into the Docker network.
-  # Vault is started with a plugin directory sized to hold both the released plugin
-  # and the candidate plugin, so no cluster restart is needed during the upgrade.
+  # Vault starts with its builtin released plugin — this is the baseline state
+  # we test against in Phase 1 before upgrading to the candidate plugin.
   step "create_vault_cluster" {
-    description = "Deploy a Vault cluster configured to support in-place plugin upgrades."
+    description = "Deploy a Vault cluster running the builtin released plugin."
     module     = module.vault_cluster
     depends_on = [step.create_network]
 
@@ -88,32 +96,74 @@ scenario "plugin_upgrade" {
     }
   }
 
-  # TODO: Add step "install_released_plugin".
-  # Copy the released plugin binary (provided by CI from Artifactory) into Vault's
-  # plugin directory, register it with `vault plugin register`, and enable the LDAP
-  # secrets engine mount using that released version.
-
-  # TODO: Add step "validate_released_plugin".
-  # Configure the released plugin (connection config, static role, dynamic role) and
-  # run the blackbox test suite to confirm the released version is healthy before
-  # attempting an upgrade. This step also seeds plugin state (roles, credentials,
-  # leases) that must survive intact. Fail immediately if baseline validation fails.
-
-  # TODO: Add step "upgrade_to_candidate_plugin".
-  # Copy the candidate plugin binary (built by CI from this branch) into Vault's
-  # plugin directory, re-register it under the same plugin name with the new SHA256
-  # sum, and call `vault plugin reload` to hot-swap the running plugin without
-  # restarting Vault or disturbing existing mount data.
-
-  # Run the full blackbox test suite against the cluster after the candidate plugin
-  # has been installed. Verifies that existing configuration, roles, leases, and
-  # credentials created by the released plugin are all preserved and still functional,
-  # and that new operations complete successfully. Any failure is a regression.
-  step "run_blackbox_system_tests" {
-    description = "Run the blackbox test suite against the upgraded plugin to detect regressions."
+  # Phase 1 — Baseline: run the blackbox suite against the builtin released plugin.
+  # This confirms the starting state is healthy and creates real plugin data
+  # (mounts, roles, leases) that must survive the upgrade intact.
+  # If this step fails, the upgrade step is never reached.
+  step "run_baseline_tests" {
+    description = "Run blackbox tests against the builtin released plugin to establish a healthy baseline."
     module     = module.run_test
     depends_on = [step.setup_ldap, step.create_vault_cluster]
-    # TODO: update depends_on to include step.upgrade_to_candidate_plugin once that step exists.
+
+    variables {
+      vault_address      = step.create_vault_cluster.vault_address
+      vault_token        = step.create_vault_cluster.vault_token
+      vault_cluster_name = "${var.vault_cluster_name}-${matrix.vault_version}"
+      repo_root          = abspath("${path.root}/..")
+      test_package       = "./blackbox"
+      test_timeout       = "5m"
+      ldap_url_private   = step.setup_ldap.ldap_url
+      ldap_url_public    = step.setup_ldap.ldap_url_public
+      ldap_bind_dn       = step.setup_ldap.ldap_bind_dn
+      ldap_bind_pass     = step.setup_ldap.ldap_bind_pass
+      ldap_username      = "enos"
+      ldap_admin_pw      = step.setup_ldap.ldap_bind_pass
+    }
+  }
+
+  # Copy the candidate plugin binary into a per-variant host directory so the
+  # upgrade step can docker cp it into the running container. Runs in parallel
+  # with run_baseline_tests since it only touches the host filesystem.
+  step "stage_candidate_plugin" {
+    description = "Copy the candidate plugin binary to the host staging directory."
+    module      = module.stage_candidate_plugin
+
+    variables {
+      plugin_binary_path = var.plugin_binary_path
+      plugin_name        = "vault-plugin-secrets-openldap"
+      # Per-variant directory prevents parallel matrix runs from clobbering each other.
+      plugin_dir = abspath("${path.root}/.enos/plugins/${matrix.vault_version}")
+    }
+  }
+
+  # Phase 2 — Upgrade: docker cp the staged binary into the running container,
+  # register it in the Vault plugin catalog with the new SHA256, and reload
+  # the secrets engine mount to hot-swap the plugin in-place. Vault does not
+  # restart; all existing mount data is preserved.
+  step "upgrade_to_candidate_plugin" {
+    description = "Upgrade the running LDAP secrets engine to the candidate plugin."
+    module      = module.upgrade_plugin
+    depends_on  = [step.run_baseline_tests, step.stage_candidate_plugin]
+
+    variables {
+      vault_address        = step.create_vault_cluster.vault_address
+      vault_token          = step.create_vault_cluster.vault_token
+      vault_container_name = "${var.vault_cluster_name}-${matrix.vault_version}-node"
+      # Combine the staging dir and binary name to get the full host path.
+      plugin_binary_path   = "${step.stage_candidate_plugin.plugin_dir}/${step.stage_candidate_plugin.plugin_name}"
+      plugin_name          = "vault-plugin-secrets-openldap"
+      plugin_mount         = "ldap"
+    }
+  }
+
+  # Phase 2 — Verification: re-run the full blackbox suite against the same
+  # Vault cluster now running the candidate plugin. Tests verify that all data
+  # created in Phase 1 (mounts, roles, leases) is still intact and functional,
+  # and that new operations complete successfully. Any failure is a regression.
+  step "run_blackbox_system_tests" {
+    description = "Run blackbox tests against the candidate plugin to detect regressions."
+    module     = module.run_test
+    depends_on = [step.upgrade_to_candidate_plugin]
 
     variables {
       vault_address      = step.create_vault_cluster.vault_address

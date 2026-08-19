@@ -15,3 +15,9 @@ variable "vault_license_path" {
   type        = string
   default     = ""
 }
+
+variable "plugin_binary_path" {
+  description = "Absolute path to the candidate plugin binary built from this branch"
+  type        = string
+  default     = ""
+}

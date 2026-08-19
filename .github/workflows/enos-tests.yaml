@@ -82,6 +82,16 @@ jobs:
           # Smoke-test the socket is up before proceeding.
           docker info
 
+      - name: Build plugin
+        run: |
+          # Build the candidate plugin binary for linux/amd64 (the runner OS/arch).
+          # The binary is placed in a well-known path that is passed to the enos
+          # scenario so it can be staged into the Vault plugin directory.
+          GOOS=linux GOARCH=amd64 go build \
+            -o "${{ github.workspace }}/dist/vault-plugin-secrets-openldap" \
+            ./cmd/vault-plugin-secrets-openldap
+          echo "Built plugin: $(ls -lh ${{ github.workspace }}/dist/vault-plugin-secrets-openldap)"
+
       - name: Prepare scenario dependencies
         run: |
           cd enos
@@ -105,8 +115,10 @@ jobs:
         run: |
           cd enos
           LICENSE_PATH="$(pwd)/support/vault.hclic"
+          PLUGIN_PATH="${{ github.workspace }}/dist/vault-plugin-secrets-openldap"
           export ENOS_VAR_vault_license_path="${LICENSE_PATH}"
-          enos scenario run ldap_poc vault_version:${{ matrix.vault_version }}
+          export ENOS_VAR_plugin_binary_path="${PLUGIN_PATH}"
+          enos scenario run plugin_upgrade vault_version:${{ matrix.vault_version }}
 
       - name: Cleanup on failure
         if: failure()

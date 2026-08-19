@@ -13,3 +13,11 @@ module "vault_cluster" {
 module "run_test" {
   source = "./modules/run_test"
 }
+
+module "stage_candidate_plugin" {
+  source = "./modules/stage_candidate_plugin"
+}
+
+module "upgrade_plugin" {
+  source = "./modules/upgrade_plugin"
+}

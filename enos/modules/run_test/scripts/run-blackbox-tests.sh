@@ -138,22 +138,26 @@ wait_for_vault_container_health() {
   local vault_container="$1"
   local attempt
   local status
-  local health
 
-  log_section "Waiting for container health"
+  # Gate only on the container process being alive. Vault readiness is verified
+  # separately by wait_for_vault_api which polls /v1/sys/health directly.
+  # Waiting for Docker's health=healthy is unreliable under resource contention:
+  # when 4 parallel matrix variants start simultaneously the daemon can delay
+  # healthcheck probes past the start_period, leaving the container stuck in
+  # "starting" indefinitely even though Vault is fully operational.
+  log_section "Waiting for Vault container to be running"
   for attempt in $(seq 1 "$SERVICE_READY_ATTEMPTS"); do
     status=$(container_status "$vault_container")
-    health=$(container_health "$vault_container")
 
-    echo "Attempt $attempt/$SERVICE_READY_ATTEMPTS: Container=$status, Health=$health"
+    echo "Attempt $attempt/$SERVICE_READY_ATTEMPTS: Container=$status"
 
-    if [ "$status" = "running" ] && [ "$health" = "healthy" ]; then
-      echo "Container is healthy!"
+    if [ "$status" = "running" ]; then
+      echo "Container is running."
       return 0
     fi
 
-    if [ "$status" != "running" ]; then
-      echo "ERROR: Container stopped running!"
+    if [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+      echo "ERROR: Container stopped unexpectedly (status: $status)"
       $CONTAINER_CMD logs "$vault_container" 2>&1 | tail -50
       return 1
     fi
@@ -161,7 +165,7 @@ wait_for_vault_container_health() {
     sleep "$SERVICE_READY_SLEEP_SECONDS"
   done
 
-  echo "ERROR: Vault container did not become healthy after $SERVICE_READY_ATTEMPTS attempts"
+  echo "ERROR: Vault container did not reach running state after $SERVICE_READY_ATTEMPTS attempts"
   return 1
 }
 

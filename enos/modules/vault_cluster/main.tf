@@ -67,15 +67,17 @@ resource "docker_container" "vault" {
     external = var.vault_port
   }
 
-  capabilities {
-    add = ["IPC_LOCK"]
-  }
+  # Do NOT request IPC_LOCK. GitHub Actions runners use rootless Podman, which
+  # cannot grant this capability; the container crashes immediately when the
+  # kernel rejects the mlock(2) syscall. VAULT_DISABLE_MLOCK=true makes Vault
+  # skip mlock altogether, which is safe in ephemeral test containers.
 
   env = concat(
     [
       "VAULT_DEV_ROOT_TOKEN_ID=${local.root_token}",
       "VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200",
       "VAULT_ADDR=http://0.0.0.0:8200",
+      "VAULT_DISABLE_MLOCK=true",
       "SKIP_SETCAP=true"
     ],
     (var.vault_license != null && var.vault_license != "" && trimspace(var.vault_license) != "") ? ["VAULT_LICENSE=${var.vault_license}"] : []
@@ -87,9 +89,12 @@ resource "docker_container" "vault" {
   # there by the upgrade_plugin module.
   command = ["server", "-dev", "-dev-root-token-id=${local.root_token}", "-dev-plugin-dir=/vault/plugins"]
 
-  # Health check
+  # Probe the sys/health endpoint directly. Using "vault status" as the check
+  # command is unreliable: it exits non-zero when sealed (exit 2) and may not
+  # be on PATH in all image variants, both of which the kreuzwerker provider
+  # interprets as an unhealthy container.
   healthcheck {
-    test         = ["CMD", "vault", "status"]
+    test         = ["CMD", "sh", "-c", "wget -qO- http://127.0.0.1:8200/v1/sys/health?standbyok=true || exit 1"]
     interval     = "5s"
     timeout      = "3s"
     retries      = 10

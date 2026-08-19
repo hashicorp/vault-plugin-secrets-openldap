@@ -60,26 +60,26 @@ jobs:
 
       - name: Install and configure Podman
         run: |
-          # Install Podman and LDAP utilities
+          # The default apt mirror on ubuntu-latest runners is azure.archive.ubuntu.com
+          # which times out repeatedly before falling back, causing multi-minute hangs.
+          # Switch to the canonical archive mirror first so apt-get update is fast.
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || \
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list
           sudo apt-get update
           sudo apt-get install -y podman ldap-utils
-          
-          # Configure Podman for rootless operation
           podman --version
-          podman info
-          
-          # Enable Docker compatibility socket for Terraform provider
+          ldapsearch --version 2>&1 | head -1
+
+          # Enable the Podman socket so the kreuzwerker Docker Terraform provider
+          # can reach it via the standard DOCKER_HOST env var.
           systemctl --user enable --now podman.socket
           USER_ID="$(id -u)"
-          export DOCKER_HOST="unix:///run/user/${USER_ID}/podman/podman.sock"
           echo "DOCKER_HOST=unix:///run/user/${USER_ID}/podman/podman.sock" >> "$GITHUB_ENV"
-          
-          # Create docker alias for compatibility
-          PODMAN_PATH="$(which podman)"
-          sudo ln -sf "${PODMAN_PATH}" /usr/local/bin/docker
-          
-          # Verify setup
-          docker --version
+
+          # Symlink podman → docker so scripts that shell out to `docker` work.
+          sudo ln -sf "$(which podman)" /usr/local/bin/docker
+
+          # Smoke-test the socket is up before proceeding.
           docker info
 
       - name: Prepare scenario dependencies

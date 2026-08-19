@@ -2,14 +2,15 @@
 set -euo pipefail
 
 # Required environment variables (injected by the upgrade_plugin Terraform module):
-#   VAULT_ADDR         — Vault API address
-#   VAULT_TOKEN        — Vault root token
-#   CONTAINER_NAME     — name of the running Vault Docker container
-#   PLUGIN_BINARY_PATH — host path to the candidate plugin binary
-#   PLUGIN_NAME        — plugin name in the Vault catalog (vault-plugin-secrets-openldap)
-#   PLUGIN_MOUNT       — secrets engine mount path to reload (ldap)
+#   VAULT_ADDR    — Vault API address
+#   VAULT_TOKEN   — Vault root token
+#   CONTAINER_NAME — name of the running Vault Docker container
+#   PLUGIN_DIR    — host directory containing the staged candidate binary
+#   PLUGIN_NAME   — plugin name in the Vault catalog (vault-plugin-secrets-openldap)
+#   PLUGIN_MOUNT  — secrets engine mount path to reload (ldap)
 
 readonly CONTAINER_CMD="docker"
+readonly PLUGIN_BINARY_PATH="${PLUGIN_DIR}/${PLUGIN_NAME}"
 readonly PLUGIN_DEST="/vault/plugins/${PLUGIN_NAME}"
 
 log_section() {

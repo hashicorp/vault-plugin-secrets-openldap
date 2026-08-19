@@ -127,6 +127,8 @@ scenario "plugin_upgrade" {
   step "stage_candidate_plugin" {
     description = "Copy the candidate plugin binary to the host staging directory."
     module      = module.stage_candidate_plugin
+    # Explicit depends_on prevents Enos from scheduling this after upgrade_to_candidate_plugin.
+    depends_on  = [step.create_network]
 
     variables {
       plugin_binary_path = var.plugin_binary_path
@@ -149,9 +151,10 @@ scenario "plugin_upgrade" {
       vault_address        = step.create_vault_cluster.vault_address
       vault_token          = step.create_vault_cluster.vault_token
       vault_container_name = "${var.vault_cluster_name}-${matrix.vault_version}-node"
-      # Combine the staging dir and binary name to get the full host path.
-      plugin_binary_path   = "${step.stage_candidate_plugin.plugin_dir}/${step.stage_candidate_plugin.plugin_name}"
-      plugin_name          = "vault-plugin-secrets-openldap"
+      # Pass dir and name separately — Enos does not allow string interpolation
+      # of step outputs; the script assembles the full path as PLUGIN_DIR/PLUGIN_NAME.
+      plugin_dir           = step.stage_candidate_plugin.plugin_dir
+      plugin_name          = step.stage_candidate_plugin.plugin_name
       plugin_mount         = "ldap"
     }
   }

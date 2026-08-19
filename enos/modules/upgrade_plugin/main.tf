@@ -22,13 +22,13 @@ variable "vault_container_name" {
   type        = string
 }
 
-variable "plugin_binary_path" {
-  description = "Absolute path to the candidate plugin binary on the host"
+variable "plugin_dir" {
+  description = "Host directory containing the staged candidate plugin binary"
   type        = string
 }
 
 variable "plugin_name" {
-  description = "Name of the plugin as registered in the Vault plugin catalog"
+  description = "Name of the plugin binary and its catalog entry"
   type        = string
   default     = "vault-plugin-secrets-openldap"
 }
@@ -48,12 +48,13 @@ variable "plugin_mount" {
 #                   existing leases, roles, and configuration are preserved.
 resource "enos_local_exec" "upgrade" {
   environment = {
-    VAULT_ADDR          = var.vault_address
-    VAULT_TOKEN         = var.vault_token
-    CONTAINER_NAME      = var.vault_container_name
-    PLUGIN_BINARY_PATH  = var.plugin_binary_path
-    PLUGIN_NAME         = var.plugin_name
-    PLUGIN_MOUNT        = var.plugin_mount
+    VAULT_ADDR         = var.vault_address
+    VAULT_TOKEN        = var.vault_token
+    CONTAINER_NAME     = var.vault_container_name
+    # The script assembles the full path as PLUGIN_DIR/PLUGIN_NAME
+    PLUGIN_DIR         = var.plugin_dir
+    PLUGIN_NAME        = var.plugin_name
+    PLUGIN_MOUNT       = var.plugin_mount
   }
 
   inline = ["${path.module}/scripts/upgrade-plugin.sh"]

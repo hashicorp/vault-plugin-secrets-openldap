@@ -37,7 +37,10 @@ scenario "plugin_upgrade" {
     # TODO: Enos does not support dynamic matrix values, so this list must be kept
     # up to date manually. Automation options: a weekly GitHub Actions cron that
     # opens a version-bump PR, or a pre-commit hook that warns when the list is stale.
-    vault_version = ["2.0.0", "1.21.5", "1.20.9", "1.19.9"]
+    # NOTE: Vault 2.x (e.g. 2.0.0) requires a new "Vaultlink" license format
+    # that is incompatible with the 1.x VAULT_LICENSE CI secret. Re-add 2.x
+    # versions once a separate VAULT_LICENSE_V2 secret is provisioned.
+    vault_version = ["1.21.5", "1.20.9", "1.19.9"]
   }
 
   terraform_cli = terraform_cli.default
@@ -54,7 +57,7 @@ scenario "plugin_upgrade" {
       network_name = "${var.docker_network_name}-${matrix.vault_version}"
       # Subnets are statically mapped per version to guarantee no CIDR overlap
       # when running all matrix variants concurrently on the same host.
-      subnet = matrix.vault_version == "2.0.0" ? "172.24.0.0/16" : (matrix.vault_version == "1.21.5" ? "172.25.0.0/16" : (matrix.vault_version == "1.20.9" ? "172.26.0.0/16" : "172.27.0.0/16"))
+      subnet = matrix.vault_version == "1.21.5" ? "172.25.0.0/16" : (matrix.vault_version == "1.20.9" ? "172.26.0.0/16" : "172.27.0.0/16")
     }
   }
 
@@ -71,8 +74,8 @@ scenario "plugin_upgrade" {
       container_name      = "openldap-poc-${matrix.vault_version}"
       ldap_admin_password = "adminpassword"
       # Ports are offset per version to avoid collisions when running in parallel.
-      ldap_port  = matrix.vault_version == "2.0.0" ? 1389 : (matrix.vault_version == "1.21.5" ? 1390 : (matrix.vault_version == "1.20.9" ? 1391 : 1392))
-      ldaps_port = matrix.vault_version == "2.0.0" ? 1636 : (matrix.vault_version == "1.21.5" ? 1637 : (matrix.vault_version == "1.20.9" ? 1638 : 1639))
+      ldap_port  = matrix.vault_version == "1.21.5" ? 1390 : (matrix.vault_version == "1.20.9" ? 1391 : 1392)
+      ldaps_port = matrix.vault_version == "1.21.5" ? 1637 : (matrix.vault_version == "1.20.9" ? 1638 : 1639)
     }
   }
 
@@ -92,7 +95,7 @@ scenario "plugin_upgrade" {
       # License is required for enterprise editions. Supply via var.vault_license_path.
       vault_license = var.vault_license_path != "" ? trimspace(file(abspath(var.vault_license_path))) : ""
       # API ports are offset per version to avoid collisions when running in parallel.
-      vault_port = matrix.vault_version == "2.0.0" ? 8199 : (matrix.vault_version == "1.21.5" ? 8200 : (matrix.vault_version == "1.20.9" ? 8201 : 8202))
+      vault_port = matrix.vault_version == "1.21.5" ? 8200 : (matrix.vault_version == "1.20.9" ? 8201 : 8202)
     }
   }
 

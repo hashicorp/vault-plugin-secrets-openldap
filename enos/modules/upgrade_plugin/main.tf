@@ -33,28 +33,24 @@ variable "plugin_name" {
   default     = "vault-plugin-secrets-openldap"
 }
 
-variable "plugin_mount" {
-  description = "Secrets engine mount path to reload after the upgrade"
-  type        = string
-  default     = "ldap"
-}
-
-# Upgrade the running plugin without restarting Vault or losing mount state:
-#   1. docker cp  — copies the candidate binary into /vault/plugins/ inside
-#                   the running container.
-#   2. vault plugin register — updates the plugin catalog entry with the new
-#                   SHA256 so Vault trusts the new binary.
-#   3. vault plugin reload  — hot-swaps the running plugin process; all
-#                   existing leases, roles, and configuration are preserved.
-resource "enos_local_exec" "upgrade" {
+# Register the candidate plugin in the Vault plugin catalog:
+#   1. Compute the SHA256 of the binary already present at /vault/plugins/
+#      inside the container (written there via the host bind-mount by
+#      stage_candidate_plugin).
+#   2. Call vault plugin register to update the catalog entry's sha256 field
+#      so Vault will trust and load the new binary.
+#
+# No container restart is required. The plugin directory is bind-mounted from
+# the host, so the candidate binary is already on disk inside the container.
+# The Phase-2 blackbox tests enable a fresh ldap/ mount for each run and Vault
+# will load the candidate binary at that point from the updated catalog entry.
+resource "enos_local_exec" "register_plugin" {
   environment = {
-    VAULT_ADDR         = var.vault_address
-    VAULT_TOKEN        = var.vault_token
-    CONTAINER_NAME     = var.vault_container_name
-    # The script assembles the full path as PLUGIN_DIR/PLUGIN_NAME
-    PLUGIN_DIR         = var.plugin_dir
-    PLUGIN_NAME        = var.plugin_name
-    PLUGIN_MOUNT       = var.plugin_mount
+    VAULT_ADDR     = var.vault_address
+    VAULT_TOKEN    = var.vault_token
+    CONTAINER_NAME = var.vault_container_name
+    PLUGIN_DIR     = var.plugin_dir
+    PLUGIN_NAME    = var.plugin_name
   }
 
   inline = ["${path.module}/scripts/upgrade-plugin.sh"]

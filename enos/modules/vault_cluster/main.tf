@@ -13,7 +13,7 @@ variable "network_id" {
 }
 
 variable "cluster_name" {
-  description = "Name of the Vault cluster"
+  description = "Name prefix for the Vault cluster. Used to name the Docker container as <cluster_name>-node."
   type        = string
   default     = "vault"
 }
@@ -42,9 +42,17 @@ variable "vault_port" {
   default     = 8200
 }
 
+variable "plugin_dir" {
+  description = "Host directory to bind-mount into /vault/plugins inside the container. Required for the upgrade_plugin module to inject the candidate binary."
+  type        = string
+  default     = ""
+}
+
 locals {
-  image_name = var.vault_edition == "ent" ? "hashicorp/vault-enterprise:${var.vault_version}-ent" : "hashicorp/vault:${var.vault_version}"
-  root_token = "root-token-for-testing"
+  image_name      = var.vault_edition == "ent" ? "hashicorp/vault-enterprise:${var.vault_version}-ent" : "hashicorp/vault:${var.vault_version}"
+  # Hard-coded dev-mode root token. Intentionally not a secret — this token is
+  # only used in ephemeral test containers and is never exposed outside the host.
+  dev_root_token  = "root-token-for-testing"
 }
 
 # Pull Vault image
@@ -74,7 +82,7 @@ resource "docker_container" "vault" {
 
   env = concat(
     [
-      "VAULT_DEV_ROOT_TOKEN_ID=${local.root_token}",
+      "VAULT_DEV_ROOT_TOKEN_ID=${local.dev_root_token}",
       "VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200",
       "VAULT_ADDR=http://0.0.0.0:8200",
       "VAULT_DISABLE_MLOCK=true",
@@ -83,11 +91,21 @@ resource "docker_container" "vault" {
     (var.vault_license != null && var.vault_license != "" && trimspace(var.vault_license) != "") ? ["VAULT_LICENSE=${var.vault_license}"] : []
   )
 
-  # Run in dev mode for simplicity.
-  # -dev-plugin-dir ensures Vault creates /vault/plugins/ and configures
-  # plugin_directory so that `vault plugin register` trusts binaries placed
-  # there by the upgrade_plugin module.
-  command = ["server", "-dev", "-dev-root-token-id=${local.root_token}", "-dev-plugin-dir=/vault/plugins"]
+  # Run in dev mode so Vault auto-initialises and unseals on startup.
+  # -dev-plugin-dir registers /vault/plugins as the external plugin directory.
+  # This path is bind-mounted from the host staging directory so the
+  # register_candidate_plugin step can inject the new binary without
+  # restarting the container.
+  command = ["server", "-dev", "-dev-root-token-id=${local.dev_root_token}", "-dev-plugin-dir=/vault/plugins"]
+
+  dynamic "volumes" {
+    for_each = var.plugin_dir != "" ? [var.plugin_dir] : []
+    content {
+      host_path      = volumes.value
+      container_path = "/vault/plugins"
+      read_only      = false
+    }
+  }
 
   # Probe the sys/health endpoint directly. Using "vault status" as the check
   # command is unreliable: it exits non-zero when sealed (exit 2) and may not
@@ -125,8 +143,8 @@ output "vault_address" {
 }
 
 output "vault_token" {
-  description = "Vault root token"
-  value       = local.root_token
+  description = "Vault dev-mode root token"
+  value       = local.dev_root_token
   sensitive   = true
 }
 

@@ -28,19 +28,29 @@ variable "plugin_dir" {
   type        = string
 }
 
-# Cross-compile the candidate plugin for linux/arm64 (the architecture of the
-# Vault container image) and write it into the staging directory on the host.
+# Build the candidate plugin for linux/<host-arch> and write it into the
+# staging directory on the host.
 #
-# CGO_ENABLED=0 + GOOS=linux + GOARCH=arm64 produces a statically-linked Linux
-# ELF binary regardless of the host OS. This is required because macOS Mach-O
-# binaries cause an "exec format error" inside the Linux container even when
-# the host and container share the same arm64 ISA.
+# GOOS=linux is always required because the Vault container is a Linux image.
+# GOARCH is derived from the host machine's architecture at build time so the
+# same Enos scenario works on both Apple Silicon (arm64) developer laptops and
+# x86-64 GitHub Actions runners (amd64) without any manual override:
+#
+#   uname -m output → GOARCH
+#   arm64 / aarch64 → arm64
+#   x86_64          → amd64
+#
+# On macOS the host and container share the same ISA (arm64), so no true
+# cross-compilation occurs and the binary runs natively. On Linux/amd64 CI
+# runners the container is also amd64, so again no cross-compilation is needed.
+# CGO_ENABLED=0 produces a fully static binary in both cases.
 resource "enos_local_exec" "build_and_stage" {
   inline = [
     "mkdir -p '${var.plugin_dir}'",
-    "cd '${var.repo_root}' && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 '${var.go_binary}' build -o '${var.plugin_dir}/${var.plugin_name}' ./cmd/${var.plugin_name}/",
-    "chmod +x '${var.plugin_dir}/${var.plugin_name}'",
-    "echo 'Staged candidate plugin (linux/arm64): ${var.plugin_dir}/${var.plugin_name}'"
+    # Derive GOARCH from the host kernel's reported machine type.
+    # arm64/aarch64 → arm64; x86_64 → amd64; anything else falls back to amd64.
+    "HOST_ARCH=$(uname -m); case \"$HOST_ARCH\" in arm64|aarch64) GOARCH=arm64 ;; x86_64) GOARCH=amd64 ;; *) GOARCH=amd64 ;; esac; cd '${var.repo_root}' && CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH '${var.go_binary}' build -o '${var.plugin_dir}/${var.plugin_name}' ./cmd/${var.plugin_name}/ && echo \"Staged candidate plugin (linux/$GOARCH): ${var.plugin_dir}/${var.plugin_name}\"",
+    "chmod +x '${var.plugin_dir}/${var.plugin_name}'"
   ]
 }
 

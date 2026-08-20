@@ -31,7 +31,7 @@ jobs:
           # with the 1.x license stored in VAULT_LICENSE. Remove 2.0.0 from the
           # matrix until a separate VAULT_LICENSE_V2 secret (Vaultlink format) is
           # provisioned and plumbed through. Tracked in: TODO add issue link.
-          echo 'vault-versions=["1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
+          echo 'vault-versions=["2.0.0", "1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
 
   enos-test:
     needs: setup

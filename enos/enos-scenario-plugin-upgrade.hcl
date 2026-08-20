@@ -49,45 +49,20 @@ scenario "plugin_upgrade" {
   terraform     = terraform.default
 
   # ---------------------------------------------------------------------------
-  # Port and subnet allocations
-  #
-  # Each matrix variant is assigned a unique set of ports and a unique subnet
-  # so all four variants can run concurrently on the same host without conflict.
-  #
-  # Mapping (index → vault_version):
-  #   0 → 2.0.0   subnet 172.24.0.0/16  vault_port 8199  ldap_port 1389  ldaps_port 1636
-  #   1 → 1.21.5  subnet 172.25.0.0/16  vault_port 8200  ldap_port 1390  ldaps_port 1637
-  #   2 → 1.20.9  subnet 172.26.0.0/16  vault_port 8201  ldap_port 1391  ldaps_port 1638
-  #   3 → 1.19.9  subnet 172.27.0.0/16  vault_port 8202  ldap_port 1392  ldaps_port 1639
-  # ---------------------------------------------------------------------------
-  locals {
-    subnet     = matrix.vault_version == "2.0.0" ? "172.24.0.0/16" : (matrix.vault_version == "1.21.5" ? "172.25.0.0/16" : (matrix.vault_version == "1.20.9" ? "172.26.0.0/16" : "172.27.0.0/16"))
-    vault_port = matrix.vault_version == "2.0.0" ? 8199 : (matrix.vault_version == "1.21.5" ? 8200 : (matrix.vault_version == "1.20.9" ? 8201 : 8202))
-    ldap_port  = matrix.vault_version == "2.0.0" ? 1389 : (matrix.vault_version == "1.21.5" ? 1390 : (matrix.vault_version == "1.20.9" ? 1391 : 1392))
-    ldaps_port = matrix.vault_version == "2.0.0" ? 1636 : (matrix.vault_version == "1.21.5" ? 1637 : (matrix.vault_version == "1.20.9" ? 1638 : 1639))
-
-    # Per-variant host directory for the staged candidate plugin binary.
-    # Isolating by version prevents parallel matrix runs from clobbering each other.
-    candidate_plugin_dir = abspath("${path.root}/.enos/plugins/${matrix.vault_version}")
-
-    # Per-variant name suffix appended to all Docker resources (network, containers).
-    variant_suffix = matrix.vault_version
-  }
-
-  # ---------------------------------------------------------------------------
   # Step 1 — Create network
   # ---------------------------------------------------------------------------
 
   # Create an isolated Docker bridge network for this scenario variant.
   # Each matrix cell (vault_version) gets its own network and non-overlapping
   # subnet so all variants can run concurrently on the same host without conflict.
+  # The docker_network module derives the unique subnet from vault_version.
   step "create_network" {
     description = "Create an isolated Docker bridge network for this scenario variant."
     module      = module.docker_network
 
     variables {
-      network_name = "${var.docker_network_name}-${local.variant_suffix}"
-      subnet       = local.subnet
+      network_name  = "${var.docker_network_name}-${matrix.vault_version}"
+      vault_version = matrix.vault_version
     }
   }
 
@@ -100,6 +75,7 @@ scenario "plugin_upgrade" {
   # Deploy an OpenLDAP container into the Docker network.
   # Provides the real LDAP directory backend that the secrets engine connects to,
   # so both the released and candidate plugins exercise genuine LDAP operations.
+  # The ldap_container module derives unique host ports from vault_version.
   step "setup_ldap" {
     description = "Deploy an OpenLDAP container as the LDAP backend for the secrets engine."
     module      = module.ldap_container
@@ -107,10 +83,9 @@ scenario "plugin_upgrade" {
 
     variables {
       network_id          = step.create_network.network_id
-      container_name      = "openldap-${local.variant_suffix}"
+      container_name      = "openldap-${matrix.vault_version}"
+      vault_version       = matrix.vault_version
       ldap_admin_password = "adminpassword"
-      ldap_port           = local.ldap_port
-      ldaps_port          = local.ldaps_port
     }
   }
 
@@ -128,7 +103,7 @@ scenario "plugin_upgrade" {
       # Absolute path to go so the enos non-login shell doesn't pick up a
       # stale system Go from /usr/local/go instead of the GVM-managed version.
       go_binary  = var.go_binary
-      plugin_dir = local.candidate_plugin_dir
+      plugin_dir = abspath("${path.root}/.enos/plugins/${matrix.vault_version}")
     }
   }
 
@@ -139,6 +114,7 @@ scenario "plugin_upgrade" {
   # Deploy a Vault cluster into the Docker network.
   # Vault starts with its builtin released plugin — this is the baseline state
   # we test against in Phase 1 before upgrading to the candidate plugin.
+  # The vault_cluster module derives the unique host port from vault_version.
   step "create_vault_cluster" {
     description = "Deploy a Vault cluster running the builtin released plugin."
     module      = module.vault_cluster
@@ -146,15 +122,14 @@ scenario "plugin_upgrade" {
 
     variables {
       network_id    = step.create_network.network_id
-      cluster_name  = "${var.vault_cluster_name}-${local.variant_suffix}"
+      cluster_name  = "${var.vault_cluster_name}-${matrix.vault_version}"
       vault_version = matrix.vault_version
       vault_edition = "ent"
       # License is required for enterprise editions. Supply via var.vault_license_path.
       vault_license = var.vault_license_path != "" ? trimspace(file(abspath(var.vault_license_path))) : ""
-      vault_port    = local.vault_port
       # Bind-mount the per-variant staging directory so the upgrade step can
       # inject the candidate plugin binary without restarting the container.
-      plugin_dir = local.candidate_plugin_dir
+      plugin_dir    = abspath("${path.root}/.enos/plugins/${matrix.vault_version}")
     }
   }
 
@@ -174,7 +149,7 @@ scenario "plugin_upgrade" {
     variables {
       vault_address      = step.create_vault_cluster.vault_address
       vault_token        = step.create_vault_cluster.vault_token
-      vault_cluster_name = "${var.vault_cluster_name}-${local.variant_suffix}"
+      vault_cluster_name = "${var.vault_cluster_name}-${matrix.vault_version}"
       repo_root          = abspath("${path.root}/..")
       test_package       = "./blackbox"
       test_timeout       = var.blackbox_test_timeout
@@ -206,7 +181,7 @@ scenario "plugin_upgrade" {
     variables {
       vault_address        = step.create_vault_cluster.vault_address
       vault_token          = step.create_vault_cluster.vault_token
-      vault_container_name = "${var.vault_cluster_name}-${local.variant_suffix}-node"
+      vault_container_name = "${var.vault_cluster_name}-${matrix.vault_version}-node"
       plugin_dir           = step.stage_candidate_plugin.plugin_dir
       plugin_name          = step.stage_candidate_plugin.plugin_name
     }
@@ -229,7 +204,7 @@ scenario "plugin_upgrade" {
     variables {
       vault_address      = step.create_vault_cluster.vault_address
       vault_token        = step.create_vault_cluster.vault_token
-      vault_cluster_name = "${var.vault_cluster_name}-${local.variant_suffix}"
+      vault_cluster_name = "${var.vault_cluster_name}-${matrix.vault_version}"
       repo_root          = abspath("${path.root}/..")
       test_package       = "./blackbox"
       test_timeout       = var.blackbox_test_timeout

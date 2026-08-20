@@ -12,18 +12,33 @@ variable "network_name" {
   type        = string
 }
 
-variable "subnet" {
-  description = "Subnet for the Docker network"
+variable "vault_version" {
+  description = "Vault version running in this network variant. Used to derive a unique subnet so all matrix variants can run concurrently without IP conflicts."
   type        = string
-  default     = "172.25.0.0/16"
+}
+
+# Derive a unique /16 subnet per supported Vault version so all matrix variants
+# can run concurrently on the same host without Docker network conflicts.
+#
+#   2.0.0  → 172.24.0.0/16
+#   1.21.x → 172.25.0.0/16
+#   1.20.x → 172.26.0.0/16
+#   1.19.x → 172.27.0.0/16  (default)
+locals {
+  subnet = (
+    var.vault_version == "2.0.0"  ? "172.24.0.0/16" :
+    var.vault_version == "1.21.5" ? "172.25.0.0/16" :
+    var.vault_version == "1.20.9" ? "172.26.0.0/16" :
+                                    "172.27.0.0/16"
+  )
 }
 
 resource "docker_network" "main" {
-  name = var.network_name
+  name   = var.network_name
   driver = "bridge"
-  
+
   ipam_config {
-    subnet = var.subnet
+    subnet = local.subnet
   }
 }
 

@@ -12,6 +12,11 @@ variable "network_id" {
   type        = string
 }
 
+variable "vault_version" {
+  description = "Vault version running alongside this LDAP container. Used to derive unique host ports so all matrix variants can run concurrently without conflicts."
+  type        = string
+}
+
 variable "container_name" {
   description = "Name of the LDAP container"
   type        = string
@@ -26,15 +31,37 @@ variable "ldap_admin_password" {
 }
 
 variable "ldap_port" {
-  description = "External LDAP port (must be unique for parallel execution)"
+  description = "Host port for LDAP. Defaults to -1, which causes the module to derive a unique port from vault_version so all matrix variants can run concurrently."
   type        = number
-  default     = 389
+  default     = -1
 }
 
 variable "ldaps_port" {
-  description = "External LDAPS port (must be unique for parallel execution)"
+  description = "Host port for LDAPS. Defaults to -1, which causes the module to derive a unique port from vault_version so all matrix variants can run concurrently."
   type        = number
-  default     = 636
+  default     = -1
+}
+
+# Derive unique host ports per supported Vault version so all matrix variants
+# can run concurrently on the same host without port conflicts.
+#
+#   2.0.0  → ldap 1389  ldaps 1636
+#   1.21.x → ldap 1390  ldaps 1637
+#   1.20.x → ldap 1391  ldaps 1638
+#   1.19.x → ldap 1392  ldaps 1639  (default)
+locals {
+  ldap_port = var.ldap_port != -1 ? var.ldap_port : (
+    var.vault_version == "2.0.0"  ? 1389 :
+    var.vault_version == "1.21.5" ? 1390 :
+    var.vault_version == "1.20.9" ? 1391 :
+                                    1392
+  )
+  ldaps_port = var.ldaps_port != -1 ? var.ldaps_port : (
+    var.vault_version == "2.0.0"  ? 1636 :
+    var.vault_version == "1.21.5" ? 1637 :
+    var.vault_version == "1.20.9" ? 1638 :
+                                    1639
+  )
 }
 
 # Pull OpenLDAP image
@@ -64,12 +91,12 @@ resource "docker_container" "openldap" {
 
   ports {
     internal = 389
-    external = var.ldap_port
+    external = local.ldap_port
   }
 
   ports {
     internal = 636
-    external = var.ldaps_port
+    external = local.ldaps_port
   }
 
   # Use restart=no for test containers so `terraform destroy` can cleanly
@@ -97,7 +124,7 @@ output "ldap_url" {
 
 output "ldap_url_public" {
   description = "LDAP connection URL for host machine (localhost with mapped port)"
-  value       = "ldap://127.0.0.1:${var.ldap_port}"
+  value       = "ldap://127.0.0.1:${local.ldap_port}"
 }
 
 output "ldap_bind_dn" {

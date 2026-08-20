@@ -4,6 +4,9 @@ terraform {
       source  = "kreuzwerker/docker"
       version = "~> 3.0"
     }
+    enos = {
+      source = "registry.terraform.io/hashicorp-forge/enos"
+    }
   }
 }
 
@@ -37,28 +40,52 @@ variable "vault_license" {
 }
 
 variable "vault_port" {
-  description = "Port for Vault API"
+  description = "Host port for the Vault API. Defaults to -1, which causes the module to derive a unique port from vault_version so all matrix variants can run concurrently."
   type        = number
-  default     = 8200
+  default     = -1
 }
 
 variable "plugin_dir" {
-  description = "Host directory to bind-mount into /vault/plugins inside the container. Required for the upgrade_plugin module to inject the candidate binary."
+  description = "Host directory to bind-mount into /vault/plugins inside the container. Must exist on the host before the container starts; this module creates it when non-empty. Required for the upgrade_plugin module to inject the candidate binary; pass an empty staging path for scenarios that only need the directory to exist."
   type        = string
   default     = ""
 }
 
+# Derive a unique host port per supported Vault version so all matrix variants
+# can run concurrently on the same host without port conflicts.
+#
+#   2.0.0  → 8199
+#   1.21.x → 8200
+#   1.20.x → 8201
+#   1.19.x → 8202  (default)
 locals {
-  image_name      = var.vault_edition == "ent" ? "hashicorp/vault-enterprise:${var.vault_version}-ent" : "hashicorp/vault:${var.vault_version}"
+  image_name = var.vault_edition == "ent" ? "hashicorp/vault-enterprise:${var.vault_version}-ent" : "hashicorp/vault:${var.vault_version}"
   # Hard-coded dev-mode root token. Intentionally not a secret — this token is
   # only used in ephemeral test containers and is never exposed outside the host.
-  dev_root_token  = "root-token-for-testing"
+  dev_root_token = "root-token-for-testing"
+  vault_port = var.vault_port != -1 ? var.vault_port : (
+    var.vault_version == "2.0.0"  ? 8199 :
+    var.vault_version == "1.21.5" ? 8200 :
+    var.vault_version == "1.20.9" ? 8201 :
+                                    8202
+  )
 }
 
 # Pull Vault image
 resource "docker_image" "vault" {
   name         = local.image_name
   keep_locally = true
+}
+
+# Ensure the plugin directory exists on the host before the container starts.
+# The kreuzwerker Docker provider bind-mounts host_path directly; if the path
+# does not exist Docker refuses to start the container. In the plugin_upgrade
+# scenario the stage_candidate_plugin module creates this directory first, but
+# in scenarios that do not stage a binary (e.g. ldap_poc) no prior step creates
+# it, so we create it here whenever plugin_dir is set.
+resource "enos_local_exec" "create_plugin_dir" {
+  count  = var.plugin_dir != "" ? 1 : 0
+  inline = ["mkdir -p '${var.plugin_dir}'"]
 }
 
 # Create Vault container
@@ -72,7 +99,7 @@ resource "docker_container" "vault" {
 
   ports {
     internal = 8200
-    external = var.vault_port
+    external = local.vault_port
   }
 
   # Do NOT request IPC_LOCK. GitHub Actions runners use rootless Podman, which
@@ -97,6 +124,8 @@ resource "docker_container" "vault" {
   # register_candidate_plugin step can inject the new binary without
   # restarting the container.
   command = ["server", "-dev", "-dev-root-token-id=${local.dev_root_token}", "-dev-plugin-dir=/vault/plugins"]
+
+  depends_on = [enos_local_exec.create_plugin_dir]
 
   dynamic "volumes" {
     for_each = var.plugin_dir != "" ? [var.plugin_dir] : []
@@ -123,7 +152,8 @@ resource "docker_container" "vault" {
   # remove them without the daemon immediately restarting them.
   restart = "no"
 
-  # Increase shared memory for stability
+  # 128 MiB of shared memory prevents OOM-related crashes observed under
+  # resource contention when four matrix variants run concurrently.
   shm_size = 128
 }
 
@@ -139,7 +169,7 @@ output "container_name" {
 
 output "vault_address" {
   description = "Vault API address (127.0.0.1 for IPv4 compatibility)"
-  value       = "http://127.0.0.1:${var.vault_port}"
+  value       = "http://127.0.0.1:${local.vault_port}"
 }
 
 output "vault_token" {

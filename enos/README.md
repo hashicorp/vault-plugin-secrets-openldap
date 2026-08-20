@@ -2,12 +2,12 @@
 
 This directory contains [Enos](https://github.com/hashicorp/enos) scenarios for
 integration-testing the LDAP secrets engine plugin against a live Vault cluster
-running in Docker on your local machine.
+running in Docker/Podman on your local machine or in CI.
 
 ## Contents
 
 - [`enos-scenario-ldap-poc.hcl`](enos-scenario-ldap-poc.hcl) — Smoke scenario: spins up Vault + OpenLDAP and runs the full blackbox test suite. Use this to verify the plugin works end-to-end on a given Vault version.
-- [`enos-scenario-plugin-upgrade.hcl`](enos-scenario-plugin-upgrade.hcl) — Upgrade scenario: (in progress) will install a released plugin, establish a baseline, upgrade to the candidate plugin from the current branch, and re-run the blackbox tests to catch regressions.
+- [`enos-scenario-plugin-upgrade.hcl`](enos-scenario-plugin-upgrade.hcl) — Upgrade scenario: runs the blackbox suite against the builtin released plugin (Phase 1 baseline), then builds the candidate plugin from the current branch, registers it in the Vault catalog, and re-runs the suite (Phase 2) to catch regressions.
 
 ## Prerequisites
 
@@ -37,6 +37,12 @@ Set the path to your `.hclic` file via the `vault_license_path` variable (see
 [Running a scenario](#running-a-scenario) below). The file is read at plan time
 and injected as an environment variable into the Vault container — it is never
 written to disk inside the scenario workspace.
+
+> **Note on Vault 2.x:** `2.0.0` is included in the matrix but requires a
+> "Vaultlink" license format that is incompatible with the 1.x `VAULT_LICENSE`
+> CI secret. The 2.x variant will fail in CI until a separate `VAULT_LICENSE_V2`
+> secret is provisioned. It can be run locally with a valid 2.x license via
+> `--var vault_license_path=/path/to/vault2.hclic`.
 
 ## Running a scenario
 
@@ -71,14 +77,25 @@ enos scenario run ldap_poc \
 ### `plugin_upgrade` — upgrade regression test
 
 Verifies that the candidate plugin (built from the current branch) does not
-introduce regressions when upgrading from a released version.
+introduce regressions when upgrading from a released version. The scenario runs
+in two phases against the same live Vault cluster:
 
-> **Note:** The install, baseline-validation, and upgrade steps are not yet
-> implemented (see TODO stubs in the scenario file). Running the scenario today
-> exercises environment setup and the post-upgrade blackbox tests only.
+- **Phase 1 — Baseline:** run the full blackbox suite against the builtin
+  released plugin that ships with the Vault image.
+- **Phase 2 — Upgrade:** build the candidate plugin from source, register it in
+  the Vault catalog, then re-run the full suite. Any failure here is a
+  regression introduced by the candidate plugin.
+
+The plugin binary is built for `linux/<host-arch>` at scenario run time by the
+`stage_candidate_plugin` module — no pre-built binary is needed.
 
 ```sh
+# Run against a single Vault version
 enos scenario run plugin_upgrade vault_version:1.21.5 \
+  --var vault_license_path=/path/to/vault.hclic
+
+# Run all four supported versions in parallel
+enos scenario run plugin_upgrade \
   --var vault_license_path=/path/to/vault.hclic
 ```
 
@@ -88,8 +105,7 @@ You can supply variables on the command line with `--var` or via a vars file.
 Copy the example file and edit it for your machine:
 
 ```sh
-cp enos-local.vars.hcl.example enos-local.vars.hcl   # if an example exists
-# or create enos-local.vars.hcl manually:
+# Create enos-local.vars.hcl with your settings:
 cat > enos-local.vars.hcl <<'EOF'
 vault_license_path = "/path/to/vault.hclic"
 EOF
@@ -109,12 +125,12 @@ Both scenarios share the same `vault_version` matrix axis:
 
 | Value | Vault release |
 |-------|--------------|
-| `2.0.0` | Vault 2.0.0 Enterprise |
+| `2.0.0` | Vault 2.0.0 Enterprise (requires 2.x license locally; excluded from CI until `VAULT_LICENSE_V2` secret is provisioned) |
 | `1.21.5` | Vault 1.21.5 Enterprise |
 | `1.20.9` | Vault 1.20.9 Enterprise |
 | `1.19.9` | Vault 1.19.9 Enterprise |
 
-Omit the matrix filter to run all four variants in parallel:
+Omit the matrix filter to run all variants in parallel:
 
 ```sh
 enos scenario run ldap_poc --var vault_license_path=/path/to/vault.hclic
@@ -139,7 +155,7 @@ you interrupt it, clean up manually:
 
 ```sh
 # Destroy a specific variant
-enos scenario destroy ldap_poc vault_version:1.21.5 \
+enos scenario destroy plugin_upgrade vault_version:1.21.5 \
   --var vault_license_path=/path/to/vault.hclic
 
 # Or stop all containers and prune networks directly
@@ -147,6 +163,18 @@ docker ps -aq | xargs -r docker stop
 docker ps -aq | xargs -r docker rm
 docker network prune -f
 ```
+
+## CI
+
+The [`enos-docker-tests`](../.github/workflows/enos-tests.yaml) workflow runs
+the `plugin_upgrade` scenario against all supported Vault versions on every pull
+request and push to `main`. It uses `ubuntu-latest` (Linux/amd64) runners with
+rootless Podman behind a `docker` symlink.
+
+The `stage_candidate_plugin` module detects the host architecture at build time
+(`uname -m`) and sets `GOARCH` accordingly, so the same scenario file works on
+both Apple Silicon developer machines (arm64) and the amd64 CI runners without
+any manual configuration.
 
 ## Troubleshooting
 
@@ -161,18 +189,26 @@ value. List available scenarios with:
 enos scenario list
 ```
 
+**`exec format error` in Vault logs**
+The plugin binary architecture does not match the container's CPU architecture.
+This should not happen with the current `stage_candidate_plugin` module, which
+auto-detects `GOARCH` from `uname -m`. If you see this error, confirm that
+`uname -m` on the host returns `arm64` or `x86_64` and that Go can build for
+that target.
+
 **Vault container exits immediately**
 The Enterprise image requires a valid license. Confirm `vault_license_path`
-points to a non-empty `.hclic` file. Check the container logs:
+points to a non-empty `.hclic` file and that the license format matches the
+Vault major version (1.x license for 1.x images). Check the container logs:
 ```sh
-docker logs $(docker ps -aq --filter name=vault-poc)
+docker logs $(docker ps -aq --filter name=vault-plugin-upgrade)
 ```
 
 **LDAP not ready / ldapsearch timeouts**
 The `osixia/openldap` image can take 10–20 seconds to initialize. The test
 script retries for up to 60 seconds. If it still times out, check:
 ```sh
-docker logs $(docker ps -aq --filter name=openldap-poc)
+docker logs $(docker ps -aq --filter name=openldap)
 ```
 
 **Port already in use**
@@ -186,14 +222,16 @@ lsof -i :8200   # or whichever port is reported
 
 ```
 enos/
-├── enos.hcl                        # Terraform provider config
-├── enos-modules.hcl                # Module registry
-├── enos-variables.hcl              # Shared input variables
-├── enos-scenario-ldap-poc.hcl      # ldap_poc scenario
-├── enos-scenario-plugin-upgrade.hcl # plugin_upgrade scenario
+├── enos.hcl                          # Terraform provider config
+├── enos-modules.hcl                  # Module registry
+├── enos-variables.hcl                # Shared input variables
+├── enos-scenario-ldap-poc.hcl        # ldap_poc scenario
+├── enos-scenario-plugin-upgrade.hcl  # plugin_upgrade scenario
 └── modules/
-    ├── docker_network/             # Creates an isolated Docker bridge network
-    ├── ldap_container/             # Runs an osixia/openldap container
-    ├── vault_cluster/              # Runs a Vault Enterprise dev-mode container
-    └── run_test/                   # Executes the Go blackbox test suite locally
+    ├── docker_network/               # Creates an isolated Docker bridge network
+    ├── ldap_container/               # Runs an osixia/openldap container
+    ├── vault_cluster/                # Runs a Vault Enterprise dev-mode container
+    ├── stage_candidate_plugin/       # Builds the plugin from source and stages it on the host
+    ├── upgrade_plugin/               # Registers the candidate binary in the Vault plugin catalog
+    └── run_test/                     # Executes the Go blackbox test suite locally
 ```

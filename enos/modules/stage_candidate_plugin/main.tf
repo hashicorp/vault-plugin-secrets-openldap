@@ -7,12 +7,12 @@ terraform {
 }
 
 variable "repo_root" {
-  description = "Absolute path to the repository root (the directory containing go.mod). The module cross-compiles the plugin from source for linux/arm64 so the binary is compatible with the Vault container."
+  description = "Absolute path to the repository root (the directory containing go.mod). The module builds the plugin from source for linux/<host-arch> so the binary is compatible with the Vault container on both arm64 developer machines and amd64 CI runners."
   type        = string
 }
 
 variable "go_binary" {
-  description = "Absolute path to the go binary to use for cross-compilation. Defaults to 'go' (relies on PATH). Override when the enos shell does not inherit the correct PATH (e.g. GVM-managed installations)."
+  description = "Absolute path to the go binary used to build the plugin. Defaults to 'go' (resolved via PATH). Override when the enos shell does not inherit the correct PATH (e.g. GVM-managed installations)."
   type        = string
   default     = "go"
 }

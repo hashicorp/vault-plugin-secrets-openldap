@@ -116,7 +116,8 @@ jobs:
           # vault_license_path points to the .hclic file written in the previous step.
           # The stage_candidate_plugin module builds the plugin binary from source
           # at scenario run time, so no pre-built binary path is needed here.
-          export ENOS_VAR_vault_license_path="$(pwd)/support/vault.hclic"
+          ENOS_VAR_vault_license_path="$(pwd)/support/vault.hclic"
+          export ENOS_VAR_vault_license_path
           enos scenario run plugin_upgrade vault_version:${{ matrix.vault_version }}
 
       - name: Dump container logs on failure

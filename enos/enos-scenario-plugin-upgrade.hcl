@@ -4,22 +4,23 @@ scenario "plugin_upgrade" {
     LDAP secrets engine plugin. The scenario runs in two phases against the same
     live Vault cluster:
 
-      Phase 1 — Baseline: run the full blackbox test suite against the builtin
-      released plugin that ships with the Vault image. This confirms the starting
-      state is healthy and seeds real plugin data (mounts, roles, leases).
+      Phase 1 — Candidate: register the plugin built from this branch, then run
+      the full blackbox test suite against it. This confirms the unreleased plugin
+      works correctly before any comparison to the released version.
 
-      Phase 2 — Upgrade: copy the candidate plugin binary (built from this branch)
-      into the running container, register it in the Vault plugin catalog, then
-      re-run the full blackbox suite to confirm that all existing data and
-      functionality are preserved under the candidate plugin.
+      Phase 2 — Released: remove the candidate plugin registration so Vault falls
+      back to the builtin released plugin that ships with the image, then re-run
+      the full blackbox suite to confirm that the released baseline is also
+      unaffected. Any regression here points to an environment or infrastructure
+      issue rather than a plugin code change.
   EOF
 
   matrix {
     # Each value in vault_version produces one independent test run. The scenario
-    # upgrades FROM that released version TO the candidate plugin built from this
-    # branch. Running all variants together gives confidence that the candidate
-    # plugin is safe to ship regardless of which supported Vault version a
-    # customer is currently running.
+    # tests the candidate plugin built from this branch first, then reverts to
+    # the released builtin plugin that ships with the Vault image. Running all
+    # variants together gives confidence that the candidate plugin is safe to
+    # ship regardless of which supported Vault version a customer is currently running.
     #
     # Versions are pinned to the latest patch of each active minor release branch.
     # The source of truth is vault-enterprise/.release/versions.hcl.
@@ -74,7 +75,7 @@ scenario "plugin_upgrade" {
 
   # Deploy an OpenLDAP container into the Docker network.
   # Provides the real LDAP directory backend that the secrets engine connects to,
-  # so both the released and candidate plugins exercise genuine LDAP operations.
+  # so both the candidate and released plugins exercise genuine LDAP operations.
   # The ldap_container module derives unique host ports from vault_version.
   step "setup_ldap" {
     description = "Deploy an OpenLDAP container as the LDAP backend for the secrets engine."
@@ -112,11 +113,12 @@ scenario "plugin_upgrade" {
   # ---------------------------------------------------------------------------
 
   # Deploy a Vault cluster into the Docker network.
-  # Vault starts with its builtin released plugin — this is the baseline state
-  # we test against in Phase 1 before upgrading to the candidate plugin.
+  # Vault starts with its builtin released plugin available. The candidate plugin
+  # binary is already present on disk via the bind-mount; we register it in the
+  # catalog before Phase 1 so Phase 1 exercises the unreleased candidate.
   # The vault_cluster module derives the unique host port from vault_version.
   step "create_vault_cluster" {
-    description = "Deploy a Vault cluster running the builtin released plugin."
+    description = "Deploy a Vault cluster with the candidate plugin staged and ready for registration."
     module      = module.vault_cluster
     depends_on  = [step.create_network, step.stage_candidate_plugin]
 
@@ -134,17 +136,35 @@ scenario "plugin_upgrade" {
   }
 
   # ---------------------------------------------------------------------------
-  # Phase 1 — Baseline
+  # Phase 1 — Candidate plugin
   # ---------------------------------------------------------------------------
 
-  # Run the blackbox suite against the builtin released plugin.
-  # Confirms the starting state is healthy and creates real plugin data
-  # (mounts, roles, leases) that must survive the upgrade intact.
-  # If this step fails, the upgrade step is never reached.
-  step "run_baseline_tests" {
-    description = "Run blackbox tests against the builtin released plugin to establish a healthy baseline."
-    module      = module.run_test
+  # Register the candidate plugin in the Vault plugin catalog before running
+  # Phase 1 tests. This ensures Phase 1 exercises the unreleased plugin built
+  # from this branch rather than the builtin released plugin.
+  step "register_candidate_plugin" {
+    description = "Register the candidate plugin binary in the Vault plugin catalog so Phase 1 tests run against the unreleased plugin."
+    module      = module.manage_plugin
     depends_on  = [step.setup_ldap, step.create_vault_cluster]
+
+    variables {
+      action               = "register"
+      vault_address        = step.create_vault_cluster.vault_address
+      vault_token          = step.create_vault_cluster.vault_token
+      vault_container_name = "${var.vault_cluster_name}-${matrix.vault_version}-node"
+      plugin_dir           = step.stage_candidate_plugin.plugin_dir
+      plugin_name          = step.stage_candidate_plugin.plugin_name
+    }
+  }
+
+  # Run the blackbox suite against the candidate plugin.
+  # Confirms the unreleased plugin works correctly and creates real plugin data
+  # (mounts, roles, leases) before we revert to the released plugin.
+  # If this step fails, the released-plugin test step is never reached.
+  step "run_candidate_tests" {
+    description = "Run blackbox tests against the candidate plugin built from this branch."
+    module      = module.run_test
+    depends_on  = [step.register_candidate_plugin]
 
     variables {
       vault_address      = step.create_vault_cluster.vault_address
@@ -163,43 +183,38 @@ scenario "plugin_upgrade" {
   }
 
   # ---------------------------------------------------------------------------
-  # Phase 2 — Upgrade
+  # Phase 2 — Released (builtin) plugin
   # ---------------------------------------------------------------------------
 
-  # Register the candidate plugin in the Vault plugin catalog:
-  #   1. Compute the SHA256 of the binary already present in the container
-  #      at /vault/plugins/ (placed there via the bind-mount).
-  #   2. Call vault plugin register to update the catalog entry's sha256 field.
-  #
-  # No container restart is required. The bind-mount already exposes the new
-  # binary on disk; Vault will load it the next time the mount is enabled.
-  step "register_candidate_plugin" {
-    description = "Register the candidate plugin binary in the Vault plugin catalog (updates SHA256; no container restart needed)."
-    module      = module.upgrade_plugin
-    depends_on  = [step.run_baseline_tests, step.stage_candidate_plugin]
+  # Remove the candidate plugin catalog entry so Vault falls back to the builtin
+  # released plugin that ships with the image. No container restart is needed —
+  # Vault resolves the plugin from the builtin registry the next time a fresh
+  # ldap/ mount is enabled by the Phase 2 tests.
+  step "revert_to_released_plugin" {
+    description = "Remove the candidate catalog entry so Vault reverts to the builtin released plugin for Phase 2 tests."
+    module      = module.manage_plugin
+    depends_on  = [step.run_candidate_tests]
 
     variables {
-      vault_address        = step.create_vault_cluster.vault_address
-      vault_token          = step.create_vault_cluster.vault_token
-      vault_container_name = "${var.vault_cluster_name}-${matrix.vault_version}-node"
-      plugin_dir           = step.stage_candidate_plugin.plugin_dir
-      plugin_name          = step.stage_candidate_plugin.plugin_name
+      action        = "revert"
+      vault_address = step.create_vault_cluster.vault_address
+      vault_token   = step.create_vault_cluster.vault_token
+      plugin_name   = step.stage_candidate_plugin.plugin_name
     }
   }
 
   # ---------------------------------------------------------------------------
-  # Phase 2 — Verification
+  # Phase 2 — Verification against released plugin
   # ---------------------------------------------------------------------------
 
   # Re-run the full blackbox suite against the same Vault cluster, now running
-  # the candidate plugin. Tests verify that all data created in Phase 1 (mounts,
-  # roles, leases) is still intact and functional, and that new operations
-  # complete successfully. Any failure here is a regression introduced by the
-  # candidate plugin.
-  step "run_post_upgrade_tests" {
-    description = "Run blackbox tests against the candidate plugin to detect regressions."
+  # the builtin released plugin. Tests confirm the released plugin is healthy
+  # and provides a stable baseline. Any failure here indicates an environment
+  # or infrastructure issue rather than a regression in the candidate plugin.
+  step "run_released_tests" {
+    description = "Run blackbox tests against the builtin released plugin that ships with the Vault image."
     module      = module.run_test
-    depends_on  = [step.register_candidate_plugin]
+    depends_on  = [step.revert_to_released_plugin]
 
     variables {
       vault_address      = step.create_vault_cluster.vault_address

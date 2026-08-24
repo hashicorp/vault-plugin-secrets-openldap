@@ -18,6 +18,6 @@ module "stage_candidate_plugin" {
   source = "./modules/stage_candidate_plugin"
 }
 
-module "upgrade_plugin" {
-  source = "./modules/upgrade_plugin"
+module "manage_plugin" {
+  source = "./modules/manage_plugin"
 }

@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# upgrade-plugin.sh — register the candidate plugin in the Vault plugin catalog
+# register-plugin.sh — register the candidate plugin in the Vault plugin catalog
 #
-# Required environment variables (injected by the upgrade_plugin Terraform module):
+# Required environment variables (injected by the manage_plugin Terraform module):
 #   VAULT_ADDR     — Vault API address (e.g. http://127.0.0.1:8200)
 #   VAULT_TOKEN    — Vault root token
 #   CONTAINER_NAME — name of the running Vault Docker container
@@ -63,5 +63,5 @@ echo "Plugin registered successfully (HTTP ${http_status})."
 
 log_section "Registration complete"
 echo "Vault catalog updated with candidate plugin SHA256."
-echo "Phase-2 tests will load the candidate binary from ${PLUGIN_CONTAINER_PATH}"
+echo "Phase-1 tests will load the candidate binary from ${PLUGIN_CONTAINER_PATH}"
 echo "when they next enable the ldap/ mount."

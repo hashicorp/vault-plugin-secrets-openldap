@@ -27,11 +27,16 @@ jobs:
       - name: Set Vault versions
         id: set-versions
         run: |
-          # Vault 2.x uses a new "Vaultlink" license format that is incompatible
-          # with the 1.x license stored in VAULT_LICENSE. Remove 2.0.0 from the
-          # matrix until a separate VAULT_LICENSE_V2 secret (Vaultlink format) is
-          # provisioned and plumbed through. Tracked in: TODO add issue link.
-          echo 'vault-versions=["2.0.0", "1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
+          # Vault 2.x currently uses the same VAULT_LICENSE secret as 1.x.
+          # 2.0.0 will fail if the secret holds a 1.x license (incompatible
+          # "Vaultlink" format). Once that becomes a problem, fix it by:
+          #   1. Provisioning a VAULT_LICENSE_V2 repository secret (Vaultlink format).
+          #   2. Adding a vault_license_v2_path variable to enos/enos-variables.hcl.
+          #   3. Writing VAULT_LICENSE_V2 to a separate .hclic file in this job
+          #      and passing it via ENOS_VAR_vault_license_v2_path.
+          #   4. Selecting the correct license file in vault_cluster/main.tf based
+          #      on the major version of vault_version.
+          echo 'vault-versions=["2.0.0","1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
 
   enos-test:
     needs: setup
@@ -86,16 +91,6 @@ jobs:
           # Smoke-test the socket is up before proceeding.
           docker info
 
-      - name: Build plugin
-        run: |
-          # Build the candidate plugin binary for linux/amd64 (the runner OS/arch).
-          # The binary is placed in a well-known path that is passed to the enos
-          # scenario so it can be staged into the Vault plugin directory.
-          GOOS=linux GOARCH=amd64 go build \
-            -o "${{ github.workspace }}/dist/vault-plugin-secrets-openldap" \
-            ./cmd/vault-plugin-secrets-openldap
-          echo "Built plugin: $(ls -lh ${{ github.workspace }}/dist/vault-plugin-secrets-openldap)"
-
       - name: Prepare scenario dependencies
         run: |
           cd enos
@@ -118,10 +113,10 @@ jobs:
       - name: Run Enos scenario
         run: |
           cd enos
-          LICENSE_PATH="$(pwd)/support/vault.hclic"
-          PLUGIN_PATH="${{ github.workspace }}/dist/vault-plugin-secrets-openldap"
-          export ENOS_VAR_vault_license_path="${LICENSE_PATH}"
-          export ENOS_VAR_plugin_binary_path="${PLUGIN_PATH}"
+          # vault_license_path points to the .hclic file written in the previous step.
+          # The stage_candidate_plugin module builds the plugin binary from source
+          # at scenario run time, so no pre-built binary path is needed here.
+          export ENOS_VAR_vault_license_path="$(pwd)/support/vault.hclic"
           enos scenario run plugin_upgrade vault_version:${{ matrix.vault_version }}
 
       - name: Dump container logs on failure

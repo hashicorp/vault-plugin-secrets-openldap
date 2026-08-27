@@ -3,16 +3,15 @@ set -euo pipefail
 
 readonly LDAP_BASE_DN="dc=enos,dc=com"
 readonly LDAP_READY_ATTEMPTS=30
-readonly LDAP_READY_SLEEP_SECONDS=2
 readonly SERVICE_READY_ATTEMPTS=60
-readonly SERVICE_READY_SLEEP_SECONDS=2
 readonly VAULT_API_ATTEMPTS=30
-readonly VAULT_API_SLEEP_SECONDS=2
+readonly BACKOFF_BASE_SECONDS=1
+readonly BACKOFF_MAX_SECONDS=30
 readonly CONTAINER_CMD="docker"
 
 # VAULT_CLUSTER_NAME is injected by the run_test module (set to the cluster_name
 # variable) so the filter matches exactly this scenario variant's container.
-readonly VAULT_CONTAINER_FILTER="${VAULT_CLUSTER_NAME:-vault-poc}"
+readonly VAULT_CONTAINER_FILTER="${VAULT_CLUSTER_NAME}"
 
 require_env() {
   local name="$1"
@@ -27,110 +26,74 @@ log_section() {
   echo "=== $1 ==="
 }
 
+# sleep_with_backoff <attempt>
+# Sleeps for min(base * 2^(attempt-1), max) seconds so that early retries are
+# fast and later retries back off gracefully instead of hammering the service.
+sleep_with_backoff() {
+  local attempt="$1"
+  local delay=$(( BACKOFF_BASE_SECONDS * (1 << (attempt - 1)) ))
+  if [ "$delay" -gt "$BACKOFF_MAX_SECONDS" ]; then
+    delay="$BACKOFF_MAX_SECONDS"
+  fi
+  sleep "$delay"
+}
+
 find_container_name() {
   local name_filter="$1"
 
-  $CONTAINER_CMD ps -a --filter "name=$name_filter" --format "{{.Names}}" | head -1
+  "$CONTAINER_CMD" ps -a --filter "name=$name_filter" --format "{{.Names}}" | head -1
 }
 
 container_status() {
   local container_name="$1"
 
-  $CONTAINER_CMD inspect "$container_name" --format='{{.State.Status}}' 2>/dev/null || echo "unknown"
+  "$CONTAINER_CMD" inspect "$container_name" --format='{{.State.Status}}' 2>/dev/null || echo "unknown"
 }
 
 container_health() {
   local container_name="$1"
 
-  $CONTAINER_CMD inspect "$container_name" --format='{{.State.Health.Status}}' 2>/dev/null || echo "none"
+  "$CONTAINER_CMD" inspect "$container_name" --format='{{.State.Health.Status}}' 2>/dev/null || echo "none"
 }
 
 wait_for_ldap() {
   local attempt
+  local ldap_output
 
   for attempt in $(seq 1 "$LDAP_READY_ATTEMPTS"); do
-    if ldapsearch -x -H "$LDAP_URL_PUBLIC" -b "$LDAP_BASE_DN" -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PASS" &>/dev/null; then
+    if ldap_output=$(ldapsearch -x -H "$LDAP_URL_PUBLIC" -b "$LDAP_BASE_DN" -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PASS" 2>&1); then
       echo "LDAP is ready at attempt $attempt"
       return 0
     fi
 
     echo "Waiting for LDAP... (attempt $attempt/$LDAP_READY_ATTEMPTS)"
-    sleep "$LDAP_READY_SLEEP_SECONDS"
+    sleep_with_backoff "$attempt"
   done
 
   echo "ERROR: LDAP did not become ready after $LDAP_READY_ATTEMPTS attempts"
+  echo "Last ldapsearch output:"
+  echo "${ldap_output}"
   return 1
 }
 
 seed_ldap_data() {
-  local tmp_ldif
+  local seed_ldif="${SEED_LDIF}"
 
   log_section "Initializing LDAP organizational units"
   wait_for_ldap
 
   log_section "Creating organizational units and test users"
-  tmp_ldif=$(mktemp)
-
-  cat <<'EOF' > "$tmp_ldif"
-dn: ou=users,dc=enos,dc=com
-objectClass: organizationalUnit
-ou: users
-
-dn: ou=groups,dc=enos,dc=com
-objectClass: organizationalUnit
-ou: groups
-
-dn: uid=enos,ou=users,dc=enos,dc=com
-objectClass: inetOrgPerson
-objectClass: posixAccount
-objectClass: shadowAccount
-uid: enos
-cn: Enos User
-sn: User
-userPassword: password
-uidNumber: 10000
-gidNumber: 10000
-homeDirectory: /home/enos
-
-dn: uid=svc-account-1,ou=users,dc=enos,dc=com
-objectClass: inetOrgPerson
-objectClass: posixAccount
-objectClass: shadowAccount
-uid: svc-account-1
-cn: Service Account 1
-sn: Account
-userPassword: password
-uidNumber: 10001
-gidNumber: 10000
-homeDirectory: /home/svc-account-1
-
-dn: uid=svc-account-2,ou=users,dc=enos,dc=com
-objectClass: inetOrgPerson
-objectClass: posixAccount
-objectClass: shadowAccount
-uid: svc-account-2
-cn: Service Account 2
-sn: Account
-userPassword: password
-uidNumber: 10002
-gidNumber: 10000
-homeDirectory: /home/svc-account-2
-
-dn: uid=svc-delete,ou=users,dc=enos,dc=com
-objectClass: inetOrgPerson
-objectClass: posixAccount
-objectClass: shadowAccount
-uid: svc-delete
-cn: Service Delete Account
-sn: Account
-userPassword: password
-uidNumber: 10003
-gidNumber: 10000
-homeDirectory: /home/svc-delete
-EOF
-
-  ldapadd -x -H "$LDAP_URL_PUBLIC" -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PASS" -f "$tmp_ldif" || true
-  rm -f "$tmp_ldif"
+  # -c (continue) keeps ldapadd running past duplicate entries instead of
+  # aborting at the first "Already exists" error. This is required for Phase 2
+  # where the LDAP container was seeded by Phase 1 and all entries already exist.
+  # However, ldapadd still exits with status 68 (LDAP_ALREADY_EXISTS) when every
+  # entry in the file is a duplicate, so we treat 68 as success.
+  local rc=0
+  ldapadd -c -x -H "$LDAP_URL_PUBLIC" -D "$LDAP_BIND_DN" -w "$LDAP_BIND_PASS" -f "$seed_ldif" || rc=$?
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 68 ]; then
+    echo "ERROR: ldapadd failed with exit status $rc"
+    return "$rc"
+  fi
   echo "LDAP initialization complete"
 }
 
@@ -158,11 +121,11 @@ wait_for_vault_container_health() {
 
     if [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
       echo "ERROR: Container stopped unexpectedly (status: $status)"
-      $CONTAINER_CMD logs "$vault_container" 2>&1 | tail -50
+      "$CONTAINER_CMD" logs "$vault_container" 2>&1 | tail -50
       return 1
     fi
 
-    sleep "$SERVICE_READY_SLEEP_SECONDS"
+    sleep_with_backoff "$attempt"
   done
 
   echo "ERROR: Vault container did not reach running state after $SERVICE_READY_ATTEMPTS attempts"
@@ -180,7 +143,7 @@ wait_for_vault_api() {
     fi
 
     echo "API check attempt $attempt/$VAULT_API_ATTEMPTS..."
-    sleep "$VAULT_API_SLEEP_SECONDS"
+    sleep_with_backoff "$attempt"
   done
 
   echo "ERROR: Vault API did not become ready after $VAULT_API_ATTEMPTS attempts"
@@ -196,6 +159,7 @@ run_blackbox_tests() {
 main() {
   require_env "VAULT_ADDR"
   require_env "VAULT_TOKEN"
+  require_env "VAULT_CLUSTER_NAME"
   require_env "REPO_ROOT"
   require_env "TEST_PACKAGE"
   require_env "TEST_TIMEOUT"
@@ -209,7 +173,7 @@ main() {
   fi
 
   log_section "Container Status"
-  $CONTAINER_CMD ps -a
+  "$CONTAINER_CMD" ps -a
 
   log_section "Finding Vault container (including exited)"
   local vault_container
@@ -221,10 +185,10 @@ main() {
   echo "Found Vault container: $vault_container"
 
   log_section "Vault container logs"
-  $CONTAINER_CMD logs "$vault_container" 2>&1
+  "$CONTAINER_CMD" logs "$vault_container" 2>&1
 
   log_section "Vault container inspection"
-  $CONTAINER_CMD inspect "$vault_container" | jq '.[] | {State: .State, Config: {Env: .Config.Env, Cmd: .Config.Cmd}}'
+  "$CONTAINER_CMD" inspect "$vault_container" | jq '.[] | {State: .State, Config: {Env: .Config.Env, Cmd: .Config.Cmd}}'
 
   if [ "$(container_status "$vault_container")" != "running" ]; then
     echo "ERROR: Container is not running (status: $(container_status "$vault_container"))"

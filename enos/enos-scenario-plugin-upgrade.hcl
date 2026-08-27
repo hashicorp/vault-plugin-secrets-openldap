@@ -171,6 +171,7 @@ scenario "plugin_upgrade" {
       vault_token        = step.create_vault_cluster.vault_token
       vault_cluster_name = "${var.vault_cluster_name}-${matrix.vault_version}"
       repo_root          = abspath("${path.root}/..")
+      seed_ldif          = abspath("${path.root}/modules/run_test/testdata/seed.ldif")
       test_package       = "./blackbox"
       test_timeout       = var.blackbox_test_timeout
       ldap_url_private   = step.setup_ldap.ldap_url
@@ -221,6 +222,7 @@ scenario "plugin_upgrade" {
       vault_token        = step.create_vault_cluster.vault_token
       vault_cluster_name = "${var.vault_cluster_name}-${matrix.vault_version}"
       repo_root          = abspath("${path.root}/..")
+      seed_ldif          = abspath("${path.root}/modules/run_test/testdata/seed.ldif")
       test_package       = "./blackbox"
       test_timeout       = var.blackbox_test_timeout
       ldap_url_private   = step.setup_ldap.ldap_url

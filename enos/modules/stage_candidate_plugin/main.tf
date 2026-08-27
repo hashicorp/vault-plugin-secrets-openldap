@@ -49,8 +49,7 @@ resource "enos_local_exec" "build_and_stage" {
     "mkdir -p '${var.plugin_dir}'",
     # Derive GOARCH from the host kernel's reported machine type.
     # arm64/aarch64 → arm64; x86_64 → amd64; anything else falls back to amd64.
-    "HOST_ARCH=$(uname -m); case \"$HOST_ARCH\" in arm64|aarch64) GOARCH=arm64 ;; x86_64) GOARCH=amd64 ;; *) GOARCH=amd64 ;; esac; cd '${var.repo_root}' && CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH '${var.go_binary}' build -o '${var.plugin_dir}/${var.plugin_name}' ./cmd/${var.plugin_name}/ && echo \"Staged candidate plugin (linux/$GOARCH): ${var.plugin_dir}/${var.plugin_name}\"",
-    "chmod +x '${var.plugin_dir}/${var.plugin_name}'"
+    "HOST_ARCH=$(uname -m); case \"$HOST_ARCH\" in arm64|aarch64) GOARCH=arm64 ;; x86_64) GOARCH=amd64 ;; *) GOARCH=amd64 ;; esac; cd '${var.repo_root}' && CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH '${var.go_binary}' build -o '${var.plugin_dir}/${var.plugin_name}' ./cmd/${var.plugin_name}/ && echo \"Staged candidate plugin (linux/$GOARCH): ${var.plugin_dir}/${var.plugin_name}\""
   ]
 }
 

@@ -34,30 +34,38 @@ log_section() {
 # Step 1 — confirm the external catalog entry currently exists
 # ---------------------------------------------------------------------------
 log_section "Step 1/2 — Confirm external catalog entry exists"
-http_status=$(curl -s -o /dev/null -w "%{http_code}" \
+response_body=$(mktemp)
+http_status=$(curl -s -o "${response_body}" -w "%{http_code}" \
   --header "X-Vault-Token: ${VAULT_TOKEN}" \
   --request GET \
   "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/${PLUGIN_NAME}")
 
 if [ "${http_status}" != "200" ]; then
   echo "WARNING: catalog entry not found (HTTP ${http_status}); nothing to revert."
+  echo "Response: $(cat "${response_body}")"
+  rm -f "${response_body}"
   exit 0
 fi
+rm -f "${response_body}"
 echo "External catalog entry confirmed (HTTP ${http_status})."
 
 # ---------------------------------------------------------------------------
 # Step 2 — delete the external catalog entry to restore the builtin plugin
 # ---------------------------------------------------------------------------
 log_section "Step 2/2 — Remove external catalog entry (restore builtin)"
-http_status=$(curl -s -o /dev/null -w "%{http_code}" \
+response_body=$(mktemp)
+http_status=$(curl -s -o "${response_body}" -w "%{http_code}" \
   --header "X-Vault-Token: ${VAULT_TOKEN}" \
   --request DELETE \
   "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/${PLUGIN_NAME}")
 
 if [ "${http_status}" != "204" ]; then
   echo "ERROR: failed to remove external catalog entry (HTTP ${http_status})"
+  echo "Response: $(cat "${response_body}")"
+  rm -f "${response_body}"
   exit 1
 fi
+rm -f "${response_body}"
 echo "External catalog entry removed (HTTP ${http_status})."
 
 log_section "Revert complete"

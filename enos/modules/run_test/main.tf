@@ -33,6 +33,11 @@ variable "repo_root" {
   type        = string
 }
 
+variable "seed_ldif" {
+  description = "Absolute path to the LDIF file used to seed the LDAP directory before tests run"
+  type        = string
+}
+
 variable "test_timeout" {
   description = "Test timeout"
   type        = string
@@ -91,6 +96,7 @@ resource "enos_local_exec" "test" {
     REPO_ROOT          = var.repo_root
     TEST_PACKAGE       = var.test_package
     TEST_TIMEOUT       = var.test_timeout
+    SEED_LDIF          = var.seed_ldif
   }
 
   inline = ["${path.module}/scripts/run-blackbox-tests.sh"]

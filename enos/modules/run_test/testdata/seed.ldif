@@ -1,0 +1,55 @@
+dn: ou=users,dc=enos,dc=com
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=enos,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=enos,ou=users,dc=enos,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: enos
+cn: Enos User
+sn: User
+userPassword: password
+uidNumber: 10000
+gidNumber: 10000
+homeDirectory: /home/enos
+
+dn: uid=svc-account-1,ou=users,dc=enos,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: svc-account-1
+cn: Service Account 1
+sn: Account
+userPassword: password
+uidNumber: 10001
+gidNumber: 10000
+homeDirectory: /home/svc-account-1
+
+dn: uid=svc-account-2,ou=users,dc=enos,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: svc-account-2
+cn: Service Account 2
+sn: Account
+userPassword: password
+uidNumber: 10002
+gidNumber: 10000
+homeDirectory: /home/svc-account-2
+
+dn: uid=svc-delete,ou=users,dc=enos,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: svc-delete
+cn: Service Delete Account
+sn: Account
+userPassword: password
+uidNumber: 10003
+gidNumber: 10000
+homeDirectory: /home/svc-delete

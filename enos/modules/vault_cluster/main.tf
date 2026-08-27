@@ -51,23 +51,25 @@ variable "plugin_dir" {
   default     = ""
 }
 
-# Derive a unique host port per supported Vault version so all matrix variants
-# can run concurrently on the same host without port conflicts.
+# Derive a unique host port per Vault version so all matrix variants can run
+# concurrently on the same host without port conflicts.
 #
-#   2.0.0  → 8199
-#   1.21.x → 8200
-#   1.20.x → 8201
-#   1.19.x → 8202  (default)
+# Strategy: take the first 4 hex digits of md5(vault_version), parse them as a
+# base-16 integer (0–65535), modulo 1000, then add to base 8100. This gives a
+# stable port in [8100, 8100+999] = [8100, 9099] for any version string without
+# requiring this file to be updated when new versions are added to the matrix.
+#
+# Example derivations (for reference — not hardcoded):
+#   2.0.0  → md5 prefix → some offset → e.g. 8199
+#   1.21.5 → md5 prefix → some offset → e.g. 8247
+#   1.20.9 → md5 prefix → some offset → e.g. 8312
 locals {
   image_name = var.vault_edition == "ent" ? "hashicorp/vault-enterprise:${var.vault_version}-ent" : "hashicorp/vault:${var.vault_version}"
   # Hard-coded dev-mode root token. Intentionally not a secret — this token is
   # only used in ephemeral test containers and is never exposed outside the host.
   dev_root_token = "root-token-for-testing"
   vault_port = var.vault_port != -1 ? var.vault_port : (
-    var.vault_version == "2.0.0"  ? 8199 :
-    var.vault_version == "1.21.5" ? 8200 :
-    var.vault_version == "1.20.9" ? 8201 :
-                                    8202
+    8100 + parseint(substr(md5(var.vault_version), 0, 4), 16) % 1000
   )
 }
 

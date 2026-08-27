@@ -17,20 +17,17 @@ variable "vault_version" {
   type        = string
 }
 
-# Derive a unique /16 subnet per supported Vault version so all matrix variants
-# can run concurrently on the same host without Docker network conflicts.
+# Derive a unique /16 subnet per Vault version so all matrix variants can run
+# concurrently on the same host without Docker network conflicts.
 #
-#   2.0.0  → 172.24.0.0/16
-#   1.21.x → 172.25.0.0/16
-#   1.20.x → 172.26.0.0/16
-#   1.19.x → 172.27.0.0/16  (default)
+# Strategy: take the first 4 hex digits of md5(vault_version), parse them as a
+# base-16 integer (0–65535), modulo 96, then add to second-octet base 20. This
+# gives a stable subnet in 172.[20,115].0.0/16 — safely within RFC 1918
+# 172.16.0.0/12 — for any version string without requiring this file to be
+# updated when new versions are added to the matrix.
 locals {
-  subnet = (
-    var.vault_version == "2.0.0"  ? "172.24.0.0/16" :
-    var.vault_version == "1.21.5" ? "172.25.0.0/16" :
-    var.vault_version == "1.20.9" ? "172.26.0.0/16" :
-                                    "172.27.0.0/16"
-  )
+  _second_octet = 20 + parseint(substr(md5(var.vault_version), 0, 4), 16) % 96
+  subnet        = "172.${local._second_octet}.0.0/16"
 }
 
 resource "docker_network" "main" {

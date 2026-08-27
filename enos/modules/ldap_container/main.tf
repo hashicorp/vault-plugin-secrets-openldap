@@ -36,32 +36,15 @@ variable "ldap_port" {
   default     = -1
 }
 
-variable "ldaps_port" {
-  description = "Host port for LDAPS. Defaults to -1, which causes the module to derive a unique port from vault_version so all matrix variants can run concurrently."
-  type        = number
-  default     = -1
-}
-
-# Derive unique host ports per supported Vault version so all matrix variants
-# can run concurrently on the same host without port conflicts.
+# Derive a unique host port per Vault version so all matrix variants can run
+# concurrently on the same host without port conflicts.
 #
-#   2.0.0  → ldap 1389  ldaps 1636
-#   1.21.x → ldap 1390  ldaps 1637
-#   1.20.x → ldap 1391  ldaps 1638
-#   1.19.x → ldap 1392  ldaps 1639  (default)
+# Strategy: take the first 4 hex digits of md5(vault_version), parse them as a
+# base-16 integer (0–65535), modulo 500, then add to base 1300. This gives a
+# stable port in [1300, 1799] for any version string without requiring this
+# file to be updated when new versions are added to the matrix.
 locals {
-  ldap_port = var.ldap_port != -1 ? var.ldap_port : (
-    var.vault_version == "2.0.0"  ? 1389 :
-    var.vault_version == "1.21.5" ? 1390 :
-    var.vault_version == "1.20.9" ? 1391 :
-                                    1392
-  )
-  ldaps_port = var.ldaps_port != -1 ? var.ldaps_port : (
-    var.vault_version == "2.0.0"  ? 1636 :
-    var.vault_version == "1.21.5" ? 1637 :
-    var.vault_version == "1.20.9" ? 1638 :
-                                    1639
-  )
+  ldap_port = var.ldap_port != -1 ? var.ldap_port : 1300 + parseint(substr(md5(var.vault_version), 0, 4), 16) % 500
 }
 
 # Pull OpenLDAP image
@@ -92,11 +75,6 @@ resource "docker_container" "openldap" {
   ports {
     internal = 389
     external = local.ldap_port
-  }
-
-  ports {
-    internal = 636
-    external = local.ldaps_port
   }
 
   # Use restart=no for test containers so `terraform destroy` can cleanly

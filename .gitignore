@@ -84,7 +84,6 @@ scripts/custom.sh
 *.terraform.lock.hcl
 
 # ldap racf terraform
-seed.ldif
 cleanup.ldif
 
 # Vault Enterprise License (Enos)

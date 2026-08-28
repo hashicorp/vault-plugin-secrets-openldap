@@ -8,7 +8,12 @@ terraform {
 }
 
 variable "network_id" {
-  description = "Docker network ID to attach the container to"
+  description = "ID of the Docker network to attach the container to"
+  type        = string
+}
+
+variable "vault_version" {
+  description = "Vault version running alongside this LDAP container. Used to derive unique host ports so all matrix variants can run concurrently without conflicts."
   type        = string
 }
 
@@ -16,12 +21,6 @@ variable "container_name" {
   description = "Name of the LDAP container"
   type        = string
   default     = "openldap"
-}
-
-variable "ldap_domain" {
-  description = "LDAP domain"
-  type        = string
-  default     = "example.org"
 }
 
 variable "ldap_admin_password" {
@@ -32,15 +31,20 @@ variable "ldap_admin_password" {
 }
 
 variable "ldap_port" {
-  description = "External LDAP port (must be unique for parallel execution)"
+  description = "Host port for LDAP. Defaults to -1, which causes the module to derive a unique port from vault_version so all matrix variants can run concurrently."
   type        = number
-  default     = 389
+  default     = -1
 }
 
-variable "ldaps_port" {
-  description = "External LDAPS port (must be unique for parallel execution)"
-  type        = number
-  default     = 636
+# Derive a unique host port per Vault version so all matrix variants can run
+# concurrently on the same host without port conflicts.
+#
+# Strategy: take the first 4 hex digits of md5(vault_version), parse them as a
+# base-16 integer (0–65535), modulo 500, then add to base 1300. This gives a
+# stable port in [1300, 1799] for any version string without requiring this
+# file to be updated when new versions are added to the matrix.
+locals {
+  ldap_port = var.ldap_port != -1 ? var.ldap_port : 1300 + parseint(substr(md5(var.vault_version), 0, 4), 16) % 500
 }
 
 # Pull OpenLDAP image
@@ -70,17 +74,13 @@ resource "docker_container" "openldap" {
 
   ports {
     internal = 389
-    external = var.ldap_port
+    external = local.ldap_port
   }
 
-  ports {
-    internal = 636
-    external = var.ldaps_port
-  }
+  # Use restart=no for test containers so `terraform destroy` can cleanly
+  # remove them without the daemon immediately restarting them.
+  restart = "no"
 
-  # Keep container running
-  restart = "unless-stopped"
-  
   # Note: Removed healthcheck - osixia/openldap image has issues with Docker healthchecks
   # The test script will wait for LDAP port availability instead
 }
@@ -102,7 +102,7 @@ output "ldap_url" {
 
 output "ldap_url_public" {
   description = "LDAP connection URL for host machine (localhost with mapped port)"
-  value       = "ldap://127.0.0.1:${var.ldap_port}"
+  value       = "ldap://127.0.0.1:${local.ldap_port}"
 }
 
 output "ldap_bind_dn" {

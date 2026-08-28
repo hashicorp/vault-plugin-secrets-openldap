@@ -18,9 +18,12 @@ ${CONTAINER_CMD} run -d \
     --name "${CONTAINER_NAME}" \
     --network "${NETWORK_NAME}" \
     -p "0.0.0.0:${LDAP_PORT}:389" \
-    -e LDAP_ORGANISATION="Example Inc." \
-    -e LDAP_DOMAIN="example.com" \
-    -e LDAP_ADMIN_PASSWORD="adminpassword" \
+    -e LDAP_ORGANISATION="Enos" \
+    -e LDAP_DOMAIN="enos.com" \
+    -e LDAP_ADMIN_PASSWORD="${LDAP_ADMIN_PASSWORD:-adminpassword}" \
+    -e LDAP_RFC2307BIS_SCHEMA=false \
+    -e LDAP_REMOVE_CONFIG_AFTER_SETUP=true \
+    -e LDAP_TLS_VERIFY_CLIENT=never \
     osixia/openldap:1.5.0
 
 # Wait for LDAP to be ready
@@ -28,7 +31,7 @@ echo "Waiting for LDAP to be ready..."
 max_attempts=30
 attempt=0
 while [ $attempt -lt $max_attempts ]; do
-    if ${CONTAINER_CMD} exec "${CONTAINER_NAME}" ldapsearch -x -H ldap://localhost -b "dc=example,dc=com" -D "cn=admin,dc=example,dc=com" -w adminpassword &> /dev/null; then
+    if ${CONTAINER_CMD} exec "${CONTAINER_NAME}" ldapsearch -x -H ldap://localhost -b "dc=enos,dc=com" -D "cn=admin,dc=enos,dc=com" -w "${LDAP_ADMIN_PASSWORD:-adminpassword}" &> /dev/null; then
         echo "LDAP is ready!"
         exit 0
     fi

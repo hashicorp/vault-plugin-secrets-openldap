@@ -27,6 +27,15 @@ jobs:
       - name: Set Vault versions
         id: set-versions
         run: |
+          # Vault 2.x currently uses the same VAULT_LICENSE secret as 1.x.
+          # 2.0.0 will fail if the secret holds a 1.x license (incompatible
+          # "Vaultlink" format). Once that becomes a problem, fix it by:
+          #   1. Provisioning a VAULT_LICENSE_V2 repository secret (Vaultlink format).
+          #   2. Adding a vault_license_v2_path variable to enos/enos-variables.hcl.
+          #   3. Writing VAULT_LICENSE_V2 to a separate .hclic file in this job
+          #      and passing it via ENOS_VAR_vault_license_v2_path.
+          #   4. Selecting the correct license file in vault_cluster/main.tf based
+          #      on the major version of vault_version.
           echo 'vault-versions=["2.0.0","1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
 
   enos-test:
@@ -60,26 +69,26 @@ jobs:
 
       - name: Install and configure Podman
         run: |
-          # Install Podman and LDAP utilities
+          # The default apt mirror on ubuntu-latest runners is azure.archive.ubuntu.com
+          # which times out repeatedly before falling back, causing multi-minute hangs.
+          # Switch to the canonical archive mirror first so apt-get update is fast.
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || \
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list
           sudo apt-get update
           sudo apt-get install -y podman ldap-utils
-          
-          # Configure Podman for rootless operation
           podman --version
-          podman info
-          
-          # Enable Docker compatibility socket for Terraform provider
+          ldapsearch --version 2>&1 | head -1
+
+          # Enable the Podman socket so the kreuzwerker Docker Terraform provider
+          # can reach it via the standard DOCKER_HOST env var.
           systemctl --user enable --now podman.socket
           USER_ID="$(id -u)"
-          export DOCKER_HOST="unix:///run/user/${USER_ID}/podman/podman.sock"
           echo "DOCKER_HOST=unix:///run/user/${USER_ID}/podman/podman.sock" >> "$GITHUB_ENV"
-          
-          # Create docker alias for compatibility
-          PODMAN_PATH="$(which podman)"
-          sudo ln -sf "${PODMAN_PATH}" /usr/local/bin/docker
-          
-          # Verify setup
-          docker --version
+
+          # Symlink podman → docker so scripts that shell out to `docker` work.
+          sudo ln -sf "$(which podman)" /usr/local/bin/docker
+
+          # Smoke-test the socket is up before proceeding.
           docker info
 
       - name: Prepare scenario dependencies
@@ -104,15 +113,31 @@ jobs:
       - name: Run Enos scenario
         run: |
           cd enos
-          LICENSE_PATH="$(pwd)/support/vault.hclic"
-          export ENOS_VAR_vault_license_path="${LICENSE_PATH}"
-          enos scenario run ldap_poc vault_version:${{ matrix.vault_version }}
+          # vault_license_path points to the .hclic file written in the previous step.
+          # The stage_candidate_plugin module builds the plugin binary from source
+          # at scenario run time, so no pre-built binary path is needed here.
+          ENOS_VAR_vault_license_path="$(pwd)/support/vault.hclic"
+          export ENOS_VAR_vault_license_path
+          enos scenario run plugin_upgrade vault_version:${{ matrix.vault_version }}
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          echo "=== Running/exited containers ==="
+          podman ps -a
+          echo ""
+          echo "=== Container logs ==="
+          for cid in $(podman ps -aq); do
+            name=$(podman inspect --format '{{.Name}}' "$cid" 2>/dev/null || echo "$cid")
+            echo "--- logs: ${name} ---"
+            podman logs "$cid" 2>&1 || true
+            echo ""
+          done
 
       - name: Cleanup on failure
         if: failure()
         run: |
           echo "Cleaning up containers and networks..."
-          podman ps -a
           CONTAINER_IDS="$(podman ps -aq)"
           if [ -n "${CONTAINER_IDS}" ]; then
             podman stop "${CONTAINER_IDS}" || true

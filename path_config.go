@@ -40,6 +40,7 @@ func (b *backend) pathConfig() []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.CreateOperation: &framework.PathOperation{
 					Callback: b.configCreateUpdateOperation,
+					Summary:  "Configure the LDAP secrets engine.",
 					DisplayAttrs: &framework.DisplayAttributes{
 						OperationVerb: "configure",
 					},

@@ -72,8 +72,8 @@ jobs:
     if: needs.detect.outputs.relevant == 'true'
     uses: ./.github/workflows/bob-openapi-review.yaml
     with:
-      vault_addr:         "https://cooperative-ride-karen-bingo.trycloudflare.com"
+      vault_addr:         "https://vaccine-universal-earning-earthquake.trycloudflare.com"
       vault_role:         ci-shared
       vault_secret_path:  secret/data/ci/shared/bob
-      vault_jwt_audience: "https://cooperative-ride-karen-bingo.trycloudflare.com"
+      vault_jwt_audience: "https://vaccine-universal-earning-earthquake.trycloudflare.com"
       go_version:         "${{ needs.detect.outputs.go_version_file }}"

@@ -25,13 +25,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 2
 
-      - name: Detect repo layout and Go version file
+      - name: Detect Go version
         id: layout
         run: |
           if [ -f ".go-version" ]; then
-            echo "go_version_file=.go-version" >> "$GITHUB_OUTPUT"
+            echo "go_version_file=$(cat .go-version)" >> "$GITHUB_OUTPUT"
           else
-            echo "go_version_file=stable"      >> "$GITHUB_OUTPUT"
+            echo "go_version_file=stable"             >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check if relevant Go files changed

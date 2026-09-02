@@ -7,6 +7,18 @@ prompt = """
 - Workspace path: {{WORKSPACE_PATH}}
 
 Use the vault-openapi-coverage skill to review this pull request for OpenAPI
-coverage gaps. Use the mcp__github__* tools to read the PR diff and post all
-findings as inline suggestions on the pull request.
+coverage gaps. Use the mcp__github__* tools to read the PR diff and post a
+single pull request review containing all findings as inline comments.
+
+For every finding, post the comment on the exact file and line where the fix
+belongs. Format each comment as a GitHub suggested change so the author can
+apply it with one click:
+
+```suggestion
+<the corrected line(s) here>
+```
+
+Only include lines that actually change. If a finding requires adding new lines,
+use a multi-line suggestion block covering the insertion point. Do not post a
+top-level review summary — use only inline suggestion comments.
 """

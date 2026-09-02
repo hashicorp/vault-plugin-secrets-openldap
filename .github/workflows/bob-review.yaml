@@ -24,9 +24,9 @@ jobs:
         id: layout
         run: |
           if [ -f ".go-version" ]; then
-            echo "go_version_file=.go-version" >> $GITHUB_OUTPUT
+            echo "go_version_file=.go-version" >> "$GITHUB_OUTPUT"
           else
-            echo "go_version_file=stable"      >> $GITHUB_OUTPUT
+            echo "go_version_file=stable"      >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check if relevant Go files changed
@@ -35,8 +35,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Fetch the list of changed files in this PR
-          CHANGED=$(gh pr view ${{ github.event.pull_request.number }} \
-            --repo ${{ github.repository }} \
+          CHANGED=$(gh pr view "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
             --json files --jq '[.files[].path] | .[]')
 
           echo "Changed files:"

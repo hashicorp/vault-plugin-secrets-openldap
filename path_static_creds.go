@@ -31,6 +31,7 @@ func (b *backend) pathStaticCredsCreate() []*framework.Path {
 			Operations: map[logical.Operation]framework.OperationHandler{
 				logical.ReadOperation: &framework.PathOperation{
 					Callback: b.pathStaticCredsRead,
+					Summary:  "Return the current LDAP credentials for a static role.",
 				},
 			},
 			HelpSynopsis:    pathStaticCredsReadHelpSyn,

@@ -100,7 +100,7 @@ jobs:
                 }
               }
             }
-          env:
-            REPOSITORY:          ${{ github.repository }}
-            PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
-            WORKSPACE_PATH:      ${{ github.workspace }}
+          env: |
+            REPOSITORY=${{ github.repository }}
+            PULL_REQUEST_NUMBER=${{ github.event.pull_request.number }}
+            WORKSPACE_PATH=${{ github.workspace }}

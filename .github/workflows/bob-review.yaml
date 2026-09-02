@@ -5,6 +5,11 @@ on:
     paths:
       - '**.go'
 
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
 jobs:
   detect:
     runs-on: ubuntu-latest

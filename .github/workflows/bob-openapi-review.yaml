@@ -89,7 +89,7 @@ jobs:
           cp -r "${{ github.workspace }}/.agents/vault-openapi-coverage/." \
                 ~/.bob/skills/vault-openapi-coverage/
 
-      - name: Configure MCP servers
+      - name: Configure Bob Shell
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -107,6 +107,11 @@ jobs:
             }
           }
           EOF
+          cat > "${{ github.workspace }}/.bob/settings.json" <<'EOF'
+          {
+            "chatMode": "advanced"
+          }
+          EOF
 
       - name: Run Bob Shell
         env:
@@ -116,7 +121,6 @@ jobs:
           WORKSPACE_PATH: ${{ github.workspace }}
         run: |
           bob --accept-license \
-              --chat-mode advanced \
               --hide-intermediary-output \
               --yolo \
               -p "

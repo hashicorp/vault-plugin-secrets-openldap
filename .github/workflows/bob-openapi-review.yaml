@@ -115,11 +115,11 @@ jobs:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           WORKSPACE_PATH: ${{ github.workspace }}
         run: |
-          bob --auth-method api-key \
+          bob --accept-license \
+              --auth-method api-key \
               --chat-mode advanced \
               --hide-intermediary-output \
               --yolo \
-              --accept-license \
               -p "
           - GitHub Repository: ${REPOSITORY}
           - Pull Request Number: ${PULL_REQUEST_NUMBER}

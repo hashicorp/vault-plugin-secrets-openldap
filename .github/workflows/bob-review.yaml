@@ -1,0 +1,71 @@
+name: Bob OpenAPI Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '**.go'
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.check.outputs.relevant }}
+      go_version_file: ${{ steps.layout.outputs.go_version_file }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+
+      - name: Detect repo layout and Go version file
+        id: layout
+        run: |
+          if [ -f ".go-version" ]; then
+            echo "go_version_file=.go-version" >> $GITHUB_OUTPUT
+          else
+            echo "go_version_file=stable"      >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if relevant Go files changed
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Fetch the list of changed files in this PR
+          CHANGED=$(gh pr view ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --json files --jq '[.files[].path] | .[]')
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Determine path patterns based on repo layout
+          # Layout 1: flat (path_*.go / backend.go at root)
+          # Layout 2: plugin subdirectory
+          # Layout 3: builtin/logical/** (monorepo)
+          RELEVANT=false
+          while IFS= read -r f; do
+            case "$f" in
+              path_*.go|backend.go|\
+              plugin/path_*.go|plugin/backend.go|\
+              builtin/logical/*/path_*.go|builtin/logical/*/backend.go)
+                RELEVANT=true
+                break
+                ;;
+            esac
+          done <<< "$CHANGED"
+
+          echo "relevant=$RELEVANT" >> $GITHUB_OUTPUT
+
+  openapi-review:
+    needs: detect
+    if: needs.detect.outputs.relevant == 'true'
+    uses: ./.github/workflows/bob-openapi-review.yaml
+    with:
+      vault_addr:        "https://cooperative-ride-karen-bingo.trycloudflare.com"
+      vault_role:        ci-shared
+      vault_secret_path: secret/data/ci/shared/bob
+      go_version:        ${{ needs.detect.outputs.go_version_file }}

@@ -1,0 +1,106 @@
+name: Bob OpenAPI Review (Reusable)
+on:
+  workflow_call:
+    inputs:
+      vault_addr:
+        description: "Vault server URL (use vars.VAULT_ADDR — not a secret)"
+        required: true
+        type: string
+      vault_role:
+        description: "Vault JWT auth role name"
+        required: false
+        type: string
+        default: ci-shared
+      vault_secret_path:
+        description: "Vault KV path containing BOB_API_KEY"
+        required: false
+        type: string
+        default: secret/data/ci/shared/bob
+      go_version:
+        description: "Go version or path to a .go-version file"
+        required: false
+        type: string
+        default: stable
+      vault_auth_method:
+        description: "Vault auth method: 'jwt' for production, 'token' for local dev testing"
+        required: false
+        type: string
+        default: jwt
+    secrets:
+      VAULT_TOKEN:
+        description: "Vault token — only required when vault_auth_method is 'token' (local dev)"
+        required: false
+
+jobs:
+  openapi-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write        # required for GitHub OIDC JWT → Vault auth
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go_version }}
+
+      - name: Verify compiled Go code
+        run: |
+          go build ./...
+          go vet ./...
+
+      - name: Fetch secrets from Vault (JWT — production)
+        if: inputs.vault_auth_method == 'jwt'
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ inputs.vault_addr }}
+          role: ${{ inputs.vault_role }}
+          method: jwt
+          secrets: |
+            ${{ inputs.vault_secret_path }} BOB_API_KEY | BOB_API_KEY ;
+
+      - name: Fetch secrets from Vault (token — local dev)
+        if: inputs.vault_auth_method == 'token'
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ inputs.vault_addr }}
+          method: token
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            ${{ inputs.vault_secret_path }} BOB_API_KEY | BOB_API_KEY ;
+
+      - name: Install vault-openapi-coverage skill
+        run: |
+          mkdir -p ~/.bob/skills/vault-openapi-coverage
+          cp -r ${{ github.workspace }}/.agents/vault-openapi-coverage/. \
+                ~/.bob/skills/vault-openapi-coverage/
+
+      - name: Run Bob Shell
+        uses: IBM/bob-shell-action@v1
+        with:
+          bobshell_api_key: ${{ env.BOB_API_KEY }}
+          prompt:                   /commands/openapi-review.toml
+          hide_intermediary_output: true
+          max_coins:                15
+          chat_mode:                advanced
+          mcp: |
+            {
+              "mcpServers": {
+                "github": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-github"],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ github.token }}"
+                  }
+                }
+              }
+            }
+          env:
+            REPOSITORY:          ${{ github.repository }}
+            PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+            WORKSPACE_PATH:      ${{ github.workspace }}

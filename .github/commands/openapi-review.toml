@@ -1,0 +1,12 @@
+description = "Reviews a pull request for OpenAPI coverage gaps using the vault-openapi-coverage skill"
+
+prompt = """
+
+- GitHub Repository: {{REPOSITORY}}
+- Pull Request Number: {{PULL_REQUEST_NUMBER}}
+- Workspace path: {{WORKSPACE_PATH}}
+
+Use the vault-openapi-coverage skill to review this pull request for OpenAPI
+coverage gaps. Use the mcp__github__* tools to read the PR diff and post all
+findings as inline suggestions on the pull request.
+"""

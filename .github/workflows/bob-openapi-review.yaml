@@ -116,7 +116,6 @@ jobs:
           WORKSPACE_PATH: ${{ github.workspace }}
         run: |
           bob --accept-license \
-              --auth-method api-key \
               --chat-mode advanced \
               --hide-intermediary-output \
               --yolo \

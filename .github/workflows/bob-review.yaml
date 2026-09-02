@@ -38,10 +38,12 @@ jobs:
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
           # Fetch the list of changed files in this PR
-          CHANGED=$(gh pr view "${{ github.event.pull_request.number }}" \
-            --repo "${{ github.repository }}" \
+          CHANGED=$(gh pr view "$PR_NUMBER" \
+            --repo "$REPO" \
             --json files --jq '[.files[].path] | .[]')
 
           echo "Changed files:"
@@ -73,4 +75,4 @@ jobs:
       vault_addr:        "https://cooperative-ride-karen-bingo.trycloudflare.com"
       vault_role:        ci-shared
       vault_secret_path: secret/data/ci/shared/bob
-      go_version:        ${{ needs.detect.outputs.go_version_file }}
+      go_version:        "${{ needs.detect.outputs.go_version_file }}"

@@ -17,7 +17,7 @@ on:
         type: string
         default: secret/data/ci/shared/bob
       go_version:
-        description: "Go version or path to a .go-version file"
+        description: "Go version string (e.g. '1.26.1') or 'stable'"
         required: false
         type: string
         default: stable
@@ -26,6 +26,11 @@ on:
         required: false
         type: string
         default: jwt
+      vault_jwt_audience:
+        description: "Value for the GitHub OIDC token 'aud' claim sent to Vault (must match the role's bound_audiences)"
+        required: false
+        type: string
+        default: vault
     secrets:
       VAULT_TOKEN:
         description: "Vault token — only required when vault_auth_method is 'token' (local dev)"
@@ -61,6 +66,7 @@ jobs:
           url: ${{ inputs.vault_addr }}
           role: ${{ inputs.vault_role }}
           method: jwt
+          jwtGithubAudience: ${{ inputs.vault_jwt_audience }}
           secrets: |
             ${{ inputs.vault_secret_path }} BOB_API_KEY | BOB_API_KEY ;
 
@@ -84,16 +90,18 @@ jobs:
                 ~/.bob/skills/vault-openapi-coverage/
 
       - name: Configure MCP servers
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "${{ github.workspace }}/.bob"
-          cat > "${{ github.workspace }}/.bob/mcp.json" <<'EOF'
+          cat > "${{ github.workspace }}/.bob/mcp.json" <<EOF
           {
             "mcpServers": {
               "github": {
                 "command": "npx",
                 "args": ["-y", "@modelcontextprotocol/server-github"],
                 "env": {
-                  "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ github.token }}"
+                  "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
                 }
               }
             }

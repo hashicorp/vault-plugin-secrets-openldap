@@ -80,20 +80,8 @@ jobs:
           secrets: |
             ${{ inputs.vault_secret_path }} BOB_API_KEY | BOB_API_KEY ;
 
-      - name: Cache Bob Shell
-        id: cache-bob
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm-global
-          key: bob-shell-${{ runner.os }}-${{ hashFiles('**/bobshell.sh') }}
-          restore-keys: bob-shell-${{ runner.os }}-
-
       - name: Install Bob Shell
-        if: steps.cache-bob.outputs.cache-hit != 'true'
-        run: curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
-
-      - name: Add Bob Shell to PATH
-        run: echo "$HOME/.npm-global/bin" >> "$GITHUB_PATH"
+        run: curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash -s -- --pm npm
 
       - name: Install vault-openapi-coverage skill
         run: |

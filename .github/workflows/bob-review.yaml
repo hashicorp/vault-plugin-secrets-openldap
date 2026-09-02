@@ -58,7 +58,7 @@ jobs:
             esac
           done <<< "$CHANGED"
 
-          echo "relevant=$RELEVANT" >> $GITHUB_OUTPUT
+          echo "relevant=$RELEVANT" >> "$GITHUB_OUTPUT"
 
   openapi-review:
     needs: detect

@@ -109,7 +109,8 @@ jobs:
           EOF
           cat > "${{ github.workspace }}/.bob/settings.json" <<'EOF'
           {
-            "chatMode": "advanced"
+            "chatMode": "advanced",
+            "approvalMode": "auto_edit"
           }
           EOF
 
@@ -121,7 +122,6 @@ jobs:
           WORKSPACE_PATH: ${{ github.workspace }}
         run: |
           bob --accept-license \
-              --hide-intermediary-output \
               --yolo \
               -p "
           - GitHub Repository: ${REPOSITORY}

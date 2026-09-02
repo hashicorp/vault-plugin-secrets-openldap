@@ -74,33 +74,50 @@ jobs:
           secrets: |
             ${{ inputs.vault_secret_path }} BOB_API_KEY | BOB_API_KEY ;
 
+      - name: Install Bob Shell
+        run: curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
+
       - name: Install vault-openapi-coverage skill
         run: |
           mkdir -p ~/.bob/skills/vault-openapi-coverage
-          cp -r ${{ github.workspace }}/.agents/vault-openapi-coverage/. \
+          cp -r "${{ github.workspace }}/.agents/vault-openapi-coverage/." \
                 ~/.bob/skills/vault-openapi-coverage/
 
-      - name: Run Bob Shell
-        uses: IBM/bob-shell-action@v1
-        with:
-          bobshell_api_key: ${{ env.BOB_API_KEY }}
-          prompt:                   /commands/openapi-review.toml
-          hide_intermediary_output: true
-          max_coins:                15
-          chat_mode:                advanced
-          mcp: |
-            {
-              "mcpServers": {
-                "github": {
-                  "command": "npx",
-                  "args": ["-y", "@modelcontextprotocol/server-github"],
-                  "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ github.token }}"
-                  }
+      - name: Configure MCP servers
+        run: |
+          mkdir -p "${{ github.workspace }}/.bob"
+          cat > "${{ github.workspace }}/.bob/mcp.json" <<'EOF'
+          {
+            "mcpServers": {
+              "github": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-github"],
+                "env": {
+                  "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ github.token }}"
                 }
               }
             }
-          env: |
-            REPOSITORY=${{ github.repository }}
-            PULL_REQUEST_NUMBER=${{ github.event.pull_request.number }}
-            WORKSPACE_PATH=${{ github.workspace }}
+          }
+          EOF
+
+      - name: Run Bob Shell
+        env:
+          BOBSHELL_API_KEY: ${{ env.BOB_API_KEY }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          WORKSPACE_PATH: ${{ github.workspace }}
+        run: |
+          bob --auth-method api-key \
+              --chat-mode advanced \
+              --hide-intermediary-output \
+              --yolo \
+              --accept-license \
+              -p "
+          - GitHub Repository: ${REPOSITORY}
+          - Pull Request Number: ${PULL_REQUEST_NUMBER}
+          - Workspace path: ${WORKSPACE_PATH}
+
+          Use the vault-openapi-coverage skill to review this pull request for OpenAPI
+          coverage gaps. Use the mcp__github__* tools to read the PR diff and post all
+          findings as inline suggestions on the pull request.
+          "

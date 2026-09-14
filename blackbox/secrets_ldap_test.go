@@ -58,7 +58,7 @@ func TestLDAP_StaticRoleCreate(t *testing.T) {
 	requireLDAPAvailable(t, 1*time.Minute, 2*time.Second)
 
 	// Enable LDAP secrets engine
-	v.MustEnableSecretsEngine("ldap-create", &api.MountInput{Type: "ldap"})
+	v.MustEnableSecretsEngine("ldap-create", &api.MountInput{Type: "openldap"})
 
 	// Configure LDAP secrets engine with integration server details
 	v.MustWrite("ldap-create/config", map[string]any{
@@ -104,7 +104,7 @@ func TestLDAP_LibrarySetRead(t *testing.T) {
 	serviceAccounts := []string{"svc-account-1", "svc-account-2"}
 
 	// Enable LDAP secrets engine
-	v.MustEnableSecretsEngine("ldap-read", &api.MountInput{Type: "ldap"})
+	v.MustEnableSecretsEngine("ldap-read", &api.MountInput{Type: "openldap"})
 
 	// Configure LDAP secrets engine with integration server details
 	v.MustWrite("ldap-read/config", map[string]any{
@@ -164,7 +164,7 @@ func TestLDAP_LibrarySetDelete(t *testing.T) {
 	serviceAccounts := []string{"svc-delete"}
 
 	// Enable LDAP secrets engine
-	v.MustEnableSecretsEngine("ldap-delete", &api.MountInput{Type: "ldap"})
+	v.MustEnableSecretsEngine("ldap-delete", &api.MountInput{Type: "openldap"})
 
 	// Configure LDAP secrets engine with integration server details
 	v.MustWrite("ldap-delete/config", map[string]any{

@@ -54,7 +54,7 @@ http_status=$(curl -s -o "${response_body}" -w "%{http_code}" \
   --header "X-Vault-Token: ${VAULT_TOKEN}" \
   --request PUT \
   --data "{\"sha256\": \"${PLUGIN_SHA256}\", \"command\": \"${PLUGIN_NAME}\"}" \
-  "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/${PLUGIN_NAME}")
+  "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/openldap")
 
 if [ "${http_status}" != "204" ]; then
   echo "ERROR: plugin catalog registration failed (HTTP ${http_status})"
@@ -68,4 +68,4 @@ echo "Plugin registered successfully (HTTP ${http_status})."
 log_section "Registration complete"
 echo "Vault catalog updated with candidate plugin SHA256."
 echo "Phase-1 tests will load the candidate binary from ${PLUGIN_CONTAINER_PATH}"
-echo "when they next enable the ldap/ mount."
+echo "when they next enable the openldap/ mount."

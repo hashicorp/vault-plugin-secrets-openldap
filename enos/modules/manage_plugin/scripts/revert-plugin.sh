@@ -38,7 +38,7 @@ response_body=$(mktemp)
 http_status=$(curl -s -o "${response_body}" -w "%{http_code}" \
   --header "X-Vault-Token: ${VAULT_TOKEN}" \
   --request GET \
-  "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/${PLUGIN_NAME}")
+  "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/openldap")
 
 if [ "${http_status}" != "200" ]; then
   echo "WARNING: catalog entry not found (HTTP ${http_status}); nothing to revert."
@@ -57,7 +57,7 @@ response_body=$(mktemp)
 http_status=$(curl -s -o "${response_body}" -w "%{http_code}" \
   --header "X-Vault-Token: ${VAULT_TOKEN}" \
   --request DELETE \
-  "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/${PLUGIN_NAME}")
+  "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/openldap")
 
 if [ "${http_status}" != "204" ]; then
   echo "ERROR: failed to remove external catalog entry (HTTP ${http_status})"
@@ -69,4 +69,4 @@ rm -f "${response_body}"
 echo "External catalog entry removed (HTTP ${http_status})."
 
 log_section "Revert complete"
-echo "Vault will now use the builtin released plugin for new ldap/ mounts."
+echo "Vault will now use the builtin released plugin for new openldap/ mounts."

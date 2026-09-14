@@ -55,7 +55,7 @@ type LDAPDomainConfig struct {
 // Deprecated: Use SetupLDAPSecretsEngineWithConfig for isolated domain support
 func setupLDAPSecretsEngine(t *testing.T, v *blackbox.Session, mount string) {
 	// Enable LDAP secrets engine
-	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "ldap"})
+	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "openldap"})
 
 	// Configure using environment variables set by ldap.tf
 	ldapURLPrivate := os.Getenv("LDAP_URL_PRIVATE")
@@ -82,7 +82,7 @@ func SetupLDAPSecretsEngineWithConfig(t *testing.T, v *blackbox.Session, mount s
 	t.Helper()
 
 	// Enable LDAP secrets engine
-	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "ldap"})
+	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "openldap"})
 
 	// Configure using isolated domain config
 	v.MustWrite(mount+"/config", map[string]any{
@@ -478,7 +478,7 @@ cn: %s
 	cmd := exec.Command(
 		"ldapadd",
 		"-x",
-		"-H", config.URL,
+		"-H", config.SetupURL,
 		"-D", config.BindDN,
 		"-w", config.BindPass,
 	)
@@ -513,7 +513,7 @@ member: %s
 	cmd := exec.Command(
 		"ldapmodify",
 		"-x",
-		"-H", config.URL,
+		"-H", config.SetupURL,
 		"-D", config.BindDN,
 		"-w", config.BindPass,
 	)
@@ -548,7 +548,7 @@ member: %s
 	cmd := exec.Command(
 		"ldapmodify",
 		"-x",
-		"-H", config.URL,
+		"-H", config.SetupURL,
 		"-D", config.BindDN,
 		"-w", config.BindPass,
 	)
@@ -573,7 +573,7 @@ func CheckLDAPUserExistsInDomain(t *testing.T, config *LDAPDomainConfig, usernam
 	cmd := exec.Command(
 		"ldapsearch",
 		"-x",
-		"-H", config.URL,
+		"-H", config.SetupURL,
 		"-b", config.UserDN,
 		"-D", config.BindDN,
 		"-w", config.BindPass,

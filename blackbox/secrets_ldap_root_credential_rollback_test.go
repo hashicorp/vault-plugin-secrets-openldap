@@ -61,7 +61,7 @@ func testLDAPRootCredentialRollbackSuccess(t *testing.T, v *blackbox.Session) {
 
 	// Configure LDAP secrets engine with valid config
 	mount := "ldap-rollback-success"
-	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "ldap"})
+	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "openldap"})
 
 	adminDN := fmt.Sprintf("uid=%s,%s", adminUser, ldapConfig.UserDN)
 	v.MustWrite(mount+"/config", map[string]any{
@@ -142,7 +142,7 @@ func testLDAPRootCredentialRollbackFailure(t *testing.T, v *blackbox.Session) {
 
 	// Configure LDAP secrets engine with valid config
 	mount := "ldap-rollback-failure"
-	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "ldap"})
+	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "openldap"})
 
 	adminDN := fmt.Sprintf("uid=%s,%s", adminUser, ldapConfig.UserDN)
 	v.MustWrite(mount+"/config", map[string]any{
@@ -220,7 +220,7 @@ func testLDAPRootCredentialAutomaticRollbackOnFailure(t *testing.T, v *blackbox.
 
 	// Configure LDAP secrets engine with valid config
 	mount := "ldap-auto-rollback"
-	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "ldap"})
+	v.MustEnableSecretsEngine(mount, &api.MountInput{Type: "openldap"})
 
 	adminDN := fmt.Sprintf("uid=%s,%s", adminUser, ldapConfig.UserDN)
 	v.MustWrite(mount+"/config", map[string]any{

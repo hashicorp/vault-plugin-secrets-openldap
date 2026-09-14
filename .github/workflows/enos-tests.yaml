@@ -1,10 +1,13 @@
 name: enos-docker-tests
 
+# Security: This workflow uses the VAULT_LICENSE secret and executes Enos/Terraform
+# code from the repository. To prevent secret exfiltration, it only runs on trusted
+# branches (push events) and manual triggers (workflow_dispatch), NOT on pull_request
+# events which would execute untrusted PR code with access to secrets.
+# 
+# For PR validation: Use the blackbox-tests.yml workflow which doesn't require secrets.
+# For integration testing: Merge to main or a hashigator/* branch, or manually trigger.
 on:
-  pull_request:
-    branches:
-      - main
-      - release/**
   push:
     branches:
       - main

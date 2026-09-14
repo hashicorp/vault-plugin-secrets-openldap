@@ -8,6 +8,9 @@ on:
       - '.github/workflows/blackbox-tests.yml'
       - 'go.mod'
       - 'go.sum'
+      - '*.go'
+      - 'client/**'
+      - 'ldapifc/**'
   push:
     branches:
       - main

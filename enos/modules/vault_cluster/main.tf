@@ -156,7 +156,7 @@ resource "docker_container" "vault" {
 
   # 128 MiB of shared memory prevents OOM-related crashes observed under
   # resource contention when four matrix variants run concurrently.
-  shm_size = 128
+  shm_size = 134217728  # 128 MiB in bytes
 }
 
 output "container_id" {

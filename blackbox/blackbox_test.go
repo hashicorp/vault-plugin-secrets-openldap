@@ -13,6 +13,10 @@ type SystemTest struct {
 	Fn   func(t *testing.T)
 }
 
+// SystemTests registry contains all blackbox tests for the OpenLDAP secrets engine.
+// Tests marked with t.Skip() are intentionally deferred for future implementation.
+// These skipped tests serve as documentation of planned test coverage and will be
+// implemented incrementally as the test infrastructure matures.
 var SystemTests = []SystemTest{
 	{
 		Name: "basic_smoke",
@@ -30,6 +34,7 @@ var SystemTests = []SystemTest{
 		Name: "ldap_static_role_create",
 		Fn:   TestLDAP_StaticRoleCreate,
 	},
+	// Dynamic role tests - implementation pending
 	{
 		Name: "ldap_dynamic_role_audit_sensitive_data",
 		Fn:   TestLDAPDynamicRoleAuditSensitiveData,
@@ -70,6 +75,7 @@ var SystemTests = []SystemTest{
 		Name: "ldap_dynamic_role_validation",
 		Fn:   TestLDAPDynamicRoleValidation,
 	},
+	// Root credential rollback tests - implementation pending
 	{
 		Name: "ldap_root_credential_rollback_workflows",
 		Fn:   TestLDAPRootCredentialRollbackWorkflows,
@@ -80,6 +86,28 @@ var SystemTests = []SystemTest{
 	},
 }
 
+// TestBasicSmoke verifies the blackbox test infrastructure is functional.
+// This is a minimal smoke test that runs in CI without requiring LDAP/Vault infrastructure.
+// Full integration tests with LDAP operations run in the enos-tests workflow.
 func TestBasicSmoke(t *testing.T) {
 	t.Log("vault-plugin-secrets-openldap blackbox smoke test")
+	
+	// Verify test infrastructure is functional
+	if len(SystemTests) == 0 {
+		t.Fatal("SystemTests registry is empty")
+	}
+	
+	// Verify this test is registered
+	found := false
+	for _, test := range SystemTests {
+		if test.Name == "basic_smoke" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("basic_smoke test not found in SystemTests registry")
+	}
+	
+	t.Logf("✅ Blackbox test infrastructure functional (%d tests registered)", len(SystemTests))
 }

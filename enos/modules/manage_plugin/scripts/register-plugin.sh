@@ -53,7 +53,7 @@ response_body=$(mktemp)
 http_status=$(curl -s -o "${response_body}" -w "%{http_code}" \
   --header "X-Vault-Token: ${VAULT_TOKEN}" \
   --request PUT \
-  --data "{\"sha256\": \"${PLUGIN_SHA256}\", \"command\": \"${PLUGIN_NAME}\"}" \
+  --data "{\"sha_256\": \"${PLUGIN_SHA256}\", \"command\": \"${PLUGIN_NAME}\"}" \
   "${VAULT_ADDR}/v1/sys/plugins/catalog/secret/openldap")
 
 if [ "${http_status}" != "204" ]; then

@@ -29,16 +29,15 @@ jobs:
       - name: Set Vault versions
         id: set-versions
         run: |
-          # Vault 2.x currently uses the same VAULT_LICENSE secret as 1.x.
-          # 2.0.0 will fail if the secret holds a 1.x license (incompatible
-          # "Vaultlink" format). Once that becomes a problem, fix it by:
-          #   1. Provisioning a VAULT_LICENSE_V2 repository secret (Vaultlink format).
-          #   2. Adding a vault_license_v2_path variable to enos/enos-variables.hcl.
-          #   3. Writing VAULT_LICENSE_V2 to a separate .hclic file in this job
-          #      and passing it via ENOS_VAR_vault_license_v2_path.
-          #   4. Selecting the correct license file in vault_cluster/main.tf based
+          # Note: Vault 2.0.0 requires a Vaultlink license (not a 1.x license).
+          # Currently testing only 1.x versions with the available 1.x license.
+          # To enable 2.0.0 testing in the future:
+          #   1. Obtain a Vaultlink license and store it in VAULT_LICENSE_V2 secret.
+          #   2. Add a vault_license_v2_path variable to enos/enos-variables.hcl.
+          #   3. Write VAULT_LICENSE_V2 to a separate .hclic file in this job.
+          #   4. Select the correct license file in vault_cluster/main.tf based
           #      on the major version of vault_version.
-          echo 'vault-versions=["2.0.0","1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
+          echo 'vault-versions=["1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
 
   enos-test:
     needs: setup

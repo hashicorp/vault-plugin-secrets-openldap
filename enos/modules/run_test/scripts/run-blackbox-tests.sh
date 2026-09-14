@@ -188,7 +188,7 @@ main() {
   "$CONTAINER_CMD" logs "$vault_container" 2>&1
 
   log_section "Vault container inspection"
-  "$CONTAINER_CMD" inspect "$vault_container" | jq '.[] | {State: .State, Config: {Env: .Config.Env, Cmd: .Config.Cmd}}'
+  "$CONTAINER_CMD" inspect "$vault_container" | jq '.[] | {State: .State, Config: {Env: (.Config.Env | map(if startswith("VAULT_LICENSE=") then "VAULT_LICENSE=<redacted>" else . end)), Cmd: .Config.Cmd}}'
 
   if [ "$(container_status "$vault_container")" != "running" ]; then
     echo "ERROR: Container is not running (status: $(container_status "$vault_container"))"

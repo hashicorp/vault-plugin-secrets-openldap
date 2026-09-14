@@ -139,14 +139,25 @@ enos scenario run ldap_poc --var vault_license_path=/path/to/vault.hclic
 ## Ports used
 
 Each matrix variant binds to a unique set of host ports so all four can run
-concurrently without conflict:
+concurrently without conflict. Ports are derived deterministically from the
+Vault version string using MD5 hashing:
 
-| Vault version | Vault API | LDAP | LDAPS |
-|--------------|-----------|------|-------|
-| `2.0.0` | 8199 | 1389 | 1636 |
-| `1.21.5` | 8200 | 1390 | 1637 |
-| `1.20.9` | 8201 | 1391 | 1638 |
-| `1.19.9` | 8202 | 1392 | 1639 |
+- **Vault API**: `8100 + (md5(version) % 1000)` → range 8100-9099
+- **LDAP**: `1300 + (md5(version) % 500)` → range 1300-1799
+- **LDAPS**: Not exposed (LDAP container uses plain LDAP only)
+
+Example port assignments (actual values depend on version hash):
+
+| Vault version | Vault API (approx) | LDAP (approx) |
+|--------------|-------------------|---------------|
+| `1.21.5` | 8100-9099 range | 1300-1799 range |
+| `1.20.9` | 8100-9099 range | 1300-1799 range |
+| `1.19.9` | 8100-9099 range | 1300-1799 range |
+
+To find the exact ports for a running scenario, check the container port mappings:
+```sh
+docker ps --format 'table {{.Names}}\t{{.Ports}}'
+```
 
 ## Destroying resources
 
@@ -167,9 +178,16 @@ docker network prune -f
 ## CI
 
 The [`enos-docker-tests`](../.github/workflows/enos-tests.yaml) workflow runs
-the `plugin_upgrade` scenario against all supported Vault versions on every pull
-request and push to `main`. It uses `ubuntu-latest` (Linux/amd64) runners with
-rootless Podman behind a `docker` symlink.
+the `plugin_upgrade` scenario against all supported Vault versions on:
+- Push to `main` or `hashigator/**` branches
+- Manual workflow dispatch
+
+**Note**: This workflow does NOT run on pull requests for security reasons, as it
+requires access to the `VAULT_LICENSE` secret. For PR validation, use the
+`blackbox-tests.yml` workflow which runs without secrets.
+
+The workflow uses `ubuntu-latest` (Linux/amd64) runners with rootless Podman
+behind a `docker` symlink.
 
 The `stage_candidate_plugin` module detects the host architecture at build time
 (`uname -m`) and sets `GOARCH` accordingly, so the same scenario file works on

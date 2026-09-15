@@ -91,12 +91,12 @@ var SystemTests = []SystemTest{
 // Full integration tests with LDAP operations run in the enos-tests workflow.
 func TestBasicSmoke(t *testing.T) {
 	t.Log("vault-plugin-secrets-openldap blackbox smoke test")
-	
+
 	// Verify test infrastructure is functional
 	if len(SystemTests) == 0 {
 		t.Fatal("SystemTests registry is empty")
 	}
-	
+
 	// Verify this test is registered
 	found := false
 	for _, test := range SystemTests {
@@ -108,6 +108,6 @@ func TestBasicSmoke(t *testing.T) {
 	if !found {
 		t.Fatal("basic_smoke test not found in SystemTests registry")
 	}
-	
+
 	t.Logf("✅ Blackbox test infrastructure functional (%d tests registered)", len(SystemTests))
 }

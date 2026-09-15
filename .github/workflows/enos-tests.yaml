@@ -1,0 +1,157 @@
+name: enos-docker-tests
+
+# Security: This workflow uses the VAULT_LICENSE secret and executes Enos/Terraform
+# code from the repository. To prevent secret exfiltration, it only runs on trusted
+# branches (push events) and manual triggers (workflow_dispatch), NOT on pull_request
+# events which would execute untrusted PR code with access to secrets.
+# 
+# For PR validation: Use the blackbox-tests.yml workflow which doesn't require secrets.
+# For integration testing: Merge to main or a hashigator/* branch, or manually trigger.
+on:
+  push:
+    branches:
+      - main
+      - 'hashigator/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      vault-versions: ${{ steps.set-versions.outputs.vault-versions }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set Vault versions
+        id: set-versions
+        run: |
+          # Note: Vault 2.0.0 requires a Vaultlink license (not a 1.x license).
+          # Currently testing only 1.x versions with the available 1.x license.
+          # To enable 2.0.0 testing in the future:
+          #   1. Obtain a Vaultlink license and store it in VAULT_LICENSE_V2 secret.
+          #   2. Add a vault_license_v2_path variable to enos/enos-variables.hcl.
+          #   3. Write VAULT_LICENSE_V2 to a separate .hclic file in this job.
+          #   4. Select the correct license file in vault_cluster/main.tf based
+          #      on the major version of vault_version.
+          echo 'vault-versions=["1.21.5","1.20.9","1.19.9"]' >> "$GITHUB_OUTPUT"
+
+  enos-test:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vault_version: ${{ fromJson(needs.setup.outputs.vault-versions) }}
+    name: enos-test (${{ matrix.vault_version }})
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Enos
+        uses: hashicorp/action-setup-enos@v1.53
+        with:
+          version: '0.0.37'
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Install and configure Podman
+        run: |
+          # The default apt mirror on ubuntu-latest runners is azure.archive.ubuntu.com
+          # which times out repeatedly before falling back, causing multi-minute hangs.
+          # Switch to the canonical archive mirror first so apt-get update is fast.
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || \
+          sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list
+          sudo apt-get update
+          sudo apt-get install -y podman ldap-utils
+          podman --version
+          ldapsearch --version 2>&1 | head -1
+
+          # Enable the Podman socket so the kreuzwerker Docker Terraform provider
+          # can reach it via the standard DOCKER_HOST env var.
+          systemctl --user enable --now podman.socket
+          USER_ID="$(id -u)"
+          echo "DOCKER_HOST=unix:///run/user/${USER_ID}/podman/podman.sock" >> "$GITHUB_ENV"
+
+          # Symlink podman → docker so scripts that shell out to `docker` work.
+          sudo ln -sf "$(which podman)" /usr/local/bin/docker
+
+          # Smoke-test the socket is up before proceeding.
+          docker info
+
+      - name: Prepare scenario dependencies
+        run: |
+          cd enos
+          mkdir -p .terraform/plugin-cache
+          terraform init
+
+      - name: Configure Vault license
+        run: |
+          mkdir -p enos/support
+          VAULT_LICENSE="${{ secrets.VAULT_LICENSE }}"
+          if [ -n "${VAULT_LICENSE}" ]; then
+            echo "${VAULT_LICENSE}" > enos/support/vault.hclic
+            echo "License file created"
+          else
+            echo "ERROR: VAULT_LICENSE secret is required for Vault Enterprise"
+            echo "Please configure the VAULT_LICENSE repository secret"
+            exit 1
+          fi
+
+      - name: Run Enos scenario
+        run: |
+          cd enos
+          # vault_license_path points to the .hclic file written in the previous step.
+          # The stage_candidate_plugin module builds the plugin binary from source
+          # at scenario run time, so no pre-built binary path is needed here.
+          ENOS_VAR_vault_license_path="$(pwd)/support/vault.hclic"
+          export ENOS_VAR_vault_license_path
+          enos scenario run plugin_upgrade vault_version:${{ matrix.vault_version }}
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          echo "=== Running/exited containers ==="
+          podman ps -a
+          echo ""
+          echo "=== Container logs ==="
+          for cid in $(podman ps -aq); do
+            name=$(podman inspect --format '{{.Name}}' "$cid" 2>/dev/null || echo "$cid")
+            echo "--- logs: ${name} ---"
+            podman logs "$cid" 2>&1 || true
+            echo ""
+          done
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          echo "Cleaning up containers and networks..."
+          CONTAINER_IDS="$(podman ps -aq)"
+          if [ -n "${CONTAINER_IDS}" ]; then
+            podman stop "${CONTAINER_IDS}" || true
+            podman rm "${CONTAINER_IDS}" || true
+          fi
+          podman network prune -f || true
+
+      - name: Upload debug data
+        if: failure()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: enos-debug-${{ matrix.vault_version }}
+          path: |
+            enos/.enos/
+            /tmp/vault.hclic
+          retention-days: 7

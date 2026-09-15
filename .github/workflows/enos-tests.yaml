@@ -6,7 +6,7 @@ name: enos-docker-tests
 # events which would execute untrusted PR code with access to secrets.
 # 
 # For PR validation: Use the blackbox-tests.yml workflow which doesn't require secrets.
-# For integration testing: Merge to main or a hashigator/* branch, or manually trigger.
+# For integration testing: Merge to main or manually trigger.
 on:
   push:
     branches:

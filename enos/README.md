@@ -179,7 +179,7 @@ docker network prune -f
 
 The [`enos-docker-tests`](../.github/workflows/enos-tests.yaml) workflow runs
 the `plugin_upgrade` scenario against all supported Vault versions on:
-- Push to `main` or `hashigator/**` branches
+- Push to `main` branch
 - Manual workflow dispatch
 
 **Note**: This workflow does NOT run on pull requests for security reasons, as it

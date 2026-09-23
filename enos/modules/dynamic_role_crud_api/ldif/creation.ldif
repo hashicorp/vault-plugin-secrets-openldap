@@ -1,0 +1,7 @@
+dn: uid={{.Username}},ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+uid: {{.Username}}
+cn: {{.Username}}
+sn: {{.Password | utf16le | base64}}
+memberOf: cn=dev,ou=groups,dc=example,dc=com
+userPassword: {{.Password}}
